@@ -37,6 +37,7 @@ import android.widget.Toast;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothIntent;
 import android.bluetooth.obex.BluetoothObexIntent;
+import android.bluetooth.obex.BluetoothOpp;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -68,6 +69,8 @@ import java.util.ArrayList;
 public class BluetoothObexReceiverService extends Service {
    private static final String TAG = "BluetoothObexReceiverService";
    private static final boolean V=false;
+
+   private BluetoothOpp mBluetoothOPP;
 
    /* If Notification is not needed, then set this to true. If the alert dialog for
       authorize needs to be handled through a notification, set this to false
@@ -229,7 +232,6 @@ public class BluetoothObexReceiverService extends Service {
 
          authorizeIntent.putExtra(BluetoothObexIntent.ADDRESS, mAddress);
          authorizeIntent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, filePath);
-         authorizeIntent.putExtra(BluetoothObexIntent.OBJECT_TYPE, mObjectType);
 
          authorizeIntent.setAction(BluetoothObexIntent.AUTHORIZE_ACTION);
          authorizeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -264,20 +266,11 @@ public class BluetoothObexReceiverService extends Service {
          if (V) {
             Log.i(TAG, "handleObexAuthorize - Reject the Transfer - Unsupported File type -- FileName : " + mFileName);
          }
-          Intent rejectIntent = new Intent();
-          rejectIntent.setClass(this, BluetoothObexAuthorizeDialog.class);
-
-          rejectIntent.putExtra(BluetoothObexIntent.ADDRESS, mAddress);
-          rejectIntent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, mFileName);
-          rejectIntent.putExtra(BluetoothObexIntent.OBJECT_TYPE, mObjectType);
-
-          rejectIntent.setAction(BluetoothObexIntent.RX_COMPLETE_ACTION);
-          rejectIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-          startActivity(rejectIntent);
+         mBluetoothOPP = new BluetoothOpp();
+         mBluetoothOPP.obexAuthorizeComplete(mFileName, false, mFileName);
       }
+      return;
    }
-
 
    /* An Obex Object is completely received, Now check again if it is a
       supported file type and do the following:
@@ -369,10 +362,9 @@ public class BluetoothObexReceiverService extends Service {
       }
       if (TextUtils.isEmpty(vCard) == false) {
          VCardManager vManager = new VCardManager(this, vCard);
-         Toast.makeText(this, "Received Contact - "+ vManager.getName(), Toast.LENGTH_SHORT).show();
          Uri uri = vManager.save();
          if (V) {
-            Log.i(TAG, "New Contact Added at : " + uri.toString());
+            Log.i(TAG, "New Contact <" + vManager.getName() + "> is added at : " + uri.toString());
          }
       } else {
          if (V) {
@@ -397,8 +389,9 @@ public class BluetoothObexReceiverService extends Service {
       if (mediaFileType != null) {
          fileType = mediaFileType.fileType;
          mimeType = mediaFileType.mimeType;
-         if ( (mediaFile.isAudioFileType(fileType)) ||
-              (mediaFile.isImageFileType(fileType)) ) {
+         if ( (mediaFile.isImageFileType(fileType)) ||
+              (mediaFile.isAudioFileType(fileType)) ||
+              (mediaFile.isVideoFileType(fileType)) ) {
             /* Invoke Media Scanner connection */
             new MediaScannerNotifier(this, fileName, mimeType);
             handlingComplete = false;
@@ -407,7 +400,7 @@ public class BluetoothObexReceiverService extends Service {
       return handlingComplete;
    }
 
-   /* Get the File Extenstion from the path */
+   /* Get the File Extension from the path */
    private static String getFileExtension(String path) {
       if (path == null) {
          return null;
@@ -487,8 +480,9 @@ public class BluetoothObexReceiverService extends Service {
             if (V) {
                Log.i(TAG, "isSupportedMediaType: mediaFileType "+ mediaFileType.fileType);
             }
-            if ( (mediaFile.isAudioFileType(mediaFileType.fileType)) ||
-                 (mediaFile.isImageFileType(mediaFileType.fileType)) ) {
+            if ( (mediaFile.isImageFileType(mediaFileType.fileType)) ||
+                 (mediaFile.isAudioFileType(mediaFileType.fileType)) ||
+                 (mediaFile.isVideoFileType(mediaFileType.fileType)) ) {
                return true;
             }
          }

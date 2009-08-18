@@ -58,8 +58,7 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
 
         Intent intent = getIntent();
 
-        if (!intent.getAction().equals(BluetoothObexIntent.AUTHORIZE_ACTION)
-         && !intent.getAction().equals(BluetoothObexIntent.RX_COMPLETE_ACTION))
+        if (!intent.getAction().equals(BluetoothObexIntent.AUTHORIZE_ACTION))
         {
             Log.e(TAG,
                   "Error: this activity may be started only with intent " +
@@ -74,15 +73,6 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
         mBluetoothOPP = new BluetoothOpp();
 
         if (mBluetoothOPP != null) {
-            if (intent.getAction().equals(BluetoothObexIntent.RX_COMPLETE_ACTION))
-            {
-                Log.e(TAG,
-                      "Reject: transfer is rejected due to unsupported file type " +
-                      BluetoothObexIntent.RX_COMPLETE_ACTION);
-                mBluetoothOPP.obexAuthorizeComplete(mFileName, false, mFileName);
-                finish();
-                return;
-            }
 
             if ((mAddress != null) && (mFileName != null)) {
                 File f = new File (mFileName);
@@ -111,7 +101,6 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
     private View createView() {
         View view = getLayoutInflater().inflate(R.layout.bluetooth_obex_authorize, null);
         String deviceName = mLocalManager.getLocalDeviceManager().getName(mAddress);
-        //String deviceName = "Bluetooth Device";
         TextView messageView = (TextView) view.findViewById(R.id.message);
         if(mFileDisplayName == null) {
             Log.e(TAG, "Error: mFileDisplayName null >> " + mAddress + " " + mFileDisplayName);
