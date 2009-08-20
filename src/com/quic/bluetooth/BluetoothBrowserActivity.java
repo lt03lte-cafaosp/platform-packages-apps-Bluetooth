@@ -253,14 +253,12 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
                   mProgressDialog.setButton(DialogInterface.BUTTON_POSITIVE,
                                             getText(R.string.cancel_transfer),
                       new DialogInterface.OnClickListener() {
-                          @Override
                           public void onClick(DialogInterface dialog, int whichButton) {
                               onCancelTransfer();
                           }
                       }
                   );
                   mProgressDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                      @Override
                       public void onCancel(DialogInterface dialog) {
                           onCancelTransfer();
                       }
