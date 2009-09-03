@@ -109,6 +109,7 @@ public class MediaFile {
         addFileType("MID", FILE_TYPE_MID, "audio/midi");
         addFileType("XMF", FILE_TYPE_MID, "audio/midi");
         addFileType("RTTTL", FILE_TYPE_MID, "audio/midi");
+        addFileType("MXMF", FILE_TYPE_MID, "audio/mobile-xmf");
         addFileType("SMF", FILE_TYPE_SMF, "audio/sp-midi");
         addFileType("IMY", FILE_TYPE_IMY, "audio/imelody");
 
