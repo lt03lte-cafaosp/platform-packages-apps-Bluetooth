@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
-
+package com.quicinc.bluetooth;
 import android.content.ContentValues;
 import android.provider.MediaStore.Audio;
 import android.provider.MediaStore.Images;
@@ -32,7 +31,7 @@ import java.util.Iterator;
  */
 public class MediaFile {
     // comma separated list of all file extensions supported by the media scanner
-    public static String sFileExtensions;
+    public final static String sFileExtensions;
 
     // Audio file types
     public static final int FILE_TYPE_MP3     = 1;
@@ -42,8 +41,9 @@ public class MediaFile {
     public static final int FILE_TYPE_AWB     = 5;
     public static final int FILE_TYPE_WMA     = 6;
     public static final int FILE_TYPE_OGG     = 7;
+    public static final int FILE_TYPE_QCP     = 8;
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
-    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_OGG;
+    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_QCP;
 
     // MIDI file types
     public static final int FILE_TYPE_MID     = 11;
@@ -77,8 +77,7 @@ public class MediaFile {
     private static final int FIRST_PLAYLIST_FILE_TYPE = FILE_TYPE_M3U;
     private static final int LAST_PLAYLIST_FILE_TYPE = FILE_TYPE_WPL;
 
-    // XXX: public since getFileType() returns a MediaFileType
-    public static class MediaFileType {
+    static class MediaFileType {
 
         int fileType;
         String mimeType;
@@ -95,7 +94,7 @@ public class MediaFile {
             = new HashMap<String, Integer>();
     static void addFileType(String extension, int fileType, String mimeType) {
         sFileTypeMap.put(extension, new MediaFileType(fileType, mimeType));
-        sMimeTypeMap.put(mimeType, new Integer(fileType));
+        sMimeTypeMap.put(mimeType, Integer.valueOf(fileType));
     }
     static {
         addFileType("MP3", FILE_TYPE_MP3, "audio/mpeg");
@@ -104,14 +103,18 @@ public class MediaFile {
         addFileType("AMR", FILE_TYPE_AMR, "audio/amr");
         addFileType("AWB", FILE_TYPE_AWB, "audio/amr-wb");
         addFileType("WMA", FILE_TYPE_WMA, "audio/x-ms-wma");
+        addFileType("QCP", FILE_TYPE_QCP, "audio/qcp");
         addFileType("OGG", FILE_TYPE_OGG, "application/ogg");
+        addFileType("OGA", FILE_TYPE_OGG, "application/ogg");
 
         addFileType("MID", FILE_TYPE_MID, "audio/midi");
+        addFileType("MIDI", FILE_TYPE_MID, "audio/midi");
         addFileType("XMF", FILE_TYPE_MID, "audio/midi");
         addFileType("RTTTL", FILE_TYPE_MID, "audio/midi");
-        addFileType("MXMF", FILE_TYPE_MID, "audio/mobile-xmf");
         addFileType("SMF", FILE_TYPE_SMF, "audio/sp-midi");
         addFileType("IMY", FILE_TYPE_IMY, "audio/imelody");
+        addFileType("RTX", FILE_TYPE_MID, "audio/midi");
+        addFileType("OTA", FILE_TYPE_MID, "audio/midi");
 
         addFileType("MP4", FILE_TYPE_MP4, "video/mp4");
         addFileType("M4V", FILE_TYPE_M4V, "video/mp4");

@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
-import com.quic.bluetooth.R;
+import com.quicinc.bluetooth.R;
 
 import android.app.Service;
 import android.app.Notification;

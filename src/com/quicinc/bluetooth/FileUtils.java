@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import java.io.File;
 

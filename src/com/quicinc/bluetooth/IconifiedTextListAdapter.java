@@ -1,4 +1,4 @@
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 /* $Id: BulletedTextListAdapter.java 57 2007-11-21 18:31:52Z steven $
  *

@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
-import com.quic.bluetooth.R;
+import com.quicinc.bluetooth.R;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -68,7 +68,7 @@ import java.util.ArrayList;
  */
 public class BluetoothObexReceiverService extends Service {
    private static final String TAG = "BluetoothObexReceiverService";
-   private static final boolean V=false;
+   private static final boolean V = false;
 
    private BluetoothOpp mBluetoothOPP;
 
@@ -84,11 +84,12 @@ public class BluetoothObexReceiverService extends Service {
 
    private static final String FILE_TYPE_VCARD     = "text/x-vCard";
    private static final String FILE_TYPE_VCALENDER = "text/x-vcalendar";
+   private static final int MAX_VCARD_SIZE = 1000000;
 
    public Handler mToastHandler = new Handler() {
       @Override
       public void handleMessage(Message msg) {
-         Toast.makeText(BluetoothObexReceiverService.this, "Media File received",
+         Toast.makeText(BluetoothObexReceiverService.this, R.string.opp_media_file_received,
                         Toast.LENGTH_SHORT).show();
       }
    };
@@ -171,7 +172,7 @@ public class BluetoothObexReceiverService extends Service {
    }
 
    /* Handle posting a Notification for user to authorize the Transfer,
-      if the objecttype is one of what is supported
+      if the object type is one of what is supported
       Support Object types: VCard, VCalender, Audio and Picture file
       types supported by Android Media Scanner
    */
@@ -220,7 +221,7 @@ public class BluetoothObexReceiverService extends Service {
             Environment.getExternalStorageDirectory().getAbsolutePath()+ "/" + mFileName;
 
          } else {
-            Toast.makeText(BluetoothObexReceiverService.this, "SD Card does not exist", Toast.LENGTH_LONG).show();
+            Toast.makeText(BluetoothObexReceiverService.this, R.string.no_sdcard_exist, Toast.LENGTH_LONG).show();
             return;
          }
          if (V) {
@@ -272,82 +273,105 @@ public class BluetoothObexReceiverService extends Service {
       return;
    }
 
-   /* An Obex Object is completely received, Now check again if it is a
+   /* An OBEX Object is completely received, Now check again if it is a
       supported file type and do the following:
       vCard: Add the contact into Contact Database.
-      vCalender: Add to Calender.
-      Music/Picture: Invoke Media scanner on the file.
+      vCalender: Add to Calendar.
+      Media: Invoke Media scanner on the file.
    */
    private boolean handleObexObjectReceived(Intent intent) {
       boolean handlingComplete = true;
       String fileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
+      int profile = intent.getIntExtra(BluetoothObexIntent.PROFILE, -1);
 
       if (V) {
-         Log.i(TAG, "handleObexObjectReceived - File Name : -" + fileName + "-");
+         Log.i(TAG, "handleObexObjectReceived - File Name : -" + fileName + "-" + " Profile : " + profile);
       }
+      if ( (fileName != null) && (!TextUtils.isEmpty(fileName)) ) {
 
-      if (fileName != null) {
-         if (! TextUtils.isEmpty(fileName)) {
-            if ( true == isFileVcard(fileName, "") ) {
+        if ( true == isFileVcard(fileName, "") ) {
+           if (V) {
+              Log.i(TAG, "vCard File received : " + fileName);
+           }
+           if (profile == BluetoothObexIntent.PROFILE_OPP) {
                if (V) {
-                  Log.i(TAG, "vCard File received : " + fileName);
+                   Log.i(TAG, "Received BluetoothObexIntent.PROFILE_OPP : " + fileName);
                }
-               addContact(fileName);
-            } else if ( true == isFileVcalender(fileName, "") ) {
+               handlingComplete = addContact(fileName);
+               if (false == handlingComplete) {
+                   Toast.makeText(BluetoothObexReceiverService.this, R.string.opp_vcard_outofmemory,
+                       Toast.LENGTH_LONG).show();
+               }
+           } else if (profile == BluetoothObexIntent.PROFILE_FTP) {
                if (V) {
-                  Log.i(TAG, "vCalender File received : " + fileName);
+                   Log.i(TAG, "Received BluetoothObexIntent.PROFILE_FTP : " + fileName);
                }
-               /* vCal is not supported yet. */
-               handlingComplete = false;
-            } else {
-               /* let handleMediaFile do the type checking ? */
-               if (V) {
-                  Log.i(TAG, "Check for Media File received : " + fileName);
-               }
-               handlingComplete = handleMediaFile(fileName);
-            }
-         }
+           } else {
+               Log.e(TAG, "Error: No OBEX profile specified for received vCard.");
+           }
+        } else if ( true == isFileVcalender(fileName, "") ) {
+           /* vCal is not supported yet. */
+           if (V) {
+              Log.i(TAG, "vCalender File received : " + fileName);
+           }
+           handlingComplete = true;
+        } else {
+           /* Let handleMediaFile check the media file type. */
+           if (V) {
+              Log.i(TAG, "Check for Media File received : " + fileName);
+           }
+           handlingComplete = handleMediaFile(fileName);
+        }
+
       }
       return handlingComplete;
    }
-   /* Invoke addContact will read a vcard file and add the
-   *   information intot he Android Contact database.
+   /* Invoke addContact will read a vCard file and add the
+   *   information into the Android Contact database.
    *
    * @param String The Name of the vCard file
    *
    * @return None.
    */
-   private void addContact(String vCardFileName) {
+   private boolean addContact(String vCardFileName) {
+
       FileInputStream fis = null;
       InputStreamReader isr = null;
       String vCard = "";
-
-      if (vCardFileName == null) {
-         return;
-      }
 
       if (V) {
          Log.i(TAG, "Received new vCard File : " + vCardFileName);
       }
       try {
          File newFile = new File(vCardFileName);
+         int fileSize = (int)newFile.length();
+         if (fileSize > MAX_VCARD_SIZE) {
+             /* Some vCard is too big to have in memory. But it should be rare. */
+             Log.e(TAG, "Received vCard is too big to have in memory. Ignore the entry : " + vCardFileName);
+             newFile.delete();
+              return false;
+         }
          fis = new FileInputStream(newFile);
          if (fis != null) {
             isr = new InputStreamReader(fis);
             Reader in = new BufferedReader(isr);
-            StringBuffer buffer = new StringBuffer();
-            int input;
-            while ((input = in.read()) > -1) {
-               buffer.append((char) input);
+
+            StringBuffer buffer = new StringBuffer(fileSize);
+            if (buffer != null) {
+               int input;
+               while ((input = in.read()) > -1) {
+                   buffer.append((char) input);
+               }
+               vCard = buffer.toString();
+               in.close();
             }
-            vCard = buffer.toString();
-            in.close();
          }
          /* Delete the vCard file after adding to the stream */
          newFile.delete();
 
       } catch (IOException ioe) {
          ioe.printStackTrace();
+
       } finally {
          try {
             if (isr != null) {
@@ -368,9 +392,10 @@ public class BluetoothObexReceiverService extends Service {
          }
       } else {
          if (V) {
-            Log.i(TAG, "Empty VCard received? ");
+            Log.i(TAG, "Empty vCard received? ");
          }
       }
+      return true;
    }
 
    /* For Music/Picture: Invoke Media scanner on the file.

@@ -19,7 +19,7 @@
  * Based on AndDev.org's file browser V 2.0.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +29,7 @@ import java.util.List;
 
 import org.xmlpull.v1.XmlPullParserException;
 
-import com.quic.bluetooth.R;
+import com.quicinc.bluetooth.R;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -157,7 +157,6 @@ public class LocalFileManagerActivity extends ListActivity {
                 browseto = dir;
             }
         }
-
         mStepsBack = 0;
 
         if (icicle != null) {
@@ -173,31 +172,26 @@ public class LocalFileManagerActivity extends ListActivity {
     @Override
     public void onStart() {
         super.onStart();
-        Log.v(TAG, "onStart");
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        Log.v(TAG, "onStop");
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        Log.v(TAG, "onPause");
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        Log.v(TAG, "onResume");
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.v(TAG, "onDestroy");
     }
 
     /**
@@ -236,23 +230,16 @@ public class LocalFileManagerActivity extends ListActivity {
      */
     private void getMimeTypes() {
         MimeTypeParser mtp = new MimeTypeParser();
-
         XmlResourceParser in = getResources().getXml(R.xml.mimetypes);
 
         try {
             mMimeTypes = mtp.fromXmlResource(in);
         } catch (XmlPullParserException e) {
-            Log
-                    .e(
-                            TAG,
-                            "PreselectedChannelsActivity: XmlPullParserException",
-                            e);
-            throw new RuntimeException(
-                    "PreselectedChannelsActivity: XmlPullParserException");
+            Log.e(TAG, "PreselectedChannelsActivity: XmlPullParserException", e);
+            throw new RuntimeException("PreselectedChannelsActivity: XmlPullParserException");
         } catch (IOException e) {
             Log.e(TAG, "PreselectedChannelsActivity: IOException", e);
-            throw new RuntimeException(
-                    "PreselectedChannelsActivity: IOException");
+            throw new RuntimeException("PreselectedChannelsActivity: IOException");
         }
     }
 
@@ -609,7 +596,7 @@ public class LocalFileManagerActivity extends ListActivity {
         if (!file.isDirectory()) {
             menu.add(0, MENU_OPEN, 0, R.string.menu_open);
             if (mContext.isServerConnected()) {
-            String sendString = getString(R.string.menu_send, mContext.getFTPServerName());
+                String sendString = getString(R.string.menu_send, mContext.getFTPServerName());
                 menu.add(0, MENU_SEND, 0, sendString);
             }
         }
@@ -762,8 +749,7 @@ public class LocalFileManagerActivity extends ListActivity {
         if (!TextUtils.isEmpty(foldername)) {
             File file = FileUtils.getFile(currentDirectory, foldername);
             if (file.mkdirs()) {
-
-                // Change into new directory:
+                /* Change into new directory: */
                 browseTo(file);
             } else {
                 Toast.makeText(this, R.string.error_creating_new_folder,
@@ -772,33 +758,40 @@ public class LocalFileManagerActivity extends ListActivity {
         }
     }
 
+    /**
+     * @param file
+     */
     private void deleteFileOrFolder(File file) {
-
+        int toast = 0;
         if (file.delete()) {
-            // Delete was successful.
+            /* Delete was successful. */
             refreshList();
             if (file.isDirectory()) {
-                Toast.makeText(this, R.string.folder_deleted,
-                        Toast.LENGTH_SHORT).show();
+                toast = R.string.folder_deleted;
             } else {
-                Toast.makeText(this, R.string.file_deleted, Toast.LENGTH_SHORT)
-                        .show();
+                toast = R.string.file_deleted;
             }
         } else {
-            if (file.isDirectory() && file.list().length > 0) {
-                Toast.makeText(this, R.string.error_folder_not_empty,
-                        Toast.LENGTH_SHORT).show();
+            if (file.isDirectory()) {
+                if (file.list().length > 0) {
+                    toast = R.string.error_folder_not_empty;
+                } else {
+                    toast = R.string.error_deleting_folder;
+                }
             } else {
-                Toast.makeText(this, R.string.error_deleting_file,
-                        Toast.LENGTH_SHORT).show();
+                toast = R.string.error_deleting_file;
             }
         }
+        Toast.makeText(this, toast, Toast.LENGTH_SHORT).show();
     }
 
+    /**
+     * @param file
+     * @param newFileName
+     */
     private void renameFileOrFolder(File file, String newFileName) {
 
         File newFile = FileUtils.getFile(currentDirectory, newFileName);
-
         rename(file, newFile);
     }
 
@@ -809,7 +802,7 @@ public class LocalFileManagerActivity extends ListActivity {
     private void rename(File oldFile, File newFile) {
         int toast = 0;
         if (oldFile.renameTo(newFile)) {
-            // Rename was successful.
+            /* Rename was successful. */
             refreshList();
             if (newFile.isDirectory()) {
                 toast = R.string.folder_renamed;
@@ -817,7 +810,7 @@ public class LocalFileManagerActivity extends ListActivity {
                 toast = R.string.file_renamed;
             }
         } else {
-            if (newFile.isDirectory()) {
+            if (oldFile.isDirectory()) {
                 toast = R.string.error_renaming_folder;
             } else {
                 toast = R.string.error_renaming_file;

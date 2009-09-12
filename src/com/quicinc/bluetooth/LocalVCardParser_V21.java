@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import android.syncml.pim.VBuilder;
 import android.syncml.pim.vcard.VCardException;
@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 public class LocalVCardParser_V21 {
 
     private static final String  TAG = "VCardParser_V21";
+    /* If an invalid field is present in the VCard, continue parsing for valid fields or throw an exception and abort */
     private static final boolean ERROR_THROW_EXCEPTION = false;
     /** Store the known-type */
     private static final HashSet<String> sKnownTypeSet = new HashSet<String>(

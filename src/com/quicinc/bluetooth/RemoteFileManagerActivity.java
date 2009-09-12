@@ -19,7 +19,9 @@
  * Based on AndDev.org's file browser V 2.0.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
+
+import com.quicinc.bluetooth.R;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,11 +32,6 @@ import java.util.Map;
 
 import org.xmlpull.v1.XmlPullParserException;
 
-import com.quic.bluetooth.R;
-import android.content.ActivityNotFoundException;
-
-//import android.app.Activity;
-//import android.view.Window;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.app.AlertDialog;
@@ -42,10 +39,8 @@ import android.app.Dialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.app.ListActivity; //import android.content.ActivityNotFoundException;
-//import android.content.ComponentName;
-//import android.content.Context;
-//import android.content.Context;
+import android.app.ListActivity;
+import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.DialogInterface.OnClickListener;
@@ -110,7 +105,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
     /** Files separate for sorting */
     List<IconifiedText> mListFile = new ArrayList<IconifiedText>();
 
-   /** Files List of current directory */
+    /** Files List of current directory */
     List<RemoteFile> mCurrentListFolder = new ArrayList<RemoteFile>();
 
     private String currentDirectory = "/";
@@ -128,12 +123,13 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
     private TextView mServerConnectHelp;
     private TextView mFolderEmpty;
 
-   /* Work in progress for async processing */
+    /* Work in progress for asynchronous processing */
     private ProgressDialog mProgressDlg;
 
     /** Connected or not */
     private static BluetoothBrowserActivity mContext;
     public static BluetoothFTPClient mFTPClient;
+    public static boolean mSessionCreated;
 
     /** Called when the activity is first created. */
     @Override
@@ -151,6 +147,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
         }
         mFTPClient = new BluetoothFTPClient(RemoteFileManagerActivity.this, "", "");
         mContext.setRemoteManagerActivity(this);
+        mSessionCreated = false;
         mFileListLayout = (FrameLayout) findViewById(R.id.display_files);
 
         mDirectoryButtons = (LinearLayout) findViewById(R.id.directory_buttons);
@@ -162,22 +159,22 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
         getListView().setEmptyView(mFolderEmpty);
 
         mServerStatusButton.setOnClickListener(new View.OnClickListener() {
-         public void onClick(View view) {
-            if(mFTPClient != null) {
-               if (!mFTPClient.isConnectionActive()) {
-                  handleServerSelect();
-               }
-            }
-         }
-      });
+           public void onClick(View view) {
+              if (mFTPClient != null) {
+                 if (!mFTPClient.isConnectionActive()) {
+                    handleServerSelect();
+                 }
+              }
+           }
+        });
 
-      // Create map of extensions:
+        /* Create map of extensions */
         getMimeTypes();
 
         File browseto = null;
 
         if (icicle != null) {
-            mContextText = icicle.getString(BUNDLE_CONTEXT_TEXT);
+           mContextText = icicle.getString(BUNDLE_CONTEXT_TEXT);
         }
 
         updateServerStatus();
@@ -187,31 +184,26 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
    @Override
     public void onStart() {
         super.onStart();
-        Log.v(TAG, "onStart");
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        Log.v(TAG, "onStop");
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        Log.v(TAG, "onPause");
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        Log.v(TAG, "onResume");
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.v(TAG, "onDestroy");
     }
 
     /**
@@ -240,17 +232,12 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
      */
     private void getMimeTypes() {
         MimeTypeParser mtp = new MimeTypeParser();
-
         XmlResourceParser in = getResources().getXml(R.xml.mimetypes);
 
         try {
             mMimeTypes = mtp.fromXmlResource(in);
         } catch (XmlPullParserException e) {
-            Log
-                    .e(
-                            TAG,
-                            "PreselectedChannelsActivity: XmlPullParserException",
-                            e);
+            Log.e(TAG, "PreselectedChannelsActivity: XmlPullParserException", e);
             throw new RuntimeException(
                     "PreselectedChannelsActivity: XmlPullParserException");
         } catch (IOException e) {
@@ -270,7 +257,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
 
    /** Go to Home Folder */
    private void goHomeDir() {
-      if(mFTPClient != null) {
+      if (mFTPClient != null) {
          mFTPClient.changeFolder("");
       }
    }
@@ -279,15 +266,16 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
    private void goParentDir() {
       if (mFTPClient != null) {
          Log.i(TAG, "goParentDir : ");
-         mFTPClient.changeFolder("..");
+         mFTPClient.changeFolder(getString(R.string.up_one_level));
       }
    }
 
    /** Initiate the refresh of the folder */
    private void refreshList() {
-      if(mFTPClient != null) {
+      if (mFTPClient != null) {
          if (mFTPClient.isConnectionActive()) {
-            showBusy(getServerName(), "Getting folder listing", true);
+            String szStr = getResources().getString(R.string.ftp_get_folder_list);
+            showBusy(getServerName(), szStr);
             mFTPClient.listFolder();
          }
       }
@@ -380,7 +368,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
         homeButton.setText(displayName);
         homeButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View view) {
-            goHomeDir();
+                goHomeDir();
             }
         });
         mDirectoryButtons.addView(homeButton);
@@ -404,7 +392,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
             ib.setImageResource(R.drawable.ic_menu_back_small);
             ib.setLayoutParams(new LinearLayout.LayoutParams(WRAP_CONTENT,
                     WRAP_CONTENT));
-            //
+
             ib.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View view) {
                     // Up one directory.
@@ -433,32 +421,32 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
     protected void onListItemClick(ListView l, View v, int position, long id) {
         super.onListItemClick(l, v, position, id);
 
-      Log.i(TAG, "onListItemClick : " + position);
+        Log.i(TAG, "onListItemClick : " + position);
 
-      String selectedFileString = directoryEntries.get(position).getText();
-      RemoteFile remoteFile = getRemoteFileObject(selectedFileString);
+        String selectedFileString = directoryEntries.get(position).getText();
+        RemoteFile remoteFile = getRemoteFileObject(selectedFileString);
 
-      if(remoteFile == null) {
-         return;
-      }
+        if(remoteFile == null) {
+            return;
+        }
 
         if (selectedFileString.equals(getString(R.string.up_one_level))) {
             upOneLevel();
         } else {
-         if (remoteFile.isDirectory()) {
-            // If we click on folders, we can return later by the "back"
-            // key.
-            if(mFTPClient != null) {
-               mFTPClient.changeFolder(selectedFileString);
+            if (remoteFile.isDirectory()) {
+                // If we click on folders, we can return later by the "back"
+                // key.
+                if (mFTPClient != null) {
+                    mFTPClient.changeFolder(selectedFileString);
+                }
+            } else {
+                downloadFile(selectedFileString);
             }
-         } else {
-            downloadFile(selectedFileString);
-         }
         }
     }
 
     /**
-     * Return the Drawable that is associated with a specific mime type for the
+     * Return the Drawable that is associated with a specific Mime type for the
      * VIEW action.
      *
      * @param mimetype
@@ -485,8 +473,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
-
-      if(mFTPClient != null) {
+        if (mFTPClient != null) {
            if (mFTPClient.isConnectionActive()) {
                menu.add(0, MENU_NEW_FOLDER, 0, R.string.menu_new_folder).setIcon(
                        android.R.drawable.ic_menu_add).setShortcut('0', 'f');
@@ -499,28 +486,38 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
                        .setIcon(android.R.drawable.ic_menu_search)
                   .setShortcut('0', 'c');
            }
-      }
-
+        }
         return true;
     }
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         super.onPrepareOptionsMenu(menu);
-      if(mFTPClient != null) {
+        if (mFTPClient != null) {
            if (mFTPClient.isConnectionActive()) {
-               if (menu.findItem(MENU_NEW_FOLDER) == null) {
-                   menu.add(0, MENU_NEW_FOLDER, 0, R.string.menu_new_folder)
-                           .setIcon(android.R.drawable.ic_menu_add).setShortcut(
-                                   '0', 'f');
+               if (mSessionCreated == true) {
+                   if (menu.findItem(MENU_NEW_FOLDER) == null) {
+                       menu.add(0, MENU_NEW_FOLDER, 0, R.string.menu_new_folder)
+                               .setIcon(android.R.drawable.ic_menu_add)
+                               .setShortcut('0', 'f');
+                   }
+                   if (menu.findItem(MENU_DISCONNECT) == null) {
+                       menu.add(0, MENU_DISCONNECT, 0,
+                               getString(R.string.menu_disconnect, "")).setIcon(
+                               android.R.drawable.ic_menu_close_clear_cancel)
+                               .setShortcut('0', 'd');
+                   }
+                   menu.removeItem(MENU_SELECT_SERVER);
+               } else {
+                   if (menu.findItem(MENU_SELECT_SERVER) == null) {
+                       menu.add(0, MENU_SELECT_SERVER, 0,
+                               getString(R.string.menu_select)).setIcon(
+                               android.R.drawable.ic_menu_search)
+                               .setShortcut('0', 'c');
+                   }
+                   menu.removeItem(MENU_NEW_FOLDER);
+                   menu.removeItem(MENU_DISCONNECT);
                }
-               if (menu.findItem(MENU_DISCONNECT) == null) {
-                   menu.add(0, MENU_DISCONNECT, 0,
-                           getString(R.string.menu_disconnect, "")).setIcon(
-                           android.R.drawable.ic_menu_close_clear_cancel)
-                           .setShortcut('0', 'd');
-               }
-               menu.removeItem(MENU_SELECT_SERVER);
            } else {
               if (Environment.getExternalStorageState().equals(
                       Environment.MEDIA_MOUNTED)) {
@@ -532,10 +529,11 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
                   }
               }
               else
-              {   
+              {
                  menu.removeItem(MENU_SELECT_SERVER);
               }
-               menu.removeItem(MENU_DISCONNECT);
+              menu.removeItem(MENU_NEW_FOLDER);
+              menu.removeItem(MENU_DISCONNECT);
            }
       }
         return true;
@@ -550,12 +548,17 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
             return true;
 
         case MENU_SELECT_SERVER:
-            /* Connect to Server */
-         handleServerSelect();
+             if (mFTPClient.isConnectionActive()) {
+                 Toast.makeText(this, R.string.error_ftp_connect_timeout, Toast.LENGTH_LONG).show();
+             } else {
+                /* Connect to Server */
+                 handleServerSelect();
+             }
             return true;
 
         case MENU_DISCONNECT:
             /* Disconnect to Server */
+            mSessionCreated = false;
             handleServerDisconnect();
             return true;
         }
@@ -587,7 +590,9 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
                menu.add(0, MENU_DOWNLOAD, 0, R.string.menu_download);
             }
          }
-         menu.add(0, MENU_DELETE, 0, R.string.menu_delete);
+         if (!selectedFileString.equals(getString(R.string.up_one_level))) {
+            menu.add(0, MENU_DELETE, 0, R.string.menu_delete);
+         }
       }
     }
 
@@ -691,36 +696,37 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
 
     private void createNewFolder(String foldername) {
         if (!TextUtils.isEmpty(foldername)) {
-         if(mFTPClient != null) {
-            mFTPClient.createFolder(foldername);
-            showBusy(getServerName(), "Creating new folder : " + foldername, true);
-         }
+            if (mFTPClient != null) {
+                mFTPClient.createFolder(foldername);
+                String szStr = getResources().getString(R.string.ftp_create_new_folder, foldername);
+                showBusy(getServerName(), szStr);
+            }
         }
     }
 
     private void deleteFileOrFolder(String name) {
-      if(mFTPClient != null) {
-         mFTPClient.delete(name);
-         showBusy(getServerName(), "Deleting : " + name, true);
-      }
+        if (mFTPClient != null) {
+            mFTPClient.delete(name);
+            String szStr = getResources().getString(R.string.ftp_delete_file_folder, name);
+            showBusy(getServerName(), szStr);
+        }
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-         if(mFTPClient != null) {
-               if (mFTPClient.isConnectionActive()) {
-                   if (doesParentFolderExist()) {
-                       upOneLevel();
-                       return true;
-                   } else {
-                       return mContext.onKeyDown(keyCode, event);
-                   }
-               }
-         }
+            if (mFTPClient != null) {
+                if (mFTPClient.isConnectionActive()) {
+                    if (doesParentFolderExist()) {
+                        upOneLevel();
+                        return true;
+                    } else {
+                        return mContext.onKeyDown(keyCode, event);
+                    }
+                }
+            }
         }
-
         return super.onKeyDown(keyCode, event);
     } /* onKeyDown */
 
@@ -734,68 +740,90 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
         switch (requestCode) {
         case SUBACTIVITY_PICK_BT_DEVICE:
             if (resultCode == RESULT_OK && data != null) {
-                // obtain the Server name and Address
-            String serverAddress = data.getStringExtra(BluetoothDevicePicker.ADDRESS);
-            String serverName = data.getStringExtra(BluetoothDevicePicker.NAME);
+                /* Obtain the Server name and Address */
+                String serverAddress = data.getStringExtra(BluetoothDevicePicker.ADDRESS);
+                String serverName = data.getStringExtra(BluetoothDevicePicker.NAME);
 
-            if(mFTPClient != null) {
-               mFTPClient.setAddress(serverAddress);
-               mFTPClient.setName(serverName);
-                   mServerConnectButtonLayout.setVisibility(View.GONE);
-               if(mFTPClient.createSession() != true) {
-                  Toast.makeText(this,"Connection could not be initiated with : "+ mFTPClient.getName(), Toast.LENGTH_LONG)
-                        .show();
-                       updateServerStatus();
-               } else {
-                  //showBusy(mFTPClient.getName(), "Connecting to device : " + mFTPClient.getName(), true);
-               }
-            }
+                if (mFTPClient != null) {
+                    mFTPClient.setAddress(serverAddress);
+                    mFTPClient.setName(serverName);
+                        mServerConnectButtonLayout.setVisibility(View.GONE);
+                    if(mFTPClient.createSession() != true) {
+                         String szStr = getResources().getString(R.string.ftp_connect_failed, mFTPClient.getName());
+                         Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
+                         updateServerStatus();
+                    } else {
+                         String szStr = getResources().getString(R.string.ftp_connect_device, mFTPClient.getName());
+                         showBusy(mFTPClient.getName(), szStr);
+                    }
+                }
             }
             break;
         }
-
     } /* onActivityResult */
 
-   public void showBusy(String title, String msg, boolean allowCancel) {
-      mProgressDlg = ProgressDialog.show(this, title, msg, true, allowCancel);
-   }
+    private static final int SHOWBUSY = 1;
+    private static final int SHOWBUSY_TIMEOUT = 60000;
+    private Handler mTimeoutHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            if (msg.what == SHOWBUSY) {
+                timeoutToast();
+            }
+        }
+    };
 
-   public void hideBusy() {
-      if(mProgressDlg != null) {
-         mProgressDlg.dismiss();
-         mProgressDlg=null;
-      }
-   }
+    private void timeoutToast() {
+        Toast.makeText(this, R.string.error_ftp_connect_timeout, Toast.LENGTH_LONG).show();
+        hideBusy();
+    }
 
-   /**
-    * This is called to update the status information in the text and status.
-    */
-   public void handleServerSelect() {
-      mDirectoryButtons.removeAllViews();
-      currentDirectory = "/";
+    public void showBusy(String title, String szStr) {
+        mProgressDlg = ProgressDialog.show(this, title, szStr, true, false);
 
-       if (mContext.isBluetoothEnabled()) {
-           Intent intent = new Intent(getApplicationContext(), BluetoothDevicePicker.class);
-           intent.setAction(BluetoothDevicePicker.ACTION_SELECT_BLUETOOTH_DEVICE);
-           intent.setData(Uri.parse("file://" + currentDirectory));
+        Message msg = new Message();
+        msg.what = SHOWBUSY;
+        mTimeoutHandler.sendMessageDelayed(msg, SHOWBUSY_TIMEOUT);
+    }
 
-           try {
-               startActivityForResult(intent, SUBACTIVITY_PICK_BT_DEVICE);
-           } catch (ActivityNotFoundException e) {
-               Log.e(TAG, "No Activity for : " + BluetoothDevicePicker.ACTION_SELECT_BLUETOOTH_DEVICE, e);
-           }
-       }
-   }
+    public void hideBusy() {
+        if(mProgressDlg != null) {
+            mProgressDlg.dismiss();
+            mProgressDlg = null;
+        }
+        mTimeoutHandler.removeMessages(SHOWBUSY);
+    }
+
+    /**
+     * This is called to update the status information in the text and status.
+     */
+    public void handleServerSelect() {
+        mDirectoryButtons.removeAllViews();
+        currentDirectory = "/";
+
+        if (mContext.isBluetoothEnabled()) {
+            Intent intent = new Intent(getApplicationContext(), BluetoothDevicePicker.class);
+            intent.setAction(BluetoothAppIntent.ACTION_SELECT_BLUETOOTH_DEVICE);
+            intent.putExtra(BluetoothAppIntent.PROFILE, BluetoothAppIntent.PROFILE_FTP);
+
+            intent.setData(Uri.parse("file://" + currentDirectory));
+
+            try {
+                startActivityForResult(intent, SUBACTIVITY_PICK_BT_DEVICE);
+            } catch (ActivityNotFoundException e) {
+                Log.e(TAG, "No Activity for : " + BluetoothAppIntent.ACTION_SELECT_BLUETOOTH_DEVICE, e);
+            }
+        }
+    }
 
     public void handleServerDisconnect() {
-      /* Initiate the server Disconnect */
-      mContext.initiateServerDisConnect();
-      if(mFTPClient != null) {
-         mFTPClient.closeSession();
-      }
+        /* Initiate the server Disconnect */
+        mContext.initiateServerDisConnect();
+        if (mFTPClient != null) {
+            mFTPClient.closeSession();
+        }
 
-      updateServerStatus();
-      refreshList();
+        updateServerStatus();
+        refreshList();
     }
 
     /**
@@ -803,44 +831,40 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
      */
     private void updateServerStatus() {
 
-        if (Environment.getExternalStorageState().equals(
-                Environment.MEDIA_MOUNTED)) {
+        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
             mFolderEmpty.setText(R.string.this_folder_is_empty);
 
-         boolean connectionActive = false;
-         if(mFTPClient != null) {
-            if (mFTPClient.isConnectionActive()) {
-               connectionActive = true;
+            boolean connectionActive = false;
+            if (mFTPClient != null) {
+                if (mFTPClient.isConnectionActive()) {
+                    connectionActive = true;
+                }
             }
-         }
 
-         /* If FTP Connection is active */
+            /* If FTP Connection is active */
             if (connectionActive) {
-            mServerConnectButtonLayout.setVisibility(View.GONE);
+                mServerConnectButtonLayout.setVisibility(View.GONE);
                 mFileListLayout.setVisibility(View.VISIBLE);
                 mDirectoryButtons.setVisibility(View.VISIBLE);
                 mServerConnectHelp.setVisibility(View.GONE);
             } else {
-            /* Is Bluetooth enabled */
+                /* Is Bluetooth enabled */
                 if (mContext.isBluetoothEnabled()) {
-                    mServerConnectHelp
-                            .setText(R.string.ServerDisconnectedHelpText);
-               mServerConnectHelp.setVisibility(View.GONE);
-               mServerConnectButtonLayout.setVisibility(View.VISIBLE);
+                    mServerConnectHelp.setText(R.string.ServerDisconnectedHelpText);
+                    mServerConnectHelp.setVisibility(View.GONE);
+                    mServerConnectButtonLayout.setVisibility(View.VISIBLE);
                 } else {
-                    mServerConnectHelp
-                            .setText(R.string.BluetoothDisabledHelpText);
-               mServerConnectHelp.setVisibility(View.VISIBLE);
-               mServerConnectButtonLayout.setVisibility(View.GONE);
+                    mServerConnectHelp.setVisibility(View.VISIBLE);
+                    mServerConnectHelp.setText(R.string.BluetoothDisabledHelpText);
                 }
                 mFileListLayout.setVisibility(View.GONE);
                 mDirectoryButtons.setVisibility(View.GONE);
             }
         } else {
-         mFolderEmpty.setText(R.string.no_sdcard_text);
-         mFileListLayout.setVisibility(View.VISIBLE);
+            mFolderEmpty.setText(R.string.no_sdcard_text);
+            mFileListLayout.setVisibility(View.VISIBLE);
 
-         mServerConnectButtonLayout.setVisibility(View.GONE);
+            mServerConnectButtonLayout.setVisibility(View.GONE);
             mDirectoryButtons.setVisibility(View.GONE);
             mServerConnectHelp.setVisibility(View.GONE);
         }
@@ -872,35 +896,34 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
 
    private String getServerName() {
 
-      if(mFTPClient != null) {
+      if (mFTPClient != null) {
          if (mFTPClient.isConnectionActive()) {
-               String string = mFTPClient.getName();
-               if (!TextUtils.isEmpty(string)) {
-                   return string;
-               }
-               return "Bluetooth Device";
-           }
+            String string = mFTPClient.getName();
+            if (!TextUtils.isEmpty(string)) {
+               return string;
+            }
+            return "Bluetooth Device";
+         }
       }
-        return "";
-    }
+      return "";
+   }
 
-    private void downloadFile(String filename) {
+   private void downloadFile(String filename) {
       Log.i(TAG, "downloadFile : " + filename);
-      if(mFTPClient != null) {
-           if (mFTPClient.isConnectionActive()) {
+      if (mFTPClient != null) {
+         if (mFTPClient.isConnectionActive()) {
             //mContext.initiateGetFile(filename);
             String localName = mContext.getFTPClientRecieveFolder() + filename;
             RemoteFile file = getRemoteFileObject(filename);
             if (file != null) {
-               if( true != mFTPClient.getFile(localName, filename)) {
-                  Toast.makeText(this, filename + ": File could not be downloaded from " + mFTPClient.getName(), Toast.LENGTH_LONG)
-                        .show();
+               if (true != mFTPClient.getFile(localName, filename)) {
+                  String szStr = getResources().getString(R.string.ftp_download_failed, filename, mFTPClient.getName());
+                  Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
                }
             }
-           }
+         }
       }
-    }
-
+   }
 
    /**
     * @param isError true if error executing createSession, false otherwise
@@ -909,32 +932,33 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
       if (mContext.V) {
          Log.i(TAG, "onCreateSessionComplete : isError - " + isError);
       }
+      mSessionCreated = !isError;
       hideBusy();
-      if(mFTPClient != null) {
-           if (isError == false) {
-                  mContext.onServerConnected();
-               goHomeDir();
-         } else {
-            Toast.makeText(this, "Failed to connect to : " + mFTPClient.getName() +". Check if File Transfer Service is enabled", Toast.LENGTH_LONG)
-                  .show();
-         }
+      if (mFTPClient != null) {
+          if (isError == false) {
+              mContext.onServerConnected();
+              goHomeDir();
+          } else {
+              String szStr = getResources().getString(R.string.ftp_connect_failed, mFTPClient.getName());
+              Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
+          }
       }
       updateServerStatus();
       refreshDirectoryPanel();
    }
 
-    /**
-     * Notification that this session has been closed.  The client will
-     * need to reconnect if future FTP operations are required.
-     */
-    public void onObexSessionClosed() {
+   /**
+    * Notification that this session has been closed.  The client will
+    * need to reconnect if future FTP operations are required.
+    */
+   public void onObexSessionClosed() {
       if (mContext.V) {
          Log.i(TAG, "onObexSessionClosed : ");
       }
       hideBusy();
-        updateServerStatus();
-        refreshDirectoryPanel();
-    }
+      updateServerStatus();
+      refreshDirectoryPanel();
+   }
 
    /**
     * @param folder name of folder to create
@@ -994,17 +1018,17 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
       if (mContext.V) {
          Log.i(TAG, "onGetFileComplete : local: "+localFilename+ "Remote: "+remoteFilename+ "isError : " + isError);
       }
-      if(mFTPClient != null) {
+      if (mFTPClient != null) {
 
          if (isError) {
-            Toast.makeText(this, remoteFilename + ": File could not be downloaded from " + mFTPClient.getName(), Toast.LENGTH_LONG)
-                  .show();
+            String szStr = getResources().getString(R.string.ftp_download_failed, remoteFilename, mFTPClient.getName());
+            Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
          } else {
-               RemoteFile remoteFile = getRemoteFileObject(remoteFilename);
-               if(remoteFile != null) {
-                   mFTPClient.getFileStarted(localFilename, remoteFile);
+            RemoteFile remoteFile = getRemoteFileObject(remoteFilename);
+            if(remoteFile != null) {
+               mFTPClient.getFileStarted(localFilename, remoteFile);
                mContext.getFileStarted();
-               }
+            }
          }
       }
    }
@@ -1018,14 +1042,14 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
       if (mContext.V) {
          Log.i(TAG, "onPutFileComplete : local: "+localFilename+ "Remote: "+remoteFilename+ "isError : " + isError);
       }
-      if(mFTPClient != null) {
-           if (isError) {
-               Toast.makeText(this, remoteFilename + ": File could not be sent to " + mFTPClient.getName(), Toast.LENGTH_LONG)
-                       .show();
-           } else {
-               mFTPClient.putFileStarted(localFilename);
+      if (mFTPClient != null) {
+         if (isError) {
+            String szStr = getResources().getString(R.string.ftp_upload_failed, remoteFilename, mFTPClient.getName());
+            Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
+         } else {
+            mFTPClient.putFileStarted(localFilename);
             mContext.putFileStarted();
-           }
+         }
       }
    }
 
@@ -1035,7 +1059,7 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
    */
    public void onDeleteComplete(String name, boolean isError) {
       if (mContext.V) {
-         Log.i(TAG, "onDeleteComplete : name: "+name+ "isError : " + isError);
+         Log.i(TAG, "onDeleteComplete : name: " + name + " isError : " + isError);
       }
       hideBusy();
       boolean temp = false;
@@ -1045,29 +1069,25 @@ public class RemoteFileManagerActivity extends ListActivity  implements Bluetoot
          if (temp) {
             File file = new File (name);
             if (file.isDirectory()) {
-               Toast.makeText(this, R.string.folder_deleted,
-                     Toast.LENGTH_SHORT).show();
+               Toast.makeText(this, R.string.folder_deleted, Toast.LENGTH_SHORT).show();
             } else {
-               Toast.makeText(this, R.string.file_deleted, Toast.LENGTH_SHORT)
-                     .show();
+               Toast.makeText(this, R.string.file_deleted, Toast.LENGTH_SHORT).show();
             }
          } else {
-            Toast.makeText(this, R.string.file_deleted, Toast.LENGTH_SHORT)
-                  .show();
+            String szStr = getResources().getString(R.string.ftp_file_folder_deleted, name);
+            Toast.makeText(this, szStr, Toast.LENGTH_SHORT).show();
          }
       } else {
          if (temp) {
             File file = new File (name);
             if (file.isDirectory()) {
-               Toast.makeText(this, R.string.error_folder_not_empty,
-                     Toast.LENGTH_LONG).show();
+               Toast.makeText(this, R.string.error_folder_not_empty, Toast.LENGTH_LONG).show();
             } else {
-               Toast.makeText(this, R.string.error_deleting_file,
-                     Toast.LENGTH_LONG).show();
+               Toast.makeText(this, R.string.error_deleting_file, Toast.LENGTH_LONG).show();
             }
          } else {
-            Toast.makeText(this, R.string.error_deleting_file,
-                  Toast.LENGTH_LONG).show();
+             String szStr = getResources().getString(R.string.ftp_error_deleting_file_folder, name);
+            Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
          }
       }
    }

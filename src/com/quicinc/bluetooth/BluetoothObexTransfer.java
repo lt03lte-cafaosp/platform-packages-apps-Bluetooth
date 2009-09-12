@@ -26,14 +26,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 
 import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.obex.BluetoothObexIntent;
-import android.bluetooth.obex.BluetoothOpp;
-import android.bluetooth.obex.BluetoothFtp;
 
 import android.util.Log;
 import android.view.View;
@@ -88,13 +86,11 @@ public class BluetoothObexTransfer {
    private List<Callback> mCallbacks = new ArrayList<Callback>();
 
    private boolean mRegisteredBroadcasts=false;
-   BluetoothOpp mBluetoothOPP;
 
    public BluetoothObexTransfer(Activity activity) {
       mActivity = activity;
       mBluetooth = (BluetoothDevice) mActivity.getSystemService(Context.BLUETOOTH_SERVICE);
       registerBluetoothOBexIntentHandler();
-      //mBluetoothOPP = new BluetoothOpp();
    }
 
    public void onDestroy() {
@@ -124,7 +120,7 @@ public class BluetoothObexTransfer {
       return(enabled);
    }
 
-   /* Is Bluetooth OBEX as supported by Qualcomm/QUIC BM3 enabled? */
+   /* Is Bluetooth OBEX as supported by Qualcomm/QuIC Inc. BM3 enabled? */
    public boolean isBluetoothOBEXEnabled() {
       boolean enabled = SystemProperties.getBoolean("ro.qualcomm.proprietary_obex", false);
       return(enabled);
@@ -165,6 +161,11 @@ public class BluetoothObexTransfer {
             String fileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
             boolean success = intent.getBooleanExtra(BluetoothObexIntent.SUCCESS, false);
             String errorMsg = intent.getStringExtra(BluetoothObexIntent.ERROR_MESSAGE);
+
+            if( false == success ) {
+                Toast.makeText(mActivity, R.string.opp_ftp_send_failed, Toast.LENGTH_LONG).show();
+            }
+
             synchronized (mCallbacks) {
                 for (Callback callback : mCallbacks) {
                    callback.onTransmitCompleteIndication(fileName, success, errorMsg);
@@ -176,7 +177,7 @@ public class BluetoothObexTransfer {
    };
 
    public void registerBluetoothOBexIntentHandler() {
-      /* Register only if not already regsitered */
+      /* Register only if not already registered */
       synchronized (this) {
          if (mRegisteredBroadcasts ==  false) {
             IntentFilter filter = new IntentFilter();
@@ -228,6 +229,6 @@ public class BluetoothObexTransfer {
       * @param totalBytes:  Total number of bytes sent so far
       * @param bytesDone:   Total number of bytes of the file
        */
-       void onProgressIndication(String fileName, int bytesTotal, int bytesDone);
+      void onProgressIndication(String fileName, int bytesTotal, int bytesDone);
   }
 }

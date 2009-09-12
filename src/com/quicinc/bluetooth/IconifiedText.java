@@ -1,4 +1,4 @@
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 /*
  * Copyright 2007 Steven Osborn

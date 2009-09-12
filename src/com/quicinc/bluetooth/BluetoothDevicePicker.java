@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
-import com.quic.bluetooth.LocalBluetoothManager.Callback;
+import com.quicinc.bluetooth.LocalBluetoothManager.Callback;
 
 import java.util.List;
 import java.util.WeakHashMap;
@@ -26,6 +26,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothIntent;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -44,8 +45,6 @@ import android.view.ContextMenu.ContextMenuInfo;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.util.Log;
 
-
-
 /**
  * BluetoothDevicePicker allows the application to pick up a
  * device.
@@ -54,7 +53,6 @@ public class BluetoothDevicePicker extends PreferenceActivity
         implements LocalBluetoothManager.Callback {
     public static final String NAME = "NAME";
     public static final String ADDRESS = "ADDRESS";
-    public static final String ACTION_SELECT_BLUETOOTH_DEVICE = "SELECT_BLUETOOTH_DEVICE";
 
     private static final String TAG = "BluetoothDevicePicker";
 
@@ -69,6 +67,8 @@ public class BluetoothDevicePicker extends PreferenceActivity
             new WeakHashMap<LocalBluetoothDevice, BluetoothDevicePreference>();
 
     /* Return with the result */
+    private Intent mIntent;
+
     private Uri mUri;
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -86,8 +86,47 @@ public class BluetoothDevicePicker extends PreferenceActivity
         mLocalManager = LocalBluetoothManager.getInstance(this);
         if (mLocalManager == null) finish();
 
-        Intent intent = getIntent();
-        mUri = intent.getData();
+        mIntent = getIntent();
+        mUri = mIntent.getData();
+        String action = mIntent.getAction();
+        String profile = mIntent.getStringExtra(BluetoothAppIntent.PROFILE);
+
+        if (mUri != null) {
+           Log.d(TAG, "onCreate : mUri - "+ mUri.toString());
+        }
+        Log.d(TAG, "onCreate : action - "+ action);
+        Log.d(TAG, "onCreate : profile - "+ profile);
+
+        boolean parametersOk=true;
+        if (!profile.equals(BluetoothAppIntent.PROFILE_OPP)
+         && !profile.equals(BluetoothAppIntent.PROFILE_FTP))
+        {
+            Log.e(TAG,
+                  "Error: this activity may be started only for Profiles " +
+                  BluetoothAppIntent.PROFILE_FTP +
+                  " or "+ BluetoothAppIntent.PROFILE_FTP);
+            parametersOk=false;
+        }
+
+        if (profile.equals(BluetoothAppIntent.PROFILE_OPP))
+        {
+           /* For OPP Push operations URI is mandatory parameter */
+           if ( (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PUSH_BUSINESS_CARD)
+              || mIntent.getAction().equals(BluetoothAppIntent.ACTION_PUSH_FILE))
+              && (mUri == null))
+           {
+              Log.e(TAG,
+                  "Error: Contact or Media Uri has to be specified to send it to the Remote device");
+              parametersOk=false;
+           }
+        }
+
+        if(parametersOk==false)
+        {
+           finish();
+           return;
+        }
+
         addPreferencesFromResource(R.xml.bluetooth_devices);
         mDeviceList = (ProgressCategory) findPreference(KEY_BT_DEVICE_LIST);
 
@@ -98,8 +137,8 @@ public class BluetoothDevicePicker extends PreferenceActivity
     protected void onResume() {
         super.onResume();
 
-        // Repopulate (which isn't too bad since it's cached in the settings
-        // bluetooth manager
+        // Re-populate (which isn't too bad since it's cached in the settings
+        // Bluetooth manager
         mDevicePreferenceMap.clear();
         mDeviceList.removeAll();
         addDevices();
@@ -163,27 +202,33 @@ public class BluetoothDevicePicker extends PreferenceActivity
             Preference preference) {
 
         if (preference instanceof BluetoothDevicePreference) {
-            BluetoothDevicePreference btPreference = (BluetoothDevicePreference) preference;
-            LocalBluetoothDevice localDevice = btPreference.getDevice();
-            //btPreference.getDevice().onClicked();
-            /* Stop the scanning */
-            mLocalManager.stopScanning();
+           BluetoothDevicePreference btPreference = (BluetoothDevicePreference) preference;
+           LocalBluetoothDevice localDevice = btPreference.getDevice();
+           /* Stop the scanning */
+           mLocalManager.stopScanning();
 
-            /** If nothing was passed, just fill in a dummy uri string */
-            Uri uri;
-            if (mUri == null) {
-               uri = Uri.parse("content://oppservers/0");
-            } else {
-               uri = mUri;
-            }
-            Intent intent = new Intent(null, uri);
-            intent.putExtra(NAME, localDevice.getName());
-            intent.putExtra(ADDRESS, localDevice.getAddress());
-            setResult(Activity.RESULT_OK, intent);
+           String profile = mIntent.getStringExtra(BluetoothAppIntent.PROFILE);
 
-
-            finish();
-            return true;
+           if (profile.equals(BluetoothAppIntent.PROFILE_OPP))
+           {
+              mIntent.putExtra(NAME, localDevice.getName());
+              mIntent.putExtra(ADDRESS, localDevice.getAddress());
+              mIntent.setClass(this, BluetoothOppActivity.class);
+              try {
+                 startActivity(mIntent);
+              } catch (ActivityNotFoundException e) {
+                  Log.e(TAG, "No Activity for : " + mIntent.getAction(), e);
+              }
+           }
+           else if (profile.equals(BluetoothAppIntent.PROFILE_FTP))
+           {
+              Intent intent = new Intent(null, mUri);
+              intent.putExtra(NAME, localDevice.getName());
+              intent.putExtra(ADDRESS, localDevice.getAddress());
+              setResult(Activity.RESULT_OK, intent);
+           }
+           finish();
+           return true;
         }
 
         return super.onPreferenceTreeClick(preferenceScreen, preference);
@@ -194,7 +239,7 @@ public class BluetoothDevicePicker extends PreferenceActivity
         if (mDevicePreferenceMap.get(device) != null) {
             throw new IllegalStateException("Got onDeviceAdded, but device already exists");
         }
-        /* Only Add Obex devices */
+        /* Only Add OBEX devices */
         if(device.doesClassMatchObjectTransfer())
         {
            Log.d(TAG, "Found Object Transfer device : "+ device.getName());

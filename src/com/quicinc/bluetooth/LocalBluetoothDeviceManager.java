@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
-import com.quic.bluetooth.R;
-import  com.quic.bluetooth.LocalBluetoothManager.Callback;
+import com.quicinc.bluetooth.R;
+import com.quicinc.bluetooth.LocalBluetoothManager.Callback;
 
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothDevice;

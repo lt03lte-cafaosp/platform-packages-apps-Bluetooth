@@ -20,6 +20,7 @@
     <string name="bluetooth_label">Bluetooth</string>
     <string name="app_name">Bluetooth</string>
     <string name="bluetooth_browser">Bluetooth Browser</string>
+    <string name="bluetooth_browser_label">Bluetooth FTP</string>
 
     <string name="my_files">Local</string>
     <!-- Server name to be added -->
@@ -58,6 +59,7 @@
     <string name="move_button">Move here</string>
     <string name="error_creating_new_folder">Could not create new folder.</string>
     <string name="error_deleting_file">Could not delete file.</string>
+    <string name="error_deleting_folder">Could not delete folder.</string>
     <string name="error_folder_not_empty">Folder is not empty.</string>
     <string name="error_renaming_file">Could not rename file.</string>
     <string name="error_renaming_folder">Could not rename folder.</string>
@@ -66,6 +68,7 @@
     <string name="error_file_does_not_exists">File does not exist.</string>
     <string name="send_not_available">No application available for sending.</string>
     <string name="application_not_available">Application not available</string>
+    <string name="error_ftp_connect_timeout">Failed to connect to the remote device. Please try again.</string>
     <string name="no_sdcard_text">\n Please insert an SD Card</string>
     <string name="ServerDisconnectedHelpText">"\nTo connect, Press <font fgcolor="#ffffffff"><b>Menu</b></font> and select
         <font fgcolor="#ffffffff"><b>Choose a Device</b></font> to choose an already paired or new Bluetooth Device that supports the File Browsing Service\n"
@@ -78,38 +81,58 @@
 
     <!-- Bluetooth related strings  -->
     <string name="transfer_complete">Transfer Completed</string>
-    <string name="cancel_tx_rx_transfer">Bluetooth Send and Receive Cancelled</string>
-    <string name="cancel_tx_transfer">Bluetooth Send Cancelled</string>
-    <string name="cancel_rx_transfer">Bluetooth Receive Cancelled</string>
+    <string name="cancel_tx_rx_transfer">Bluetooth Send and Receive Canceled</string>
+    <string name="cancel_tx_transfer">Bluetooth Send Canceled</string>
+    <string name="cancel_rx_transfer">Bluetooth Receive Canceled</string>
     <string name="sending_progress_one">Sending <xliff:g id="send_progress_one_text">%s</xliff:g></string>
     <string name="sending_progress_more">Sending <xliff:g id="send_progress_more_text">%s</xliff:g> files </string>
     <string name="get_progress_one">Receiving <xliff:g id="get_progress_one_text">%s</xliff:g></string>
-    <string name="get_progress_more">Receiving <xliff:g id="rx_progress_more_text">%s</xliff:g> contacts </string>
-    <string name="receive_contact_done">Received Contact :  <xliff:g id="receive_sontact_text">%s</xliff:g></string>
+    <string name="get_progress_more">Receiving <xliff:g id="rx_progress_more_text">%s</xliff:g> files </string>
+    <string name="get_businesscard">Receiving Business Card</string>
+    <string name="get_multiple_businesscards">Receiving <xliff:g id="rx_progress_more_text">%s</xliff:g> Business Cards</string>
+    <string name="receive_contact_done">Received Contact : <xliff:g id="receive_sontact_text">%s</xliff:g></string>
+    <string name="opp_ftp_send_failed">Failed to send via Bluetooth</string>
+    <string name="opp_get_failed">Failed to pull Business Card from <xliff:g id="device_name">%s</xliff:g></string>
+    <string name="opp_not_available">OPP service is not available!</string>
+    <string name="opp_media_file_received">Media File received</string>
+    <string name="opp_vcard_outofmemory">Rejected vCard due to big size</string>
+    <string name="no_sdcard_exist">SD Card does not exist</string>
+    <string name="ftp_send_failed">Failed to send <xliff:g id="file_name">%1$s</xliff:g> to <xliff:g id="device_name">%2$s</xliff:g></string>
+    <string name="ftp_connect_device">Connecting to <xliff:g id="device_name">%s</xliff:g></string>
+    <string name="ftp_connect_failed">Connection could not be initiated with <xliff:g id="device_name">%s</xliff:g>.\nCheck if File Transfer Service is enabled.</string>
+    <string name="ftp_download_failed"><xliff:g id="file_name">%1$s</xliff:g> could not be downloaded from <xliff:g id="device_name">%2$s</xliff:g></string>
+    <string name="ftp_upload_failed"><xliff:g id="file_name">%1$s</xliff:g> could not be sent to <xliff:g id="device_name">%2$s</xliff:g></string>
+    <string name="ftp_get_folder_list">Getting folder listing</string>
+    <string name="ftp_create_new_folder">Creating new folder : <xliff:g id="file_name">%s</xliff:g></string>
+    <string name="ftp_delete_file_folder">Deleting : <xliff:g id="file_name">%s</xliff:g></string>
+    <string name="ftp_file_folder_deleted"><xliff:g id="file_name">%s</xliff:g> is deleted.</string>
+    <string name="ftp_error_deleting_file_folder">Could not delete <xliff:g id="file_name">%s</xliff:g>.</string>
 
     <string name="bluetooth_device_picker_title">Select a Device</string>
-    <!--Bluetooth settings screen, text that appears in heading bar when scanning for devices -->
+    <!-- Bluetooth settings screen, text that appears in heading bar when scanning for devices -->
     <string name="progress_scanning">Scanning</string>
-    <!-- Bluetooth settings screen, menu item to scan for nearby bluetooth devices -->
+    <!-- Bluetooth settings screen, menu item to scan for nearby Bluetooth devices -->
     <string name="bluetooth_scan_for_devices">Scan for devices</string>
     <!-- Title for BT error dialogs. -->
     <string name="bluetooth_error_title">Attention</string>
     <!-- Message for the error dialog when BT connecting operation fails generically. -->
     <string name="bluetooth_connecting_error_message">There was a problem connecting to <xliff:g id="device_name">%1$s</xliff:g>.</string>
 
-    <!-- Title for the dialog to Obex Authorize.  -->
+    <!-- Title for the dialog to OBEX Authorize.  -->
     <string name="bluetooth_obex_authorize">Bluetooth Authorize</string>
     <!-- Title for the bluetooth device info screen. -->
     <string name="bluetooth_obex_device_info">Bluetooth device info</string>
     <!-- Message when bluetooth dialog for Authorizing file receive -->
     <string name="bluetooth_authorize_receive_file_msg"><xliff:g id="device_name">%1$s</xliff:g> is sending <xliff:g id="file_name">%2$s</xliff:g>\n\n Accept ?\n</string>
+    <string name="bluetooth_obex_authorize_accept">Accept <xliff:g id="file_name">%s</xliff:g> </string>
+    <string name="bluetooth_obex_authorize_reject">Reject <xliff:g id="file_name">%s</xliff:g> </string>
     <!-- Message when bluetooth dialog for Authorizing Contact or Business card receive -->
     <string name="bluetooth_authorize_receive_contact_msg"><xliff:g id="device_name">%1$s</xliff:g> is sending Business Card\n\n Accept ?\n</string>
     <!-- Notification ticker text (shown in the status bar) when a Bluetooth device wants to send Obex files to us -->
     <string name="bluetooth_notify_obexauthorize_ticker">Bluetooth Transfer request</string>
-    <!-- Notification title when a Bluetooth device wants to transfer Obex files with us -->
+    <!-- Notification title when a Bluetooth device wants to transfer OBEX files with us -->
     <string name="bluetooth_notif_obexauthorize_title">Transfer request</string>
-    <!-- Notification message when a Bluetooth device wants to transfer Contact/vcard with us -->
+    <!-- Notification message when a Bluetooth device wants to transfer Contact/vCard with us -->
     <string name="bluetooth_notif_obexauthorize_contact_message">Receive Contact from device \u0020</string>
     <!-- Notification message when a Bluetooth device wants to transfer file with us -->
     <string name="bluetooth_notif_obexauthorize_file_message">Receive file from device \u0020</string>

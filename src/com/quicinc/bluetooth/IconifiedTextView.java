@@ -1,4 +1,4 @@
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 /* $Id: BulletedTextView.java 57 2007-11-21 18:31:52Z steven $
  *
@@ -22,7 +22,7 @@ package com.quic.bluetooth;
  * Dec 7, 2008: Peli: Use inflated layout.
  */
 
-import com.quic.bluetooth.R;
+import com.quicinc.bluetooth.R;
 
 import android.content.Context;
 import android.graphics.drawable.Drawable;

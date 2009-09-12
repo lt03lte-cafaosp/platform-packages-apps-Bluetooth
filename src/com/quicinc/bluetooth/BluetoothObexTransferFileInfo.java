@@ -26,7 +26,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import java.io.File;
 import java.io.FileNotFoundException;

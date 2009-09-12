@@ -15,12 +15,13 @@
  * limitations under the License.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothIntent;
 import android.bluetooth.obex.BluetoothObexIntent;
 import android.bluetooth.obex.BluetoothOpp;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
@@ -34,7 +35,7 @@ import android.widget.Toast;
 
 import com.android.internal.app.AlertActivity;
 import com.android.internal.app.AlertController;
-import com.quic.bluetooth.R;
+import com.quicinc.bluetooth.R;
 import java.io.File;
 
 /**
@@ -44,7 +45,7 @@ import java.io.File;
 public class BluetoothObexAuthorizeDialog extends AlertActivity implements DialogInterface.OnClickListener {
     private static final String TAG = "BluetoothObexAuthorizeDialog";
 
-    private LocalBluetoothManager mLocalManager;
+    private BluetoothDevice mBluetooth;
     private String mAddress;
     private String mFileName;
     private String mFileDisplayName;
@@ -67,9 +68,10 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
             return;
         }
 
-        mLocalManager = LocalBluetoothManager.getInstance(this);
         mAddress = intent.getStringExtra(BluetoothObexIntent.ADDRESS);
         mFileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
+
+        mBluetooth = (BluetoothDevice) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothOPP = new BluetoothOpp();
 
         if (mBluetoothOPP != null) {
@@ -100,7 +102,7 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
 
     private View createView() {
         View view = getLayoutInflater().inflate(R.layout.bluetooth_obex_authorize, null);
-        String deviceName = mLocalManager.getLocalDeviceManager().getName(mAddress);
+        String deviceName = mBluetooth.getRemoteName(mAddress);
         TextView messageView = (TextView) view.findViewById(R.id.message);
         if(mFileDisplayName == null) {
             Log.e(TAG, "Error: mFileDisplayName null >> " + mAddress + " " + mFileDisplayName);
@@ -113,12 +115,14 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
     }
 
     private void onAccept() {
-        Toast.makeText(BluetoothObexAuthorizeDialog.this, "Accept " + mFileDisplayName ,Toast.LENGTH_SHORT).show();
+        String szStr = getResources().getString(R.string.bluetooth_obex_authorize_accept, mFileDisplayName);
+        Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
         mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, true, mFileName);
     }
 
     private void onReject() {
-        Toast.makeText(BluetoothObexAuthorizeDialog.this, "Reject " + mFileDisplayName ,Toast.LENGTH_SHORT).show();
+        String szStr = getResources().getString(R.string.bluetooth_obex_authorize_reject, mFileDisplayName);
+        Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
         mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, false, mFileName);
     }
 

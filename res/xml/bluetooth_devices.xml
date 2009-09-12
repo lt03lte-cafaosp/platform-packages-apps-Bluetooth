@@ -18,7 +18,7 @@
 <PreferenceScreen
     xmlns:android="http://schemas.android.com/apk/res/android">
     <PreferenceCategory/>
-    <com.quic.bluetooth.ProgressCategory
+    <com.quicinc.bluetooth.ProgressCategory
         android:key="bt_device_list"
         android:title="@string/bluetooth_device_picker_title"
      />

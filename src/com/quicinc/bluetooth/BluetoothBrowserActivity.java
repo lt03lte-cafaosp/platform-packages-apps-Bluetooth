@@ -26,7 +26,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,11 +58,10 @@ import android.content.SharedPreferences;
 import android.content.DialogInterface.OnClickListener;
 import android.text.TextUtils;
 
-import com.quic.bluetooth.R;
+import com.quicinc.bluetooth.R;
 
 public class BluetoothBrowserActivity extends TabActivity implements BluetoothObexTransfer.Callback{
-
-    public static final boolean V = true;
+    public static final boolean V = false;
     private static final String TAG = "BluetoothBrowserActivity";
 
     protected static final int FINISHEDID = 0x1337;
@@ -83,7 +82,7 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
 
 
    /**
-    * For transfering contact over Bluetooth
+    * For transferring contact over Bluetooth
     */
    private BluetoothObexTransfer mBluetoothObexTransfer;
 
@@ -95,12 +94,11 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.v(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.main);
         /**
-         * For transfering contact over Bluetooth
+         * For transferring contact over Bluetooth
          */
         mBluetoothObexTransfer = new BluetoothObexTransfer(BluetoothBrowserActivity.this);
         mTabHost = getTabHost();
@@ -118,37 +116,31 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        Log.v(TAG, "onSaveInstanceState");
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        Log.v(TAG, "onStart");
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        Log.v(TAG, "onStop");
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        Log.v(TAG, "onPause");
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        Log.v(TAG, "onResume");
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.v(TAG, "onDestroy");
         if(mBluetoothObexTransfer != null) {
             mBluetoothObexTransfer.onDestroy();
       }
@@ -157,24 +149,18 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
-        Log.v(TAG, "onCreateOptionsMenu");
-
         return true;
     }
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         super.onPrepareOptionsMenu(menu);
-        Log.v(TAG, "onPrepareOptionsMenu");
-
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         super.onOptionsItemSelected(item);
-        Log.v(TAG, "onPrepareOptionsMenu");
-
         return true;
     }
 
@@ -278,21 +264,21 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
         super.onPrepareDialog(id, dialog);
         switch (id) {
         case DIALOG_BACK_DISCONNECT:
-         String msg = "Disconnect from Bluetooth Device";
-         if(mRemoteFileManagerActivity != null) {
-            if(mRemoteFileManagerActivity.mFTPClient != null) {
-               msg = "Disconnet from : " + getFTPServerName() + " ?";
-            }
-         }
-            ((AlertDialog) dialog).setTitle(msg);
-            break;
+           String msg = "Disconnect from Bluetooth Device";
+           if(mRemoteFileManagerActivity != null) {
+              if(mRemoteFileManagerActivity.mFTPClient != null) {
+                 msg = "Disconnet from : " + getFTPServerName() + " ?";
+              }
+           }
+           ((AlertDialog) dialog).setTitle(msg);
+           break;
 
         case DIALOG_PROGRESS:
            if (mProgressDialog != null) {
                mProgressDialog.setTitle(getFTPServerName());
                mProgressDialog.setMessage(getTransferFileMessage());
            }
-            break;
+           break;
 
         }
     }
@@ -357,7 +343,8 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
         boolean connected = false;
         if(mRemoteFileManagerActivity != null) {
             if(mRemoteFileManagerActivity.mFTPClient != null) {
-                connected = mRemoteFileManagerActivity.mFTPClient.isConnectionActive();
+                connected = mRemoteFileManagerActivity.mFTPClient.isConnectionActive()
+                         && mRemoteFileManagerActivity.mSessionCreated;
             }
         }
         return connected;
@@ -375,11 +362,8 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
                    Log.i(TAG, "File to Send: " + file.getCanonicalPath());
                    if(true != mRemoteFileManagerActivity.mFTPClient.putFile(filename, file.getName()))
                    {
-                       Toast.makeText(
-                               this,
-                               "Failed to send the file : " + file.getName()
-                                       + " to :" + getFTPServerName(), Toast.LENGTH_LONG)
-                               .show();
+                       String szStr = getResources().getString(R.string.ftp_send_failed, file.getName(), getFTPServerName());
+                       Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
                    }
                }
          }
@@ -391,77 +375,79 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
 
     public void onCancelTransfer() {
         /** Clean up after the cancel */
-      closeTransferProgress();
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            mRemoteFileManagerActivity.mFTPClient.CancelTransfer();
-         }
+        closeTransferProgress();
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                mRemoteFileManagerActivity.mFTPClient.CancelTransfer();
+            }
         }
     }
 
     public void updateProgressStats() {
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            boolean transferInProgress = mRemoteFileManagerActivity.mFTPClient.isTransferInProgress();
-            if (mProgressDialog != null)
-            {
-               /* Update the progress bar */
-               if (transferInProgress == true) {
-                  mProgressDialog.setMessage(getTransferFileMessage());
-                  mProgressDialog.setMax((int)mRemoteFileManagerActivity.mFTPClient.getTotalBytes());
-                  mProgressDialog.setProgress((int)mRemoteFileManagerActivity.mFTPClient.getDoneBytes());
-               }
-               else
-               {
-                  closeTransferProgress();
-               }
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                boolean transferInProgress = mRemoteFileManagerActivity.mFTPClient.isTransferInProgress();
+                if (mProgressDialog != null)
+                {
+                    /* Update the progress bar */
+                    if (transferInProgress == true) {
+                        mProgressDialog.setMessage(getTransferFileMessage());
+                        mProgressDialog.setMax((int)mRemoteFileManagerActivity.mFTPClient.getTotalBytes());
+                        mProgressDialog.setProgress((int)mRemoteFileManagerActivity.mFTPClient.getDoneBytes());
+                    }
+                    else
+                    {
+                        closeTransferProgress();
+                    }
+                }
             }
-         }
-      }
+        }
     }
 
-   /* Routine to provide the name of the file(s) being sent/received.
-      Right now, we only support only one transfer at a time
-      */
-   public String getTransferFileMessage() {
-      String szTxString = "";
-      String szRxString = "";
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            int txCount = mRemoteFileManagerActivity.mFTPClient.getTxFilesCount();
-            if( txCount > 0) {
-               if( txCount == 1) {
-                 BluetoothObexTransferFileInfo fileInfo = (BluetoothObexTransferFileInfo) mRemoteFileManagerActivity.mFTPClient.getTxFileItem(0);
-                 szTxString = getString(R.string.sending_progress_one, fileInfo.getDisplayName());
-               }else {
-                 szTxString = getString(R.string.sending_progress_more, (String)(""+txCount));
-               }
+    /** Routine to provide the name of the file(s) being sent/received.
+     *  Right now, we only support only one transfer at a time
+     */
+    public String getTransferFileMessage() {
+        String szTxString = "";
+        String szRxString = "";
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                int txCount = mRemoteFileManagerActivity.mFTPClient.getTxFilesCount();
+                if( txCount > 0) {
+                    if( txCount == 1) {
+                        BluetoothObexTransferFileInfo fileInfo = (BluetoothObexTransferFileInfo) mRemoteFileManagerActivity.mFTPClient.getTxFileItem(0);
+                        szTxString = getString(R.string.sending_progress_one, fileInfo.getDisplayName());
+                    }else {
+                        szTxString = getString(R.string.sending_progress_more, (String)(""+txCount));
+                    }
+                }
+                int rxCount = mRemoteFileManagerActivity.mFTPClient.getRxFilesCount();
+                if( rxCount > 0) {
+                    if (txCount > 0) {
+                        szTxString += ", ";
+                    }
+
+                    if( rxCount == 1) {
+                        BluetoothObexTransferFileInfo fileInfo = (BluetoothObexTransferFileInfo) mRemoteFileManagerActivity.mFTPClient.getRxFileItem(0);
+                        szRxString = getString(R.string.get_progress_one, fileInfo.getDisplayName());
+                    }else {
+                        szRxString = getString(R.string.get_progress_more, (String)(""+rxCount));
+                    }
+                }
             }
-            int rxCount = mRemoteFileManagerActivity.mFTPClient.getRxFilesCount();
-            if( rxCount > 0) {
-               if (txCount > 0) {
-                 szTxString += ", ";
-               }
+        }
+        return (szTxString + szRxString);
+    }
 
-               if( rxCount == 1) {
-                 BluetoothObexTransferFileInfo fileInfo = (BluetoothObexTransferFileInfo) mRemoteFileManagerActivity.mFTPClient.getRxFileItem(0);
-                 szRxString = getString(R.string.get_progress_one, fileInfo.getDisplayName());
-               }else {
-                 szRxString = getString(R.string.get_progress_more, (String)(""+rxCount));
-               }
-            }
-         }
-     }
-     return (szTxString + szRxString);
-   }
-
-   public void closeTransferProgress() {
-      if (mProgressDialog != null) {
-         removeDialog(DIALOG_PROGRESS);
-         mProgressDialog=null;
-      }
-   }
-
+    /**
+     * Close the Transfer Progress
+     */
+    public void closeTransferProgress() {
+        if (mProgressDialog != null) {
+            removeDialog(DIALOG_PROGRESS);
+            mProgressDialog=null;
+        }
+    }
 
     /**
      * Initiate a Send File
@@ -502,9 +488,9 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
             }
             case ADDSENDFILE:
             case ADDGETFILE:{
-                  initiateTransferUI();
-                  updateProgressStats();
-                  break;
+                initiateTransferUI();
+                updateProgressStats();
+                break;
             }
             default:
                 break;

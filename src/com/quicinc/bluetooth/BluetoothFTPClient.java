@@ -26,7 +26,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.quic.bluetooth;
+package com.quicinc.bluetooth;
 
 import android.bluetooth.obex.BluetoothObexIntent;
 import android.bluetooth.obex.BluetoothOpp;
@@ -42,10 +42,8 @@ import java.lang.Object;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
 import android.text.TextUtils;
-
-///import android.widget.Toast;
+import android.util.Log;
 
 public class BluetoothFTPClient {
    private static final String TAG = "BluetoothFTPClient";
@@ -74,7 +72,7 @@ public class BluetoothFTPClient {
       mTotalBytes = 0;
 
       try {
-         mBluetoothFtp = new BluetoothFtp ();
+         mBluetoothFtp = new BluetoothFtp();
          mCallbackHandler = new CallbackHandler();
       } catch (RuntimeException e) {
          Log.e(TAG, "", e);
@@ -172,7 +170,6 @@ public class BluetoothFTPClient {
       return listFolderInitiated;
    }//listFolder
 
-
    /**
     * Change the current folder on the remote device
     * This is an asynchronous call.
@@ -186,11 +183,11 @@ public class BluetoothFTPClient {
       if (null != mBluetoothFtp) {
          changeFolderInitiated = mBluetoothFtp.changeFolder(folder);
       }
-      Log.i(TAG, "changeFolder returned " + changeFolderInitiated);
+      Log.i(TAG, "changeFolderInitiated returned " + changeFolderInitiated);
       return changeFolderInitiated;
    }//changeFolder
 
-    /**
+   /**
      * Create a folder on the remote device
      * This is an asynchronous call.
      *
@@ -198,14 +195,15 @@ public class BluetoothFTPClient {
      *
      * @return false indicates immediate error
      */
-    public boolean createFolder(String folder) {
-       boolean createFolderInitiated = false;
-       if (null != mBluetoothFtp) {
-          createFolderInitiated = mBluetoothFtp.createFolder(folder);
-       }
-       Log.i(TAG, "createFolder returned " + createFolderInitiated);
-       return createFolderInitiated;
-    }//createFolder
+   public boolean createFolder(String folder) {
+      boolean createFolderInitiated = false;
+      if (null != mBluetoothFtp) {
+         createFolderInitiated = mBluetoothFtp.createFolder(folder);
+      }
+      Log.i(TAG, "createFolderInitiated returned " + createFolderInitiated);
+      return createFolderInitiated;
+   }//createFolder
+
    /**
     * Request a list of the current folder contents on the remote device.
     * This is an asynchronous call.
@@ -217,7 +215,7 @@ public class BluetoothFTPClient {
       if (null != mBluetoothFtp) {
          deleteInitiated = mBluetoothFtp.delete(name);
       }
-      Log.i(TAG, "delete returned " + deleteInitiated);
+      Log.i(TAG, "deleteInitiated returned " + deleteInitiated);
       return deleteInitiated;
    }//delete
 
@@ -367,7 +365,7 @@ public class BluetoothFTPClient {
             BluetoothObexTransferFileInfo fileInfo = (BluetoothObexTransferFileInfo) iter.next();
             if (fileInfo != null) {
                if (fileName.equals(fileInfo.getName())) {
-                  /* Set Done = total and let the updateprogress take care of remove the file from the list */
+                  /* Set Done = total and let the updateProgress take care of remove the file from the list */
                   fileInfo.setDone(fileInfo.getTotal());
                   iter.remove();
                   Log.i(TAG, "Removed file from mSendingFileList : "+fileName );
@@ -403,7 +401,7 @@ public class BluetoothFTPClient {
             BluetoothObexTransferFileInfo fileInfo = (BluetoothObexTransferFileInfo) iter.next();
             if (fileInfo != null) {
                if (fileName.equals(fileInfo.getName())) {
-                  /* Set Done = total and let the updateprogress take care of remove the file from the list */
+                  /* Set Done = total and let the updateProgress take care of remove the file from the list */
                   fileInfo.setDone(fileInfo.getTotal());
                   iter.remove();
                   Log.i(TAG, "Removed file from mReceivingFileList : "+fileName );
@@ -629,7 +627,7 @@ public class BluetoothFTPClient {
       */
       public void onCreateFolderComplete(String folder, boolean isError) {
          if (V) {
-            Log.i(TAG, "onCreateFolderComplete : Folder: "+folder+ "isError : " + isError);
+            Log.i(TAG, "onCreateFolderComplete : Folder: "+folder+ " isError : " + isError);
          }
          Message msg = Message.obtain();
          msg.what = TYPE_CREATE_FOLDER_COMPLETE;
@@ -646,7 +644,7 @@ public class BluetoothFTPClient {
       */
       public void onChangeFolderComplete(String folder, boolean isError) {
          if (V) {
-            Log.i(TAG, "onChangeFolderComplete : Folder: "+folder+ "isError : " + isError);
+            Log.i(TAG, "onChangeFolderComplete : Folder: "+folder+ " isError : " + isError);
          }
          Message msg = Message.obtain();
          msg.what = TYPE_CHANGE_FOLDER_COMPLETE;
@@ -688,7 +686,7 @@ public class BluetoothFTPClient {
       */
       public void onGetFileComplete(String localFilename, String remoteFilename, boolean isError) {
          if (V) {
-            Log.i(TAG, "onGetFileComplete : local: "+localFilename+ "Remote: "+remoteFilename+ "isError : " + isError);
+            Log.i(TAG, "onGetFileComplete : local: "+localFilename+ "Remote: "+remoteFilename+ " isError : " + isError);
          }
          Message msg = Message.obtain();
          msg.what = TYPE_GETFILE_COMPLETE;
@@ -725,7 +723,7 @@ public class BluetoothFTPClient {
       */
       public void onDeleteComplete(String name, boolean isError) {
          if (V) {
-            Log.i(TAG, "onDeleteComplete : name: "+name+ "isError : " + isError);
+            Log.i(TAG, "onDeleteComplete : name: " + name + " isError : " + isError);
          }
          Message msg = Message.obtain();
          msg.what = TYPE_DELETE_COMPLETE;
@@ -804,7 +802,7 @@ public class BluetoothFTPClient {
       }
    }
 
-    public interface Callback {
+   public interface Callback {
       /**
        * @param isError true if error executing createSession, false otherwise
       */

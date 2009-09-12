@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-      package="com.quic.bluetooth"
+      package="com.quicinc.bluetooth"
       android:versionCode="1"
       android:versionName="1.0.0">
 
@@ -20,6 +20,8 @@
                  android:label="@string/bluetooth_label">
 
         <activity android:name=".BluetoothBrowserActivity"
+                  android:icon="@drawable/ic_launcher_bluetooth"
+                  android:label="@string/bluetooth_browser_label"
                   android:configChanges="keyboardHidden|orientation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -51,9 +53,26 @@
     <activity android:name=".BluetoothDevicePicker"
               android:label="@string/bluetooth_device_picker_title"
               android:theme="@android:style/Theme.NoTitleBar">
+        <intent-filter>
+            <action android:name="com.quicinc.bluetooth.ACTION_PUSH_BUSINESS_CARD" />
+            <action android:name="com.quicinc.bluetooth.ACTION_PULL_BUSINESS_CARD" />
+            <action android:name="com.quicinc.bluetooth.ACTION_PUSH_FILE" />
+            <action android:name="com.quicinc.bluetooth.ACTION_SELECT_BLUETOOTH_DEVICE" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
     </activity>
 
-    <!-- Bluetooth OBEX Authorize stuff -->
+    <activity android:name=".BluetoothOppActivity"
+              android:theme="@android:style/Theme.NoTitleBar">
+        <intent-filter>
+            <action android:name="com.quicinc.bluetooth.ACTION_PUSH_BUSINESS_CARD" />
+            <action android:name="com.quicinc.bluetooth.ACTION_PULL_BUSINESS_CARD" />
+            <action android:name="com.quicinc.bluetooth.ACTION_PUSH_FILE" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
+    </activity>
+
+    <!-- Bluetooth OBEX Authorize related -->
     <activity android:name=".BluetoothObexAuthorizeDialog"
               android:label="@string/bluetooth_obex_authorize"
               android:theme="@*android:style/Theme.Dialog.Alert">
