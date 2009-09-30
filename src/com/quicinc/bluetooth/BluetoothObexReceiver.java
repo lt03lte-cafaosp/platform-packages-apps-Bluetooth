@@ -39,18 +39,22 @@ import android.text.TextUtils;
 import android.util.Log;
 
 /**
- * BluetoothObexAuthorize is a receiver for any Bluetooth
- * OBEX Authorization request. It checks if the Bluetooth
- * Settings is currently visible and brings up Accept/Reject
- * dialog. Otherwise it puts a Notification in the status bar,
- * which can be clicked to bring up the Accept/Reject entry
- * dialog.
+ * BluetoothObexReceiver is a receiver for any Bluetooth OBEX
+ * Authorization request. This receiver handles the OBEX
+ * AUTHORIZE_ACTION and RX_COMPLETE_ACTION as part of the OPP
+ * Server Application handling.
+ * AUTHORIZE_ACTION: Invokes the service to launch the
+ * BluetoothObexAuthorizeDialog to Accept/Reject the connection.
+ * RX_COMPLETE_ACTION: Invokes the service to handle the
+ * received VCard or Media File.
+ *
  */
+
 public class BluetoothObexReceiver extends BroadcastReceiver {
    static final Object mStartingServiceSync = new Object();
    static PowerManager.WakeLock mStartingService;
 
-   private static final String TAG = "BluetoothObexAuthorize";
+   private static final String TAG = "BluetoothObexReceiver";
    private String mAddress;
    private String mFileName;
    private String mObjectType;
@@ -63,7 +67,7 @@ public class BluetoothObexReceiver extends BroadcastReceiver {
          beginStartingService(context, intent);
       } else if (action.equals(BluetoothObexIntent.RX_COMPLETE_ACTION)) {
          Log.v(TAG, "onReceive : RX_COMPLETE_ACTION ");
-         boolean rxCompleteSuccess = intent.getBooleanExtra(BluetoothObexIntent.SUCCESS, true);
+         boolean rxCompleteSuccess = intent.getBooleanExtra(BluetoothObexIntent.SUCCESS, false);
 
          /* If Notifications are disabled */
          if (BluetoothObexReceiverService.mNoNotification == false) {
@@ -75,7 +79,7 @@ public class BluetoothObexReceiver extends BroadcastReceiver {
          *   into the Android system (Contacts Database for vCard or run
          *   media scanner if it is a media file.
          */
-         if (rxCompleteSuccess != false) {
+         if (rxCompleteSuccess == true) {
             intent.setClass(context, BluetoothObexReceiverService.class);
             beginStartingService(context, intent);
          }
