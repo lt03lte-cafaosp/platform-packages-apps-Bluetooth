@@ -97,7 +97,11 @@
     <string name="opp_media_file_received">Media File received</string>
     <string name="opp_vcard_outofmemory">Rejected vCard due to big size</string>
     <string name="no_sdcard_exist">SD Card does not exist</string>
+    <string name="ftp_changing_folder">Changing folder</string>
     <string name="ftp_send_failed">Failed to send <xliff:g id="file_name">%1$s</xliff:g> to <xliff:g id="device_name">%2$s</xliff:g></string>
+    <string name="ftp_change_folder_failed">Failed to change folder in remote device</string>
+    <string name="ftp_create_folder_failed">Failed to create folder in remote device</string>
+    <string name="ftp_refresh_folder_failed">Failed to refresh folder list</string>
     <string name="ftp_connect_device">Connecting to <xliff:g id="device_name">%s</xliff:g></string>
     <string name="ftp_connect_failed">Connection could not be initiated with <xliff:g id="device_name">%s</xliff:g>.\nCheck if File Transfer Service is enabled.</string>
     <string name="ftp_download_failed"><xliff:g id="file_name">%1$s</xliff:g> could not be downloaded from <xliff:g id="device_name">%2$s</xliff:g></string>
