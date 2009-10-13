@@ -91,6 +91,7 @@
     <string name="get_businesscard">Receiving Business Card</string>
     <string name="get_multiple_businesscards">Receiving <xliff:g id="rx_progress_more_text">%s</xliff:g> Business Cards</string>
     <string name="receive_contact_done">Received Contact : <xliff:g id="receive_sontact_text">%s</xliff:g></string>
+    <string name="opp_connect_status">Connecting...</string>
     <string name="opp_ftp_send_failed">Failed to send via Bluetooth</string>
     <string name="opp_get_failed">Failed to pull Business Card from <xliff:g id="device_name">%s</xliff:g></string>
     <string name="opp_not_available">OPP service is not available!</string>
