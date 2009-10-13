@@ -58,8 +58,6 @@ public class BluetoothOppActivity extends Activity {
     private static BluetoothObexTransfer mBluetoothObexTransfer = null;
     private static BluetoothOppClient mBluetoothOppClient = null;
 
-    private static final int DIALOG_BT_PROGRESS = 1;
-    private static final int DIALOG_BT_PROGRESS_INDETERMINATE = 2;
     private Uri mUri;
 
     @Override
@@ -118,33 +116,33 @@ public class BluetoothOppActivity extends Activity {
         Log.v(TAG, "onCreate : serverAddress - "+ serverAddress);
         Log.v(TAG, "onCreate : serverName - "+ serverName);
 
-      if(parametersOk==true)
-      {
-         parametersOk=false;
-         mBluetoothOppClient = new BluetoothOppClient(this, mTransferProgressCallback);
-         mBluetoothObexTransfer = new BluetoothObexTransfer(this );
-         mBluetoothObexTransfer.registerCallback(mBluetoothOppClient);
-         if (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PUSH_BUSINESS_CARD))
-         {
-            mBluetoothOppClient.sendContact(mUri, serverAddress);
-            parametersOk=true;
-         }
-         else if (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PULL_BUSINESS_CARD))
-         {
-            mBluetoothOppClient.getContact(serverAddress);
-            parametersOk=true;
-         }
-         else if (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PUSH_FILE))
-         {
-              mBluetoothOppClient.sendMedia(mUri, serverAddress, BluetoothOppActivity.this);
-              parametersOk=true;
-         }
-      }
-      if(parametersOk==false)
-      {
-         finish();
-         return;
-      }
+        if(parametersOk==true)
+        {
+            parametersOk=false;
+            mBluetoothOppClient = new BluetoothOppClient(this, mTransferProgressCallback);
+            mBluetoothObexTransfer = new BluetoothObexTransfer(this );
+            mBluetoothObexTransfer.registerCallback(mBluetoothOppClient);
+            if (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PUSH_BUSINESS_CARD))
+            {
+                mBluetoothOppClient.sendContact(mUri, serverAddress);
+                parametersOk=true;
+            }
+            else if (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PULL_BUSINESS_CARD))
+            {
+                mBluetoothOppClient.getContact(serverAddress);
+                parametersOk=true;
+            }
+            else if (mIntent.getAction().equals(BluetoothAppIntent.ACTION_PUSH_FILE))
+            {
+                mBluetoothOppClient.sendMedia(mUri, serverAddress, BluetoothOppActivity.this);
+                parametersOk=true;
+            }
+        }
+        if(parametersOk==false)
+        {
+            finish();
+            return;
+        }
     }
 
     /**
@@ -155,7 +153,7 @@ public class BluetoothOppActivity extends Activity {
     {
        super.onDestroy();
        if(mBluetoothOppClient != null){
-          mBluetoothOppClient.Cleanup();
+          mBluetoothOppClient.cleanup();
        }
 
        if(mBluetoothObexTransfer != null){
@@ -167,9 +165,9 @@ public class BluetoothOppActivity extends Activity {
 
     @Override
     protected Dialog onCreateDialog(int id) {
-        switch (id) {
-        case DIALOG_BT_PROGRESS:
-        case DIALOG_BT_PROGRESS_INDETERMINATE:
+        if (id == mBluetoothOppClient.DIALOG_BT_PROGRESS ||
+            id == mBluetoothOppClient.DIALOG_BT_PROGRESS_INDETERMINATE ||
+            id == mBluetoothOppClient.DIALOG_BT_PROGRESS_CONNECT) {
             return createBluetoothProgressDialog(id);
         }
         return null;
@@ -178,25 +176,18 @@ public class BluetoothOppActivity extends Activity {
     /*************************************
       Bluetooth transfer related UI - Start
       ************************************ */
-    /** Dialog that displays the progress of the Put/Get */
+    /* Dialog that displays the progress of the Put/Get */
     private ProgressDialog mProgressDialog=null;
     private int mProgressDlgId ;
     private BluetoothOppClient.TransferProgressCallback mTransferProgressCallback = new BluetoothOppClient.TransferProgressCallback () {
 
-       public void onStart(boolean showCancelProgress) {
-          if(mBluetoothObexTransfer != null)
-          {
-             if (showCancelProgress) {
-                showDialog(DIALOG_BT_PROGRESS);
-             }
-             else
-             {
-                showDialog(DIALOG_BT_PROGRESS_INDETERMINATE);
-             }
-             if(mProgressHandler != null) {
-                mProgressHandler.sendEmptyMessage(0);
-             }
-          }
+       public void onStart(int showDialogId) {
+           if(mBluetoothObexTransfer != null) {
+               showDialog(showDialogId);
+               if(mProgressHandler != null) {
+                   mProgressHandler.sendEmptyMessage(0);
+               }
+           }
        }
 
        public void onUpdate() {
@@ -206,6 +197,14 @@ public class BluetoothOppActivity extends Activity {
                if (! mProgressDialog.isIndeterminate()) {
                   mProgressDialog.setMax((int)mBluetoothOppClient.getTotalBytes());
                   mProgressDialog.setProgress((int)mBluetoothOppClient.getDoneBytes());
+               }
+           }
+       }
+       public void onTransfer(int hideDialogId) {
+           if(mBluetoothObexTransfer != null) {
+               removeDialog(hideDialogId);
+               if (mProgressDialog != null) {
+                   mProgressDialog = null;
                }
            }
        }
@@ -222,15 +221,15 @@ public class BluetoothOppActivity extends Activity {
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             if (mProgressDialog != null) {
-               if(mBluetoothOppClient.isTransferinProgress()) {
-                  mProgressHandler.sendEmptyMessageDelayed(0, 3000);
-               }
-               else
-               {
-                  removeDialog(mProgressDlgId);
-                  mProgressDialog=null;
-                  finish();
-               }
+                if(mBluetoothOppClient.isTransferInProgress()) {
+                    mProgressHandler.sendEmptyMessageDelayed(0, 3000);
+                }
+                else
+                {
+                    removeDialog(mProgressDlgId);
+                    mProgressDialog=null;
+                    finish();
+                }
             }
         }
     };
@@ -239,19 +238,19 @@ public class BluetoothOppActivity extends Activity {
        Dialog dlg = null;
        if(mBluetoothOppClient != null)
        {
-           mProgressDlgId = id;
+          mProgressDlgId = id;
           /* If the transfer completed even before the progress dialog is launched,
              no need to open the transfer progress
              */
-          if(mBluetoothOppClient.isTransferinProgress()) {
+          if(mBluetoothOppClient.isTransferInProgress()) {
              mProgressDialog = new ProgressDialog(BluetoothOppActivity.this);
 
              mProgressDialog.setTitle(mBluetoothOppClient.getActiveRemoteOPPServerName());
-             mProgressDialog.setMessage(mBluetoothOppClient.getTransferFileMessage());
              mProgressDialog.setIcon(R.drawable.ic_launcher_bluetooth);
-             if(mProgressDlgId == DIALOG_BT_PROGRESS)
+             if(mProgressDlgId == mBluetoothOppClient.DIALOG_BT_PROGRESS)
              {
                 mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                mProgressDialog.setMessage(mBluetoothOppClient.getTransferFileMessage());
 
                 mProgressDialog.setMax((int)mBluetoothOppClient.getTotalBytes());
                 mProgressDialog.setProgress((int)mBluetoothOppClient.getDoneBytes());
@@ -264,7 +263,7 @@ public class BluetoothOppActivity extends Activity {
                          mBluetoothOppClient.CancelTransfer();
                       }
                     }
-                }
+                  }
                 );
                 mProgressDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
                    public void onCancel(DialogInterface dialog) {
@@ -272,12 +271,16 @@ public class BluetoothOppActivity extends Activity {
                       {
                          mBluetoothOppClient.CancelTransfer();
                       }
-                   }
-                }
+                    }
+                  }
                 );
-             }
-             else {
+             } else {
                 mProgressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+                if (mProgressDlgId == mBluetoothOppClient.DIALOG_BT_PROGRESS_CONNECT) {
+                    mProgressDialog.setMessage(getString(R.string.opp_connect_status));
+                } else {
+                    mProgressDialog.setMessage(mBluetoothOppClient.getTransferFileMessage());
+                }
              }
           }
        }

@@ -146,7 +146,6 @@ public class BluetoothObexTransfer {
                 }
             }
 
-
          } else if (action.equals(BluetoothObexIntent.RX_COMPLETE_ACTION)) {
             String fileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
             boolean success = intent.getBooleanExtra(BluetoothObexIntent.SUCCESS, false);
@@ -161,18 +160,21 @@ public class BluetoothObexTransfer {
             String fileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
             boolean success = intent.getBooleanExtra(BluetoothObexIntent.SUCCESS, false);
             String errorMsg = intent.getStringExtra(BluetoothObexIntent.ERROR_MESSAGE);
-
-            if( false == success ) {
-                Toast.makeText(mActivity, R.string.opp_ftp_send_failed, Toast.LENGTH_LONG).show();
-            }
-
             synchronized (mCallbacks) {
                 for (Callback callback : mCallbacks) {
                    callback.onTransmitCompleteIndication(fileName, success, errorMsg);
                 }
             }
 
+         } else if (action.equals(BluetoothObexIntent.CONNECT_STATUS_ACTION)) {
+            boolean success = intent.getBooleanExtra(BluetoothObexIntent.SUCCESS, false);
+            synchronized (mCallbacks) {
+                for (Callback callback : mCallbacks) {
+                   callback.onConnectStatusIndication(success);
+                }
+            }
          }
+
       }
    };
 
@@ -183,6 +185,7 @@ public class BluetoothObexTransfer {
             IntentFilter filter = new IntentFilter();
 
             // Bluetooth on/off broadcasts
+            filter.addAction(BluetoothObexIntent.CONNECT_STATUS_ACTION);
             filter.addAction(BluetoothObexIntent.PROGRESS_ACTION);
             filter.addAction(BluetoothObexIntent.TX_COMPLETE_ACTION);
             filter.addAction(BluetoothObexIntent.RX_COMPLETE_ACTION);
@@ -206,15 +209,22 @@ public class BluetoothObexTransfer {
          }
       }
    }
+
    public interface Callback {
      /*
       * @param fileName Name of the file that completed transfer
       *
       * @param success true if transmit completed successfully
       *                otherwise false
-      * @param errorString if success = false, errorString contains the errorstring
+      * @param errorString if success = false, errorString contains the error string
       */
       void onTransmitCompleteIndication(String fileName, boolean success, String errorString);
+
+      /*
+       * @param success true if transmit completed successfully
+       *                otherwise false
+       */
+      void onConnectStatusIndication(boolean success);
 
       /*
        * @param fileName Name of the file that completed transfer

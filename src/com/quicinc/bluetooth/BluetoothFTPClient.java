@@ -134,7 +134,7 @@ public class BluetoothFTPClient {
       }
       mName = "";
       mAddress = "";
-      Cleanup();
+      cleanup();
    }//closeSession
 
    /**
@@ -267,7 +267,7 @@ public class BluetoothFTPClient {
    }
 
    /**
-    * Send File
+    * Receive File
     */
    public boolean getFile(String localPathName, String remoteFileName) {
       boolean getStarted = false;
@@ -322,14 +322,14 @@ public class BluetoothFTPClient {
             }//while iter.hasNext
          }//synchronized (mSendingFileList)
       }
-      Cleanup();
+      cleanup();
    }
 
    /**
     * When a Server is disconnected, and Tab = "Remote Files", then 1. Clean up
     * the server listing.
     */
-   public void Cleanup() {
+   public void cleanup() {
       synchronized (mSendingFileList) {
          mSendingFileList.clear();
       }

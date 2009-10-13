@@ -72,6 +72,10 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
    private static final boolean useSdCardForVCard = false;
    private static final int PULL_VCARD_UNKNOWN_SIZE = 1000;
 
+   public static final int DIALOG_BT_PROGRESS = 1;
+   public static final int DIALOG_BT_PROGRESS_INDETERMINATE = 2;
+   public static final int DIALOG_BT_PROGRESS_CONNECT = 3;
+
    private static final String TAG = "BluetoothOppClient";
    private BluetoothDevice mBluetooth;
 
@@ -109,13 +113,20 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
    private void setActiveRemoteOPPServerName(String name) {
       mOPPServerName = name;
    }
-   public void showProgress(boolean showCancelProgress) {
+
+   public void hideProgress(int hideDialogId) {
       if (mTransferProgressCallback != null) {
-         mTransferProgressCallback.onStart(showCancelProgress);
+          mTransferProgressCallback.onTransfer(hideDialogId);
       }
    }
 
-   public void Cleanup() {
+   public void showProgress(int showDialogId) {
+      if (mTransferProgressCallback != null) {
+         mTransferProgressCallback.onStart(showDialogId);
+      }
+   }
+
+   public void cleanup() {
       mProgressPercent=0;
       mTotalBytes = 0;
       mDoneBytes = 0;
@@ -166,7 +177,7 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
             mReceivingContactsList.clear();
          }//synchronized (mSendingFileList)
       }
-      Cleanup();
+      cleanup();
       String cancelString = new String();
       if ( (rxCanceled) && (txCanceled)) {
          cancelString = mActivity.getResources().getString(R.string.cancel_tx_rx_transfer);
@@ -185,7 +196,7 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
       if (V) {
          Log.i(TAG, "Transfer Complete ");
       }
-      Cleanup();
+      cleanup();
    }
 
    public String getTransferFileMessage() {
@@ -291,6 +302,9 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
                if (fileName.equals(fileInfo.getName())) {
                   /* Set Done = total and let the updateProgress take care of remove the file from the list */
                   fileInfo.setDone(fileInfo.getTotal());
+                  if( false == success ) {
+                      Toast.makeText(mActivity, R.string.opp_ftp_send_failed, Toast.LENGTH_LONG).show();
+                  }
                   fileInfo.deleteIfVCard(mActivity);
                   iter.remove();
                   break;
@@ -299,6 +313,26 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
          }//while iter.hasNext
       }//synchronized (mSendingFileList)
       updateProgress();
+   }
+
+   /* onConnectStatusIndication
+    *  This routine will handle the CONNECT_STATUS_ACTION broadcast
+    *
+    * @param success:  true: Is transfer succeeded. false: transfer failed
+    *
+    * @return None.
+    */
+   public void onConnectStatusIndication(boolean success) {
+
+      if( false == success ) {
+          Toast.makeText(mActivity, R.string.opp_ftp_send_failed, Toast.LENGTH_LONG).show();
+          cleanup();
+      }
+      else {
+          hideProgress(DIALOG_BT_PROGRESS_CONNECT);
+          showProgress(DIALOG_BT_PROGRESS);
+          updateProgress();
+      }
    }
 
    /* onReceiveCompleteIndication
@@ -331,7 +365,7 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
       updateProgress();
    }
 
-   public boolean isTransferinProgress() {
+   public boolean isTransferInProgress() {
       boolean transferActive=false;
       if(isEnabled() && (mBluetoothOPP != null)) {
          synchronized (mSendingFileList) {
@@ -418,7 +452,7 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
       }
       mDoneBytes = (currentRxDone+currentTxDone);
 
-      if(isTransferinProgress() && (mTransferProgressCallback != null)) {
+      if(isTransferInProgress() && (mTransferProgressCallback != null)) {
          /* Update the progress bar only for horizontal bar */
          mTransferProgressCallback.onUpdate();
       } else {
@@ -602,7 +636,7 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
                /* The size of the contact VCard is unknown,
                   and also there is no Cancel for "pullBusinesscard"
                */
-               showProgress(false);
+               showProgress(DIALOG_BT_PROGRESS_INDETERMINATE);
             }
          }//vcfFile non empty
       }//isEnabled
@@ -672,7 +706,7 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
       }
 
       if (true != TextUtils.isEmpty(fileName)) {
-         /* Initate the push */
+         /* Initiate the push */
          if (null != mBluetoothOPP) {
             bStarted = mBluetoothOPP.pushObject(bluetoothDeviceAddress, fileName);
          }
@@ -687,11 +721,11 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
                mSendingFileList.add(fileinfo);
                mTotalBytes += fileSize;
             }
-            showProgress(true);
+            showProgress(DIALOG_BT_PROGRESS_CONNECT);
          }
          else {
-             Toast.makeText(mActivity, R.string.opp_not_available, Toast.LENGTH_LONG).show();
-             Cleanup();
+            Toast.makeText(mActivity, R.string.opp_not_available, Toast.LENGTH_LONG).show();
+            cleanup();
          }
       }
    }
@@ -702,14 +736,19 @@ public class BluetoothOppClient implements BluetoothObexTransfer.Callback {
       *
       * @param:  boolean showCancelProgress: If transfer progress has to be displayed.
       */
-      public void onStart(boolean showCancelProgress);
+      public void onStart(int showDialogId);
 
      /*
       * Routine to update the transfer progress dialog
       */
       public void onUpdate();
 
-      /*
+     /*
+      * Routine to close the busy waiting dialog
+      */
+      public void onTransfer(int hideDialogId);
+
+     /*
       * Routine to close the transfer progress dialog
       */
       public void onComplete();

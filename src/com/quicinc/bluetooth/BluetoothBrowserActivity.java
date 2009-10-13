@@ -207,55 +207,53 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
 
     @Override
     protected Dialog onCreateDialog(int id) {
-       if(mRemoteFileManagerActivity != null) {
-          if(mRemoteFileManagerActivity.mFTPClient != null) {
-              switch (id) {
-              case DIALOG_BACK_DISCONNECT:
-                     String msg = "Disconnet from : " + getFTPServerName() + " ?";
-                     return new AlertDialog.Builder(this).setTitle(msg).setIcon(
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                switch (id) {
+                case DIALOG_BACK_DISCONNECT:
+                    String msg = "Disconnet from : " + getFTPServerName() + " ?";
+                    return new AlertDialog.Builder(this).setTitle(msg).setIcon(
                            android.R.drawable.ic_dialog_alert).setPositiveButton(
                            android.R.string.ok, new OnClickListener() {
-                              public void onClick(DialogInterface dialog, int which) {
-                                 /** Disconnect */
-                                 mRemoteFileManagerActivity
-                                       .handleServerDisconnect();
-                              }
+                               public void onClick(DialogInterface dialog, int which) {
+                                   /** Disconnect */
+                                   mRemoteFileManagerActivity
+                                           .handleServerDisconnect();
+                               }
                            }).setNegativeButton(android.R.string.cancel,
                            new OnClickListener() {
-                              public void onClick(DialogInterface dialog, int which) {
-                                 // Cancel should not do anything.
-                              }
+                               public void onClick(DialogInterface dialog, int which) {
+                                   // Cancel should not do anything.
+                               }
                            }).create();
-              case DIALOG_PROGRESS:
-                  mProgressDialog = new ProgressDialog(BluetoothBrowserActivity.this);
-                  mProgressDialog.setTitle(getFTPServerName());
-                  mProgressDialog.setMessage(getTransferFileMessage());
+                case DIALOG_PROGRESS:
+                    mProgressDialog = new ProgressDialog(BluetoothBrowserActivity.this);
+                    mProgressDialog.setTitle(getFTPServerName());
+                    mProgressDialog.setMessage(getTransferFileMessage());
 
-                  mProgressDialog.setProgress(0);
-                  mProgressDialog.setMax(100);
-                  mProgressDialog.setIcon(R.drawable.ic_launcher_bluetooth);
-                  mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                    mProgressDialog.setProgress(0);
+                    mProgressDialog.setMax(100);
+                    mProgressDialog.setIcon(R.drawable.ic_launcher_bluetooth);
+                    mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
 
-                  mProgressDialog.setButton(DialogInterface.BUTTON_POSITIVE,
-                                            getText(R.string.cancel_transfer),
-                      new DialogInterface.OnClickListener() {
-                          public void onClick(DialogInterface dialog, int whichButton) {
-                              onCancelTransfer();
-                          }
-                      }
-                  );
-                  mProgressDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                      public void onCancel(DialogInterface dialog) {
-                          onCancelTransfer();
-                      }
-                  }
-
-                  );
-
-                  return mProgressDialog;
-              }
-          }
-       }
+                    mProgressDialog.setButton(DialogInterface.BUTTON_POSITIVE, getText(R.string.cancel_transfer),
+                            new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int whichButton) {
+                                    onCancelTransfer();
+                                }
+                            }
+                        );
+                    mProgressDialog.setOnCancelListener(
+                            new DialogInterface.OnCancelListener() {
+                                public void onCancel(DialogInterface dialog) {
+                                    onCancelTransfer();
+                                }
+                            }
+                        );
+                    return mProgressDialog;
+                }
+            }
+        }
         return null;
     }
 
@@ -264,22 +262,21 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
         super.onPrepareDialog(id, dialog);
         switch (id) {
         case DIALOG_BACK_DISCONNECT:
-           String msg = "Disconnect from Bluetooth Device";
-           if(mRemoteFileManagerActivity != null) {
-              if(mRemoteFileManagerActivity.mFTPClient != null) {
-                 msg = "Disconnet from : " + getFTPServerName() + " ?";
-              }
-           }
-           ((AlertDialog) dialog).setTitle(msg);
-           break;
+            String msg = "Disconnect from Bluetooth Device";
+            if(mRemoteFileManagerActivity != null) {
+                if(mRemoteFileManagerActivity.mFTPClient != null) {
+                    msg = "Disconnet from : " + getFTPServerName() + " ?";
+                }
+            }
+            ((AlertDialog) dialog).setTitle(msg);
+            break;
 
         case DIALOG_PROGRESS:
-           if (mProgressDialog != null) {
-               mProgressDialog.setTitle(getFTPServerName());
-               mProgressDialog.setMessage(getTransferFileMessage());
-           }
-           break;
-
+            if (mProgressDialog != null) {
+                mProgressDialog.setTitle(getFTPServerName());
+                mProgressDialog.setMessage(getTransferFileMessage());
+            }
+            break;
         }
     }
 
@@ -356,21 +353,20 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
     public void initiateSendFile(File file) {
 
         try {
-         if(mRemoteFileManagerActivity != null) {
-            if(mRemoteFileManagerActivity.mFTPClient != null) {
-                   String filename = file.getCanonicalPath();
-                   Log.i(TAG, "File to Send: " + file.getCanonicalPath());
-                   if(true != mRemoteFileManagerActivity.mFTPClient.putFile(filename, file.getName()))
-                   {
-                       String szStr = getResources().getString(R.string.ftp_send_failed, file.getName(), getFTPServerName());
-                       Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
-                   }
-               }
-         }
+            if(mRemoteFileManagerActivity != null) {
+                if(mRemoteFileManagerActivity.mFTPClient != null) {
+                    String filename = file.getCanonicalPath();
+                    Log.i(TAG, "File to Send: " + file.getCanonicalPath());
+                    if(true != mRemoteFileManagerActivity.mFTPClient.putFile(filename, file.getName()))
+                    {
+                        String szStr = getResources().getString(R.string.ftp_send_failed, file.getName(), getFTPServerName());
+                        Toast.makeText(this, szStr, Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
         } catch (IOException e) {
             Log.e(TAG, "sendFile - getCanonicalPath: IOException", e);
         }
-
     }
 
     public void onCancelTransfer() {
@@ -440,12 +436,23 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
     }
 
     /**
+     * Clean up the resources for FTP Get failure
+     */
+    public void cleanupResource() {
+        Log.i(TAG, "cleanupResource: Clean up the resources for FTP Get failure");
+        closeTransferProgress();
+        if (mRemoteFileManagerActivity.mFTPClient != null) {
+            mRemoteFileManagerActivity.mFTPClient.cleanup();
+        }
+    }
+
+    /**
      * Close the Transfer Progress
      */
     public void closeTransferProgress() {
         if (mProgressDialog != null) {
             removeDialog(DIALOG_PROGRESS);
-            mProgressDialog=null;
+            mProgressDialog = null;
         }
     }
 
@@ -472,9 +479,9 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
             switch (msg.what) {
             case FINISHEDID: {
             if(mRemoteFileManagerActivity != null) {
-               if(mRemoteFileManagerActivity.mFTPClient != null) {
-                  mRemoteFileManagerActivity.mFTPClient.TransferComplete();
-               }
+                if(mRemoteFileManagerActivity.mFTPClient != null) {
+                    mRemoteFileManagerActivity.mFTPClient.TransferComplete();
+                }
             }
 
             closeTransferProgress();
@@ -499,107 +506,109 @@ public class BluetoothBrowserActivity extends TabActivity implements BluetoothOb
         }
     };
 
-   /* onProgressIndication
-    *  This routine will handle the PROGRESS_ACTION broadcast and
-    *  updates the progress if the progress was for one of its
-    *  file.
-    *
-    * @param fileName: The name of the file that is being transfered
-    * @param totalBytes:  Total number of bytes of the file
-    * @param bytesDone:   Number of bytes sent so far
-    *
-    * @return None.
-    */
-   public void onProgressIndication(String fileName, int bytesTotal, int bytesDone) {
-      Log.i(TAG, "onProgressIndication : fileName " + fileName +
-                  " Total : " + bytesTotal  +
-                  " done so far : " + bytesDone);
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            mRemoteFileManagerActivity.mFTPClient.onProgressIndication(fileName, bytesTotal, bytesDone);
-         }
-      }
-      updateProgressStats();
-   }
+    /* onProgressIndication
+     *  This routine will handle the PROGRESS_ACTION broadcast and
+     *  updates the progress if the progress was for one of its
+     *  file.
+     *
+     * @param fileName: The name of the file that is being transfered
+     * @param totalBytes:  Total number of bytes of the file
+     * @param bytesDone:   Number of bytes sent so far
+     *
+     * @return None.
+     */
+    public void onProgressIndication(String fileName, int bytesTotal, int bytesDone) {
+        Log.i(TAG, "onProgressIndication : fileName " + fileName +
+                        " Total : " + bytesTotal  +
+                        " done so far : " + bytesDone);
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                mRemoteFileManagerActivity.mFTPClient.onProgressIndication(fileName, bytesTotal, bytesDone);
+            }
+        }
+        updateProgressStats();
+    }
 
-   public void onTransmitCompleteIndication(String fileName, boolean success, String errorString) {
-      Log.i(TAG, "onTransmitCompleteIndication : fileName " + fileName +
-                  " success : " + success  +
-                  " errorString : " + errorString);
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            mRemoteFileManagerActivity.mFTPClient.onTransmitCompleteIndication(fileName, success, errorString);
-         }
-      }
-      updateProgressStats();
-   }
+    public void onConnectStatusIndication(boolean success) {
+    }
 
-   public void onReceiveCompleteIndication(String fileName, boolean success) {
-      Log.i(TAG, "onReceiveCompleteIndication : fileName " + fileName + " success : " + success);
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            mRemoteFileManagerActivity.mFTPClient.onReceiveCompleteIndication(fileName, success);
-         }
-      }
-      updateProgressStats();
-   }
+    public void onTransmitCompleteIndication(String fileName, boolean success, String errorString) {
+        Log.i(TAG, "onTransmitCompleteIndication : fileName " + fileName +
+                        " success : " + success  +
+                        " errorString : " + errorString);
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                mRemoteFileManagerActivity.mFTPClient.onTransmitCompleteIndication(fileName, success, errorString);
+            }
+        }
+        updateProgressStats();
+    }
 
+    public void onReceiveCompleteIndication(String fileName, boolean success) {
+        Log.i(TAG, "onReceiveCompleteIndication : fileName " + fileName + " success : " + success);
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                mRemoteFileManagerActivity.mFTPClient.onReceiveCompleteIndication(fileName, success);
+            }
+        }
+        updateProgressStats();
+    }
 
     public boolean isBluetoothEnabled() {
-      boolean bluetoothEnabled = false;
-      if (mBluetoothObexTransfer != null) {
-         bluetoothEnabled = mBluetoothObexTransfer.isBluetoothEnabled();
-      }
+        boolean bluetoothEnabled = false;
+        if (mBluetoothObexTransfer != null) {
+            bluetoothEnabled = mBluetoothObexTransfer.isBluetoothEnabled();
+        }
         return bluetoothEnabled;
     }
 
     public boolean isBluetoothOBEXEnabled() {
-      boolean bluetoothObexEnabled = false;
-      if (mBluetoothObexTransfer != null) {
-         bluetoothObexEnabled = mBluetoothObexTransfer.isBluetoothOBEXEnabled();
-      }
-      return bluetoothObexEnabled;
+        boolean bluetoothObexEnabled = false;
+        if (mBluetoothObexTransfer != null) {
+            bluetoothObexEnabled = mBluetoothObexTransfer.isBluetoothOBEXEnabled();
+        }
+        return bluetoothObexEnabled;
     }
 
     /* The files received over Bluetooth will be stored in the current Local browsed folder or
        if ALWAYS_USE_BT_RX_FOLDER is set to true, it will always be in a specific folder pointed by
        mFTPClientRecieveFolder
      */
-   public String getFTPClientRecieveFolder() {
-      String path = mFTPClientRecieveFolder;
-      if (ALWAYS_USE_BT_RX_FOLDER == false) {
-         if(mLocalFileManagerActivity != null) {
-            String dir = mLocalFileManagerActivity.getCurrentDirectory();
-            if (dir != null) {
-               if (! TextUtils.isEmpty(dir)) {
-                  if (dir.endsWith("/")) {
-                     path = dir;
-                  }
-                  else
-                  {
-                     path = dir+"/";
-                  }
-               }
+    public String getFTPClientRecieveFolder() {
+        String path = mFTPClientRecieveFolder;
+        if (ALWAYS_USE_BT_RX_FOLDER == false) {
+            if(mLocalFileManagerActivity != null) {
+                String dir = mLocalFileManagerActivity.getCurrentDirectory();
+                if (dir != null) {
+                    if (! TextUtils.isEmpty(dir)) {
+                        if (dir.endsWith("/")) {
+                            path = dir;
+                        }
+                        else
+                        {
+                            path = dir+"/";
+                        }
+                    }
+                }
             }
-         }
-      }
-      return path;
-   }
+        }
+        return path;
+    }
 
     public String getFTPServerName() {
-      if(mRemoteFileManagerActivity != null) {
-         if(mRemoteFileManagerActivity.mFTPClient != null) {
-            return mRemoteFileManagerActivity.mFTPClient.getName();
-         }
-      }
-      return "";
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                return mRemoteFileManagerActivity.mFTPClient.getName();
+            }
+        }
+        return "";
     }
 
     private void initiateTransferUI() {
-       if(mRemoteFileManagerActivity != null) {
-          if(mRemoteFileManagerActivity.mFTPClient != null) {
-             showDialog(DIALOG_PROGRESS);
-          }
-       }
+        if(mRemoteFileManagerActivity != null) {
+            if(mRemoteFileManagerActivity.mFTPClient != null) {
+                showDialog(DIALOG_PROGRESS);
+            }
+        }
     }
 }
