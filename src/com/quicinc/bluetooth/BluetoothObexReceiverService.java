@@ -235,7 +235,7 @@ public class BluetoothObexReceiverService extends Service {
          authorizeIntent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, filePath);
 
          authorizeIntent.setAction(BluetoothObexIntent.AUTHORIZE_ACTION);
-         authorizeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+         authorizeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_HISTORY);
 
          if (mNoNotification == true) {
             startActivity(authorizeIntent);
@@ -493,7 +493,7 @@ public class BluetoothObexReceiverService extends Service {
       }
 
       if (objectType != null) {
-         // Get file type and mime type from objectType if objectType is not null.
+         // Get file type and MIME type from objectType if objectType is not null.
          int fileType = mediaFile.getFileTypeForMimeType(objectType);
          if (fileType != 0) {
             return true;
@@ -521,7 +521,7 @@ public class BluetoothObexReceiverService extends Service {
       if ( true == isFileVcard(path, objectType)) {
          return true;
       }
-      /* Is it Calender ? */
+      /* Is it Calendar ? */
       if ( true == isFileVcalender(path, objectType)) {
          return true;
       }
