@@ -21,9 +21,11 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothIntent;
 import android.bluetooth.obex.BluetoothObexIntent;
 import android.bluetooth.obex.BluetoothOpp;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.text.InputFilter;
 import android.text.method.DigitsKeyListener;
@@ -50,8 +52,23 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
     private String mFileName;
     private String mFileDisplayName;
     private Intent mIntent;
+    private boolean mAuthorizeCancelled;
 
     private BluetoothOpp mBluetoothOPP;
+
+    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (!intent.getAction().equals(BluetoothObexIntent.AUTHORIZE_CANCEL_ACTION)) {
+                return;
+            }
+
+            Log.i(TAG, "Close the Authorizatino dialog when canceled." +
+                    BluetoothObexIntent.AUTHORIZE_CANCEL_ACTION);
+            onReceivedAuthorizeCancelled();
+            return;
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,15 +76,15 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
 
         Intent intent = getIntent();
 
-        if (!intent.getAction().equals(BluetoothObexIntent.AUTHORIZE_ACTION))
-        {
+        if (!intent.getAction().equals(BluetoothObexIntent.AUTHORIZE_ACTION)) {
             Log.e(TAG,
-                  "Error: this activity may be started only with intent " +
-                  BluetoothObexIntent.AUTHORIZE_ACTION + BluetoothObexIntent.RX_COMPLETE_ACTION);
+                    "Error: this activity may be started only with intent " +
+                    BluetoothObexIntent.AUTHORIZE_ACTION);
             finish();
             return;
         }
 
+        mAuthorizeCancelled = false;
         mAddress = intent.getStringExtra(BluetoothObexIntent.ADDRESS);
         mFileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
 
@@ -96,8 +113,21 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
                 p.mNegativeButtonText = getString(android.R.string.cancel);
                 p.mNegativeButtonListener = this;
                 setupAlert();
+
+                /*
+                 * Leave this registered through pause/resume since we still want to
+                 * finish the activity in the background if pairing is canceled.
+                 */
+                registerReceiver(mReceiver, new IntentFilter(BluetoothObexIntent.AUTHORIZE_CANCEL_ACTION));
             }
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        unregisterReceiver(mReceiver);
     }
 
     private View createView() {
@@ -106,24 +136,28 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
         TextView messageView = (TextView) view.findViewById(R.id.message);
         if(mFileDisplayName == null) {
             Log.e(TAG, "Error: mFileDisplayName null >> " + mAddress + " " + mFileDisplayName);
+        } else {
+            messageView.setText(getString(R.string.bluetooth_authorize_receive_file_msg, deviceName, mFileDisplayName));
         }
-        else {
-           messageView.setText(getString(R.string.bluetooth_authorize_receive_file_msg, deviceName, mFileDisplayName));
-        }
-
         return view;
     }
 
     private void onAccept() {
-        String szStr = getResources().getString(R.string.bluetooth_obex_authorize_accept, mFileDisplayName);
-        Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
-        mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, true, mFileName);
+        if (mAuthorizeCancelled == false) {
+            String szStr = getResources().getString(R.string.bluetooth_obex_authorize_accept, mFileDisplayName);
+            Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
+            mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, true, mFileName);
+        }
+
+        return;
     }
 
     private void onReject() {
-        String szStr = getResources().getString(R.string.bluetooth_obex_authorize_reject, mFileDisplayName);
-        Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
-        mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, false, mFileName);
+        if (mAuthorizeCancelled == false) {
+            String szStr = getResources().getString(R.string.bluetooth_obex_authorize_reject, mFileDisplayName);
+            Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
+            mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, false, mFileName);
+        }
     }
 
     public void onClick(DialogInterface dialog, int which) {
@@ -136,5 +170,16 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
                 onReject();
                 break;
         }
+    }
+
+    private void onReceivedAuthorizeCancelled() {
+
+        mAuthorizeCancelled = true;
+
+        TextView messageView = (TextView) findViewById(R.id.message);
+        messageView.setText(getString(R.string.bluetooth_obex_authorize_error));
+
+        mAlert.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(true);
+        mAlert.getButton(DialogInterface.BUTTON_NEGATIVE).setVisibility(View.GONE);
     }
 }
