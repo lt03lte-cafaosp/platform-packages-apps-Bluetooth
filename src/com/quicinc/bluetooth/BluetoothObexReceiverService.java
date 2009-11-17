@@ -197,9 +197,14 @@ public class BluetoothObexReceiverService extends Service {
 
             FileOutputStream fos = null;
             try {
-                /* Use openFileOuput without the path */
-                fos = this.openFileOutput(mFileName, Context.MODE_WORLD_READABLE | Context.MODE_WORLD_WRITEABLE);
-                File file = this.getFileStreamPath(mFileName);
+                /* Get a temporary File object to strip off any path info
+                   that may be in the filename */
+                File file = new File(mFileName);
+
+                /* Open a stream to a private File then get the path to that
+                   file */
+                fos = this.openFileOutput(file.getName(), Context.MODE_WORLD_READABLE | Context.MODE_WORLD_WRITEABLE);
+                file = this.getFileStreamPath(file.getName());
                 filePath = file.getCanonicalPath();
             } catch (IOException ioe) {
                 ioe.printStackTrace();
