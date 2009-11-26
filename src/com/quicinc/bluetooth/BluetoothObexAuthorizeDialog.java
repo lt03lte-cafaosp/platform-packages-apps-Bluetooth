@@ -27,6 +27,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.text.InputFilter;
 import android.text.method.DigitsKeyListener;
 import android.util.Log;
@@ -46,6 +48,7 @@ import java.io.File;
  */
 public class BluetoothObexAuthorizeDialog extends AlertActivity implements DialogInterface.OnClickListener {
     private static final String TAG = "BluetoothObexAuthorizeDialog";
+    private static final boolean V = false;
 
     private BluetoothDevice mBluetooth;
     private String mAddress;
@@ -56,6 +59,20 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
 
     private BluetoothOpp mBluetoothOPP;
 
+    private Handler mTimeoutHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, false, mFileName);
+
+            if (V) {
+                Log.i(TAG, "Timeout: Close the Authorization dialog");
+            }
+
+            onReceivedAuthorizeCancelled();
+        }
+    };
+
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -63,8 +80,13 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
                 return;
             }
 
-            Log.i(TAG, "Close the Authorizatino dialog when canceled." +
-                    BluetoothObexIntent.AUTHORIZE_CANCEL_ACTION);
+            if (V) {
+                Log.i(TAG, "Close the Authorization dialog when canceled." +
+                        BluetoothObexIntent.AUTHORIZE_CANCEL_ACTION);
+            }
+
+            mTimeoutHandler.removeMessages(0);
+
             onReceivedAuthorizeCancelled();
             return;
         }
@@ -101,7 +123,9 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
                     mFileDisplayName = mFileName;
                 }
 
-                Log.v(TAG, "Extra Data: " + mAddress + " " + mFileName);
+                if (V) {
+                    Log.v(TAG, "Extra Data: " + mAddress + " " + mFileName);
+                }
 
                 // Set up the "dialog"
                 final AlertController.AlertParams p = mAlertParams;
@@ -113,6 +137,8 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
                 p.mNegativeButtonText = getString(android.R.string.cancel);
                 p.mNegativeButtonListener = this;
                 setupAlert();
+
+                mTimeoutHandler.sendEmptyMessageDelayed(0, 60 * 1000);
 
                 /*
                  * Leave this registered through pause/resume since we still want to
@@ -144,8 +170,13 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
 
     private void onAccept() {
         if (mAuthorizeCancelled == false) {
+            if (V) {
+                Log.i(TAG, "Authorization accepted");
+            }
+
             String szStr = getResources().getString(R.string.bluetooth_obex_authorize_accept, mFileDisplayName);
             Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
+
             mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, true, mFileName);
         }
 
@@ -154,13 +185,21 @@ public class BluetoothObexAuthorizeDialog extends AlertActivity implements Dialo
 
     private void onReject() {
         if (mAuthorizeCancelled == false) {
+            if (V) {
+                Log.i(TAG, "Authorization reject");
+            }
+
             String szStr = getResources().getString(R.string.bluetooth_obex_authorize_reject, mFileDisplayName);
             Toast.makeText(BluetoothObexAuthorizeDialog.this, szStr, Toast.LENGTH_SHORT).show();
+
             mBluetoothOPP.obexAuthorizeComplete(mFileDisplayName, false, mFileName);
         }
     }
 
     public void onClick(DialogInterface dialog, int which) {
+
+        mTimeoutHandler.removeMessages(0);
+
         switch (which) {
             case DialogInterface.BUTTON_POSITIVE:
                 onAccept();

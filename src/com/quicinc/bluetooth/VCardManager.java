@@ -175,7 +175,6 @@ public class VCardManager {
     * @return None
     */
    private void parse(String data) {
-      VCardParser mParser = new VCardParser();
       VDataBuilder builder = new VDataBuilder();
 
       mContactMethodList = new ArrayList<ContentValues>();
@@ -184,30 +183,19 @@ public class VCardManager {
       mPeople = new ContentValues();
 
       if (data != null) {
-      /* Try to parse with the original VCard parser implementation */
-      try {
-         mParser.parse(data, builder);
-      } catch (VCardException e) {
-          /* If the VCard parser threw an exception, try to parse all the fields that can be parsed and
-           * ignore the rest, without aborting the parsing.
-           */
          LocalVCardParser_V21 mParser21 = new LocalVCardParser_V21();
+         /* Try to parse with the local VCard parser implementation */
          try {
-                mParser21.parse(new ByteArrayInputStream(data.getBytes()), "US-ASCII", builder);
-          } catch (VCardException e1) {
-              Log.e(TAG, e1.getMessage(), e1);
-          }
-          catch (IOException e1) {
-              Log.e(TAG, e1.getMessage(), e1);
-          }
-      } catch (IOException e) {
-         Log.e(TAG, e.getMessage(), e);
+            mParser21.parse(new ByteArrayInputStream(data.getBytes()), "US-ASCII", builder);
+         } catch (VCardException e1) {
+            Log.e(TAG, e1.getMessage(), e1);
+         } catch (IOException e1) {
+            Log.e(TAG, e1.getMessage(), e1);
+         }
+         for (VNode vnode : builder.vNodeList) {
+            setContactsValue(vnode);
+         }
       }
-
-      for (VNode vnode : builder.vNodeList) {
-         setContactsValue(vnode);
-      }
-   }
    }
 
    /**

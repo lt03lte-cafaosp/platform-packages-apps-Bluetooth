@@ -58,6 +58,8 @@ import java.io.Reader;
 import java.io.OutputStreamWriter;
 import java.io.FileOutputStream;
 import java.io.Writer;
+import java.util.Enumeration;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
@@ -184,62 +186,64 @@ public class BluetoothObexReceiverService extends Service {
       String mFileName = intent.getStringExtra(BluetoothObexIntent.OBJECT_FILENAME);
       String mObjectType = intent.getStringExtra(BluetoothObexIntent.OBJECT_TYPE);
 
-      if ( (mAddress != null)
-           && (mFileName != null)
-           && (true == isSupportedFileType(mFileName, mObjectType)) ) {
+      if ((mAddress != null) && (mFileName != null) &&
+         (true == isSupportedFileType(mFileName, mObjectType))) {
 
          String filePath = new String();
-         if ( isFileVcard(mFileName, mObjectType) || isFileVcalender(mFileName, mObjectType) ) {
+
+         if ((isFileVcard(mFileName, mObjectType)) ||
+            (isFileVcalender(mFileName, mObjectType))) {
 
             if (V) {
-               Log.i(TAG, "vCard/vCalender File authorization : " + mFileName);
+              Log.i(TAG, "vCard/vCalender File : " + mFileName);
             }
 
             FileOutputStream fos = null;
             try {
-                /* Get a temporary File object to strip off any path info
-                   that may be in the filename */
-                File file = new File(mFileName);
+               /* Get a temporary File object to strip off any path info
+                  that may be in the filename */
+               File file = new File(mFileName);
 
-                /* Open a stream to a private File then get the path to that
-                   file */
-                fos = this.openFileOutput(file.getName(), Context.MODE_WORLD_READABLE | Context.MODE_WORLD_WRITEABLE);
-                file = this.getFileStreamPath(file.getName());
-                filePath = file.getCanonicalPath();
+               /* Open a stream to a private File then get the path to that
+                  file */
+               fos = this.openFileOutput(file.getName(), Context.MODE_WORLD_READABLE | Context.MODE_WORLD_WRITEABLE);
+               file = this.getFileStreamPath(file.getName());
+               filePath = file.getCanonicalPath();
             } catch (IOException ioe) {
-                ioe.printStackTrace();
+               ioe.printStackTrace();
             } finally {
-                try {
-                   /* Clean up after the write */
-                   if (fos != null) {
-                      fos.close();
-                   }
-                } catch (IOException e) {
-                   e.printStackTrace();
-                }
+               try {
+                  /* Clean up after the write */
+                  if (fos != null) {
+                     fos.close();
+                  }
+               } catch (IOException e) {
+                  e.printStackTrace();
+               }
             }
-         } else if ( Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED) ){
+         } else if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
             if (V) {
-               Log.i(TAG, "Media File authorization : " + mFileName);
+               Log.i(TAG, "OPP Media File  : " + mFileName);
             }
+
             filePath =
             Environment.getExternalStorageDirectory().getAbsolutePath()+ "/" + mFileName;
-
          } else {
             Toast.makeText(BluetoothObexReceiverService.this, R.string.no_sdcard_exist, Toast.LENGTH_LONG).show();
+            rejectTransfer(mFileName);
             return;
          }
+
          if (V) {
             Log.i(TAG, "handleObexAuthorize - File Name : <" + filePath + ">");
          }
 
          Intent authorizeIntent = new Intent();
          authorizeIntent.setClass(this, BluetoothObexAuthorizeDialog.class);
-
+         authorizeIntent.setAction(BluetoothObexIntent.AUTHORIZE_ACTION);
          authorizeIntent.putExtra(BluetoothObexIntent.ADDRESS, mAddress);
          authorizeIntent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, filePath);
 
-         authorizeIntent.setAction(BluetoothObexIntent.AUTHORIZE_ACTION);
          authorizeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_HISTORY);
 
          if (mNoNotification == true) {
@@ -268,13 +272,9 @@ public class BluetoothObexReceiverService extends Service {
             manager.notify(NOTIFICATION_ID, notification);
          }
       } else {
-         /* Reject the transfer */
-         if (V) {
-            Log.i(TAG, "handleObexAuthorize - Reject the Transfer - Unsupported File type -- FileName : " + mFileName);
-         }
-         mBluetoothOPP = new BluetoothOpp();
-         mBluetoothOPP.obexAuthorizeComplete(mFileName, false, mFileName);
+        rejectTransfer(mFileName);
       }
+
       return;
    }
 
@@ -292,27 +292,27 @@ public class BluetoothObexReceiverService extends Service {
       if (V) {
          Log.i(TAG, "handleObexObjectReceived - File Name : -" + fileName + "-" + " Profile : " + profile);
       }
-      if ( (fileName != null) && (!TextUtils.isEmpty(fileName)) ) {
+      if ((fileName != null) && (!TextUtils.isEmpty(fileName))) {
 
-        if ( true == isFileVcard(fileName, "") ) {
+        if (true == isFileVcard(fileName, "")) {
            if (V) {
-              Log.i(TAG, "vCard File received : " + fileName);
+              Log.i(TAG, "vCard File received");
            }
+
+           handlingComplete = addContact(fileName);
+
            if (profile == BluetoothObexIntent.PROFILE_OPP) {
+               File newFile = new File(fileName);
+               /* Delete the vCard file after adding to Contacts */
+               newFile.delete();
                if (V) {
-                   Log.i(TAG, "Received BluetoothObexIntent.PROFILE_OPP : " + fileName);
+                  Log.i(TAG, "Temporary file : " + fileName + " deleted.");
                }
-               handlingComplete = addContact(fileName);
-               if (false == handlingComplete) {
-                   Toast.makeText(BluetoothObexReceiverService.this, R.string.opp_vcard_outofmemory,
-                       Toast.LENGTH_LONG).show();
-               }
-           } else if (profile == BluetoothObexIntent.PROFILE_FTP) {
-               if (V) {
-                   Log.i(TAG, "Received BluetoothObexIntent.PROFILE_FTP : " + fileName);
-               }
-           } else {
-               Log.e(TAG, "Error: No OBEX profile specified for received vCard.");
+           }
+
+           if (false == handlingComplete) {
+               Toast.makeText(BluetoothObexReceiverService.this, R.string.opp_vcard_outofmemory,
+                   Toast.LENGTH_LONG).show();
            }
         } else if ( true == isFileVcalender(fileName, "") ) {
            /* vCal is not supported yet. */
@@ -331,6 +331,27 @@ public class BluetoothObexReceiverService extends Service {
       }
       return handlingComplete;
    }
+
+   /* Invoke rejectTransfer to reject the transfer and
+   *  and complete authorization by declining to
+   *  authorize the transfer
+   *
+   * @param filename Name of the file for which the
+   *                 transfer should be rejected
+   *
+   * @return None.
+   */
+   private void rejectTransfer(String filename) {
+      if (V) {
+         Log.i(TAG, "handleObexAuthorize - Reject the Transfer -- FileName : " + filename);
+      }
+
+      BluetoothOpp bluetoothOPP = new BluetoothOpp();
+      bluetoothOPP.obexAuthorizeComplete(filename, false, filename);
+
+      return;
+   }
+
    /* Invoke addContact will read a vCard file and add the
    *   information into the Android Contact database.
    *
@@ -371,8 +392,6 @@ public class BluetoothObexReceiverService extends Service {
                in.close();
             }
          }
-         /* Delete the vCard file after adding to the stream */
-         newFile.delete();
 
       } catch (IOException ioe) {
          ioe.printStackTrace();
@@ -390,11 +409,50 @@ public class BluetoothObexReceiverService extends Service {
          }
       }
       if (TextUtils.isEmpty(vCard) == false) {
-         VCardManager vManager = new VCardManager(this, vCard);
-         Uri uri = vManager.save();
-         if (V) {
-            Log.i(TAG, "New Contact <" + vManager.getName() + "> is added at : " + uri.toString());
+
+         Hashtable vCardTable = new Hashtable();
+         String vCardToken = new String();
+         String name = new String();
+         String endToken = "END:VCARD";
+         String nameToken = "\nN:";
+         int beginIdx = -1;
+         int endIdx = -1;
+         int tokenIdx = -1;
+         while ((tokenIdx = vCard.indexOf(endToken)) != -1) {
+            /* Get a single vCard entry from the vCard file */
+            vCardToken = vCard.substring(0, tokenIdx + endToken.length());
+            /* Store the remaining vCard entries to continue parsing */
+            vCard = vCard.substring(tokenIdx + endToken.length());
+
+            /* Parse a name out of the vCard entry */
+            name = "";
+            beginIdx = vCardToken.indexOf(nameToken);
+            if (beginIdx != -1) {
+               beginIdx += nameToken.length();
+               endIdx = vCardToken.indexOf("\n", beginIdx);
+               if (endIdx != -1) {
+                  name = vCardToken.substring(beginIdx, endIdx);
+               }
+            }
+            if (vCardTable.containsKey(name)) {
+               /* Append to the existing vCard entry if the name is found in a Hash table */
+               vCardToken += "\n" + vCardTable.get(name);
+            }
+            /* Put the vCard entry into a Hash table with name as a key */
+            vCardTable.put(name, new String(vCardToken));
          }
+
+         Enumeration e = vCardTable.elements();
+         while(e.hasMoreElements()) {
+            /* Get the vCard entries from a Hash table */
+            vCardToken = (String)e.nextElement();
+            VCardManager vManager = new VCardManager(this, vCardToken);
+            Uri uri = vManager.save();
+            if (V) {
+               Log.i(TAG, "New Contact <" + vManager.getName() + "> is added at : " + uri.toString());
+            }
+         }
+         vCardTable.clear();
       } else {
          if (V) {
             Log.i(TAG, "Empty vCard received? ");
@@ -526,9 +584,9 @@ public class BluetoothObexReceiverService extends Service {
       if ( true == isFileVcard(path, objectType)) {
          return true;
       }
-      /* Is it Calendar ? */
+      /* Is it Calendar ? vCal not yet supported */
       if ( true == isFileVcalender(path, objectType)) {
-         return true;
+         return false;
       }
       /* Is it Music or Picture ? */
       if ( true == isSupportedMediaType(path, objectType)) {
