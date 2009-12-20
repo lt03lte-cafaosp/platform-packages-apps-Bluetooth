@@ -244,7 +244,9 @@ public class BluetoothObexReceiverService extends Service {
          authorizeIntent.putExtra(BluetoothObexIntent.ADDRESS, mAddress);
          authorizeIntent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, filePath);
 
-         authorizeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_HISTORY);
+         authorizeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
+                                  Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS |
+                                  Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
          if (mNoNotification == true) {
             startActivity(authorizeIntent);
