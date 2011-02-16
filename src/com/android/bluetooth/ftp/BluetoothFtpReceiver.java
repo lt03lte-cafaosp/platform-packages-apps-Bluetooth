@@ -31,6 +31,7 @@ import android.content.Intent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.util.Log;
+import android.os.SystemProperties;
 
 public class BluetoothFtpReceiver extends BroadcastReceiver {
 
@@ -64,7 +65,11 @@ public class BluetoothFtpReceiver extends BroadcastReceiver {
             }
 
             if (startService) {
-                context.startService(in);
+                /* start the FTP service only if ftp property is enabled in build */
+                if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.ftp", false)) {
+                    if(V) Log.v(TAG,"BluetoothFtpReceiver Start Service");
+                    context.startService(in);
+                }
             }
         }
 }
