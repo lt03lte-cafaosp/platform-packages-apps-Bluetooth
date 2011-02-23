@@ -383,6 +383,11 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                 Log.e(TAG, "onPut File receive"+ e1.toString());
                 if (D) Log.d(TAG, "Error when receiving file");
                 ((ServerOperation)op).isAborted = true;
+                /* If the transfer completed due to a
+                 * abort from Ftp client, clean up the
+                 * file in the Server
+                 */
+                fileinfo.delete();
                 return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             }
 
