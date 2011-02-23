@@ -305,7 +305,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
          */
         try {
             request = op.getReceivedHeader();
-            length = (Long)request.getHeader(HeaderSet.LENGTH);
+            length = extractLength(request);
             name = (String)request.getHeader(HeaderSet.NAME);
             filetype = (String)request.getHeader(HeaderSet.TYPE);
             if (D) Log.d(TAG,"type = " + filetype + " name = " + name
@@ -736,6 +736,22 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         }else {
             return ResponseCodes.OBEX_HTTP_CONTINUE;
         }
+    }
+
+    /* Extract the length from header */
+    private final long extractLength(HeaderSet request) {
+        long len = 0;
+        if(request != null) {
+            try {
+               Object length = request.getHeader(HeaderSet.LENGTH);
+               /* Ensure that the length is not null before
+                * attempting a type cast to Long
+                */
+               if(length != null)
+                  len = (Long)length;
+           } catch(IOException e) {}
+        }
+        return len;
     }
 
     /** check whether path is legal */
