@@ -341,7 +341,13 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             }
             /* If File exists we delete and proceed to take the rest of bytes */
             if(fileinfo.exists() == true) {
-                fileinfo.delete();
+                if(fileinfo.canWrite()) {
+                    fileinfo.delete();
+                } else {
+                    /* if Readonly reject the replace */
+                    if (D) Log.d(TAG,"File is readonly");
+                    return ResponseCodes.OBEX_DATABASE_LOCKED;
+                }
             }
 
             FileOutputStream fileOutputStream = new FileOutputStream(fileinfo);
