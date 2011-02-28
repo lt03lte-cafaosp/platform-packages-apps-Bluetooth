@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 import javax.obex.ServerRequestHandler;
 import javax.obex.ResponseCodes;
@@ -598,7 +599,10 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         ArrayList<String> nameList = mVcardManager.getPhonebookNameList(mOrderBy);
         final int requestSize = nameList.size() >= maxListCount ? maxListCount : nameList.size();
         final int listSize = nameList.size();
-        String compareValue = "", currentValue;
+        String compareValue = "", currentValue, tmpCurrentValue;
+
+        if (listSize > 1)
+            Collections.sort(nameList, String.CASE_INSENSITIVE_ORDER);
 
         if (D) Log.d(TAG, "search by " + type + ", requestSize=" + requestSize + " offset="
                     + listStartOffset + " searchValue=" + searchValue);
@@ -606,6 +610,8 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         if (type.equals("number")) {
             // query the number, to get the names
             ArrayList<String> names = mVcardManager.getContactNamesByNumber(searchValue);
+            if (names.size() > 1)
+                Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
             for (int i = 0; i < names.size(); i++) {
                 compareValue = names.get(i).trim();
                 if (D) Log.d(TAG, "compareValue=" + compareValue);
@@ -626,15 +632,29 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         } else {
             if (searchValue != null) {
                 compareValue = searchValue.trim();
+                compareValue = compareValue.toLowerCase();
             }
             for (int pos = listStartOffset; pos < listSize &&
                     itemsFound < requestSize; pos++) {
                 currentValue = nameList.get(pos);
+                tmpCurrentValue = currentValue.toLowerCase();
                 if (D) Log.d(TAG, "currentValue=" + currentValue);
-                if (searchValue == null || currentValue.startsWith(compareValue)) {
+                if (searchValue == null) {
                     itemsFound++;
                     result.append("<card handle=\"" + pos + ".vcf\" name=\""
                             + currentValue + "\"" + "/>");
+                } else {
+                    int sIndex = -1;
+                    do {
+                        tmpCurrentValue = tmpCurrentValue.substring(sIndex+1);
+                        if (tmpCurrentValue.startsWith(compareValue)) {
+                            itemsFound++;
+                            result.append("<card handle=\"" + pos + ".vcf\" name=\""
+                                + currentValue + "\"" + "/>");
+                            break;
+                        }
+                        sIndex = tmpCurrentValue.indexOf(' ');
+                    }while(sIndex > 0);
                 }
             }
         }

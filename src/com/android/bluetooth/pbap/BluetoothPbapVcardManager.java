@@ -242,23 +242,33 @@ public class BluetoothPbapVcardManager {
         ArrayList<String> nameList = new ArrayList<String>();
 
         Cursor contactCursor = null;
-        final Uri uri = Uri.withAppendedPath(PhoneLookup.CONTENT_FILTER_URI,
-                Uri.encode(phoneNumber));
+        final Uri uri = Data.CONTENT_URI;
 
         try {
-            contactCursor = mResolver.query(uri, CONTACTS_PROJECTION, CLAUSE_ONLY_VISIBLE,
-                        null, Contacts._ID);
+            contactCursor = mResolver.query(uri, PHONES_PROJECTION, CLAUSE_ONLY_VISIBLE,
+                        null, Contacts.DISPLAY_NAME);
 
             if (contactCursor != null) {
                 for (contactCursor.moveToFirst(); !contactCursor.isAfterLast(); contactCursor
                         .moveToNext()) {
-                    String name = contactCursor.getString(CONTACTS_NAME_COLUMN_INDEX);
-                    long id = contactCursor.getLong(CONTACTS_ID_COLUMN_INDEX);
-                    if (TextUtils.isEmpty(name)) {
-                        name = mContext.getString(android.R.string.unknownName);
+                    String number = contactCursor.getString(PHONE_NUMBER_COLUMN_INDEX);
+                    StringBuilder onlyNumber = new StringBuilder();
+                    for (int j=0; j<number.length(); j++) {
+                        char c = number.charAt(j);
+                        if (c >= '0' && c <= '9') {
+                            onlyNumber = onlyNumber.append(c);
+                        }
                     }
-                    if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber + " @" + id);
-                    nameList.add(name);
+                    String tmpNumber = onlyNumber.toString();
+                    if (V) Log.v(TAG, "number: "+number+" onlyNumber:"+onlyNumber+" tmpNumber:"+tmpNumber);
+                    if (tmpNumber.startsWith(phoneNumber)) {
+                        String name = contactCursor.getString(CONTACTS_DISPLAY_NAME_COLUMN_INDEX);
+                        if (TextUtils.isEmpty(name)) {
+                            name = mContext.getString(android.R.string.unknownName);
+                        }
+                        if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber);
+                        nameList.add(name);
+                    }
                 }
             }
         } finally {
