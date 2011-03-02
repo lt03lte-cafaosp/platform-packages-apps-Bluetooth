@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -50,6 +51,7 @@ import android.util.Log;
 import android.webkit.MimeTypeMap;
 
 import javax.obex.HeaderSet;
+import javax.obex.ObexHelper;
 import javax.obex.ObexTransport;
 import javax.obex.Operation;
 import javax.obex.ResponseCodes;
@@ -120,6 +122,16 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         try {
             if (D) Log.d(TAG, "Create ServerSession with transport " + mTransport.toString());
             mSession = new ServerSession(mTransport, this, null);
+            int mps = ((BluetoothOppTransport)mTransport).getMaxPacketSize();
+            mSession.setMaxPacketSize(mps);
+            if (D) Log.d(TAG, "Setting ServerSession mps " + mps);
+
+            // Turn on/off SRM based on transport capability (whether this is OBEX-over-L2CAP, or not)
+            ObexHelper.setLocalSrmCapability(((BluetoothOppTransport)mTransport).isSrmCapable());
+
+            if (!ObexHelper.getLocalSrmCapability()) {
+                ObexHelper.setLocalSrmParamStatus(ObexHelper.SRMP_DISABLED);
+            }
         } catch (IOException e) {
             Log.e(TAG, "Create server session error" + e);
         }
@@ -169,6 +181,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         HeaderSet request;
         String name, mimeType;
         Long length;
+        Byte srm;
 
         int obexResponse = ResponseCodes.OBEX_HTTP_OK;
 
@@ -187,6 +200,22 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             name = (String)request.getHeader(HeaderSet.NAME);
             length = (Long)request.getHeader(HeaderSet.LENGTH);
             mimeType = (String)request.getHeader(HeaderSet.TYPE);
+
+            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                if (V) Log.v(TAG, "Local Device SRM: Capable");
+
+                srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                    if (V) Log.v(TAG, "SRM status: Enabled");
+                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                } else {
+                    if (V) Log.v(TAG, "SRM status: Disabled");
+                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                }
+            } else {
+                if (V) Log.v(TAG, "Local Device SRM: Incapable");
+                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+            }
 
             if (length == 0) {
                 if (D) Log.w(TAG, "length is 0, reject the transfer");
@@ -255,8 +284,8 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         values.put(BluetoothShare.TOTAL_BYTES, length.intValue());
         values.put(BluetoothShare.MIMETYPE, mimeType);
 
-        if (mTransport instanceof BluetoothOppRfcommTransport) {
-            String a = ((BluetoothOppRfcommTransport)mTransport).getRemoteAddress();
+        if(mTransport instanceof BluetoothOppTransport){
+            String a = ((BluetoothOppTransport)mTransport).getRemoteAddress();
             values.put(BluetoothShare.DESTINATION, a);
         } else {
             values.put(BluetoothShare.DESTINATION, "FF:FF:FF:00:00:00");

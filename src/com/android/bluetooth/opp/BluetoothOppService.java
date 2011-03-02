@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -123,7 +124,9 @@ public class BluetoothOppService extends Service {
 
     private PowerManager mPowerManager;
 
-    private BluetoothOppRfcommListener mSocketListener;
+    private BluetoothOppL2capListener mL2capSocketListener;
+
+    private BluetoothOppRfcommListener mRfcommSocketListener;
 
     private boolean mListenStarted = false;
 
@@ -150,7 +153,9 @@ public class BluetoothOppService extends Service {
         super.onCreate();
         if (V) Log.v(TAG, "Service onCreate");
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        mSocketListener = new BluetoothOppRfcommListener(mAdapter);
+        mL2capSocketListener = new BluetoothOppL2capListener(mAdapter);
+        mRfcommSocketListener = new BluetoothOppRfcommListener(mAdapter);
+
         mShares = Lists.newArrayList();
         mBatchs = Lists.newArrayList();
         mObserver = new BluetoothShareContentObserver();
@@ -312,9 +317,10 @@ public class BluetoothOppService extends Service {
 
     private void startSocketListener() {
 
-        if (V) Log.v(TAG, "start RfcommListener");
-        mSocketListener.start(mHandler);
-        if (V) Log.v(TAG, "RfcommListener started");
+        if (V) Log.v(TAG, "start RFCOMM and L2CAP listeners");
+        mRfcommSocketListener.start(mHandler);
+        mL2capSocketListener.start(mHandler);
+        if (V) Log.d(TAG, "RFCOMM and L2CAP listeners started");
     }
 
     @Override
@@ -323,7 +329,8 @@ public class BluetoothOppService extends Service {
         super.onDestroy();
         getContentResolver().unregisterContentObserver(mObserver);
         unregisterReceiver(mBluetoothReceiver);
-        mSocketListener.stop();
+        mRfcommSocketListener.stop();
+        mL2capSocketListener.stop();
     }
 
     /* suppose we auto accept an incoming OPUSH connection */
@@ -348,7 +355,8 @@ public class BluetoothOppService extends Service {
                         break;
                     case BluetoothAdapter.STATE_TURNING_OFF:
                         if (V) Log.v(TAG, "Receiver DISABLED_ACTION ");
-                        mSocketListener.stop();
+                        mRfcommSocketListener.stop();
+                        mL2capSocketListener.stop();
                         mListenStarted = false;
                         synchronized (BluetoothOppService.this) {
                             if (mUpdateThread == null) {
