@@ -476,7 +476,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             AppParamValue appParamValue) {
         int i = 0;
         boolean parseOk = true;
-        while (i < appParam.length) {
+        while ((i < appParam.length) && (parseOk == true)) {
             switch (appParam[i]) {
                 case ApplicationParameter.TRIPLET_TAGID.FILTER_TAGID:
                     i += 2; // length and tag field in triplet
@@ -492,6 +492,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
                     // length of search value is variable
                     int length = appParam[i];
                     if (length == 0) {
+                        //If parse is not OK return false
                         parseOk = false;
                         break;
                     }
