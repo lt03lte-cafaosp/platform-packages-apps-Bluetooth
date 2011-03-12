@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -35,9 +36,11 @@ package com.android.bluetooth.opp;
 import javax.obex.ClientOperation;
 import javax.obex.ClientSession;
 import javax.obex.HeaderSet;
+import javax.obex.ObexHelper;
 import javax.obex.ObexTransport;
 import javax.obex.ResponseCodes;
 
+import android.bluetooth.BluetoothSocket;
 import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
@@ -46,6 +49,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.os.Process;
+import android.os.SystemProperties;
 import android.util.Log;
 
 import java.io.BufferedInputStream;
@@ -62,6 +66,15 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
     private static final String TAG = "BtOpp ObexClient";
     private static final boolean D = Constants.DEBUG;
     private static final boolean V = Constants.VERBOSE;
+
+    /* AMP move file size threshold property */
+    private static final String AMP_MOVE_THRESHOLD = "bt.opp.amp_move_threshold";
+    /* Approx threshold for 2 sec AMP channel move delay, 600kB/sec AMP, 140 kB/sec BR/EDR */
+    private static final int AMP_MOVE_THRESHOLD_DEFAULT = 400000;
+
+    /* Debugging hooks to control AMP-related operations */
+    private static final String DEBUG_PRE_AMP_MOVE_DELAY = "debug.bt.opp.ms_pre_amp_move";
+    private static final String DEBUG_POST_AMP_MOVE_DELAY = "debug.bt.opp.ms_post_amp_move";
 
     private ClientThread mThread;
 
@@ -224,6 +237,9 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             try {
                 mCs = new ClientSession(mTransport1);
                 mConnected = true;
+                int mps = ((BluetoothOppTransport)mTransport1).getMaxPacketSize();
+                mCs.setMaxPacketSize(mps);
+                if (D) Log.d(TAG, "Setting ClientSession mps " + mps);
             } catch (IOException e1) {
                 Log.e(TAG, "OBEX session create error");
             }
@@ -328,6 +344,8 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             int status = BluetoothShare.STATUS_SUCCESS;
             Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + mInfo.mId);
             ContentValues updateValues;
+            HeaderSet reply;
+            reply = new HeaderSet();
             HeaderSet request;
             request = new HeaderSet();
             request.setHeader(HeaderSet.NAME, fileInfo.mFileName);
@@ -338,6 +356,24 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             Constants.updateShareStatus(mContext1, mInfo.mId, BluetoothShare.STATUS_RUNNING);
 
             request.setHeader(HeaderSet.LENGTH, fileInfo.mLength);
+
+            // Turn on/off SRM based on transport capability
+            //(whether this is OBEX-over-L2CAP, or not)
+            ObexHelper.setLocalSrmCapability(((BluetoothOppTransport)mTransport1).isSrmCapable());
+
+            // Add the SRM header if both client and server are SRM capable
+            boolean remoteSrmStatus = ObexHelper.getRemoteSrmStatus();
+            if ( ( ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE )
+                && ( remoteSrmStatus == ObexHelper.SRM_CAPABLE ) ) {
+                Log.v(TAG, "SRM status: Enable SRM for first PUT");
+                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                request.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
+            } else {
+                Log.v(TAG, "SRM status: Disable SRM for first PUT");
+                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+            }
+            ObexHelper.setLocalSrmpWait(false);
+
             ClientOperation putOperation = null;
             OutputStream outputStream = null;
             InputStream inputStream = null;
@@ -360,6 +396,45 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                 }
 
                 if (!error) {
+                    // Per Bluetooth OPP v1.2 specification (Appendix A), it is
+                    // recommended that an AMP move be performed at this point,
+                    // if applicable (e.g., if an AMP is present and is deemed
+                    // favorable).
+                    int ampThresh = SystemProperties.getInt(AMP_MOVE_THRESHOLD,
+                            AMP_MOVE_THRESHOLD_DEFAULT);
+                    if (((BluetoothOppTransport)mTransport1).isAmpCapable() &&
+                        (fileInfo.mLength > ampThresh)) {
+                        if (D) {
+                            int preWait = SystemProperties.getInt(DEBUG_PRE_AMP_MOVE_DELAY, -1);
+                            if (preWait >= 0) {
+                                Log.v(TAG, "DEBUG: delaying before AMP move: " + preWait);
+                                try {
+                                    Thread.sleep(preWait);
+                                } catch (InterruptedException e) {
+                                    Log.v(TAG, "Interrupted during pre-AMP move delay.");
+                                }
+                            }
+                        }
+
+                        if(!((BluetoothOppTransport)mTransport1).setDesiredAmpPolicy(
+                              BluetoothSocket.BT_AMP_POLICY_PREFER_AMP)) {
+                            Log.e(TAG, "Unable to set AMP policy, " +
+                                "using default (BR/EDR req).");
+                        }
+
+                        if (D) {
+                            int postWait = SystemProperties.getInt(DEBUG_POST_AMP_MOVE_DELAY, -1);
+                            if (postWait >= 0) {
+                                Log.v(TAG, "DEBUG: delaying after AMP move: " + postWait);
+                                try {
+                                    Thread.sleep(postWait);
+                                } catch (InterruptedException e) {
+                                    Log.v(TAG, "Interrupted during post-AMP move delay.");
+                                }
+                            }
+                        }
+                    }
+
                     try {
                         if (V) Log.v(TAG, "openOutputStream " + fileInfo.mFileName);
                         outputStream = putOperation.openOutputStream();
@@ -422,6 +497,26 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                         if (responseCode == ResponseCodes.OBEX_HTTP_CONTINUE
                                 || responseCode == ResponseCodes.OBEX_HTTP_OK) {
                             if (V) Log.v(TAG, "Remote accept");
+
+                            reply = putOperation.getReceivedHeader();
+                            Byte srm = (Byte)reply.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                            if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                                Log.v(TAG, "SRM status: Enabled by Server response");
+                                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                                Byte srmp = (Byte)reply.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+                                Log.v(TAG, "SRMP header (CONTINUE or OK): " + srmp);
+                                if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                                    Log.v(TAG, "SRMP status: WAIT");
+                                    ObexHelper.setLocalSrmpWait(true);
+                                } else {
+                                    Log.v(TAG, "SRMP status: NONE");
+                                    ObexHelper.setLocalSrmpWait(false);
+                                }
+                            } else {
+                                Log.v(TAG, "SRM status: Disabled by Server response");
+                                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                                ObexHelper.setLocalSrmpWait(false);
+                            }
                             okToProceed = true;
                             updateValues = new ContentValues();
                             updateValues.put(BluetoothShare.CURRENT_BYTES, position);
@@ -483,10 +578,13 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                     }
                 }
             } catch (IOException e) {
+                Log.e(TAG, "IOException", e);
                 handleSendException(e.toString());
             } catch (NullPointerException e) {
+                Log.e(TAG, "NullPointerException", e);
                 handleSendException(e.toString());
             } catch (IndexOutOfBoundsException e) {
+                Log.e(TAG, "IndexOutOfBoundsException", e);
                 handleSendException(e.toString());
             } finally {
                 try {
@@ -521,6 +619,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                         putOperation.close();
                     }
                 } catch (IOException e) {
+                    Log.e(TAG, "IOException", e);
                     Log.e(TAG, "Error when closing stream after send");
                 }
             }
