@@ -984,13 +984,12 @@ public class MapUtils {
         String vCard = null;
         vCard = fetchRecepientVcardEmail(bmsg);
         Log.d("MapUtils", "vCard Info:: "+vCard);
-        email = fetchVcardEmail(vCard);
-
+        email = fetchRecipientEmail(bmsg);
         Log.d("MapUtils", "email Info:: "+email);
         bMsgObj.setRecipientVcard_email(email);
 
         String vcardOrig = fetchOriginatorVcardEmail(bmsg);
-        String emailOrig = fetchVcardEmail(vcardOrig);
+        String emailOrig = fetchOriginatorEmail(bmsg);
         Log.d("MapUtils", "Vcard Originator Email:: "+emailOrig);
         bMsgObj.setOriginatorVcard_email(emailOrig);
 
@@ -1023,10 +1022,8 @@ public class MapUtils {
         Log.d("MapUtils", "body length:: "+fetchBodyLength(bmsg));
         // Fetch Message Length
         bMsgObj.setBody_length(fetchBodyLength(bmsg));
-
-        Log.d("MapUtils", "Message body:: "+fetchBodyMsgEmail(bmsg));
         // Extract Message
-        bMsgObj.setBody_msg(fetchBodyMsgEmail(bmsg));
+        bMsgObj.setBody_msg(fetchBodyEmail(bmsg));
 
         Log.d("MapUtils", "Message encoding:: "+fetchBodyEncoding(bmsg));
         // Extract Message encoding
@@ -1055,6 +1052,20 @@ public class MapUtils {
         Log.d("Map Utils","Begin Version Position Email:: "+beginVersionPos);
         int endVersionPos = vCard.indexOf("\n", beginVersionPos);
         Log.d("Map Utils","End version Pos Email:: "+endVersionPos);
+        return vCard.substring(beginVersionPos, endVersionPos);
+    }
+    private String fetchOriginatorEmail(String vCard) {
+
+        int pos = vCard.indexOf(("From:"));
+        int beginVersionPos = pos + (("From:").length());
+        int endVersionPos = vCard.indexOf(CRLF, beginVersionPos);
+        return vCard.substring(beginVersionPos, endVersionPos);
+    }
+    private String fetchRecipientEmail(String vCard) {
+
+        int pos = vCard.indexOf(("To:"));
+        int beginVersionPos = pos + (("To:").length());
+        int endVersionPos = vCard.indexOf(CRLF, beginVersionPos);
         return vCard.substring(beginVersionPos, endVersionPos);
     }
     private String fetchRecepientVcardEmail(String bmsg) {
@@ -1470,7 +1481,102 @@ public class MapUtils {
             return null;
         }
     }
+    private String fetchBoundary(String body) {
+        int pos = body.indexOf("boundary=\"");
+        if (pos > 0) {
+            int beginVersionPos = pos + (("boundary=\"").length());
+            int endVersionPos = body.indexOf("\"", beginVersionPos);
+            return body.substring(beginVersionPos, endVersionPos);
 
+        } else {
+
+            return null;
+        }
+    }
+
+    private String fetchBodyEmail(String body) {
+        Log.d("MapUtils", "inside fetch body Email ::"+body);
+        int beginVersionPos = -1;
+        int rfc822Flag = 0;
+        int mimeFlag = 0;
+        int beginVersionPos1 = -1;
+        String contentType;
+        int pos1 = 0;
+        String boundary = fetchBoundary(body);
+        if(boundary != null && !boundary.equalsIgnoreCase("")){
+            pos1 = body.indexOf("--"+boundary);
+            mimeFlag = 1;
+        }
+        else{
+            pos1 = body.indexOf("Date:");
+            mimeFlag = 0;
+        }
+        int contentIndex = body.indexOf("Content-Type",pos1);
+        if(contentIndex > 0){
+            contentType = fetchContentType(body, boundary);
+            if(contentType != null && contentType.trim().equalsIgnoreCase("message/rfc822")){
+                rfc822Flag = 1;
+            }
+        }
+        int pos = body.indexOf(CRLF, pos1) + CRLF.length();
+        while (pos > 0) {
+            if(body.startsWith(CRLF, pos) == true){
+                beginVersionPos = pos + CRLF.length();
+                break;
+                }
+            else{
+                pos = body.indexOf(CRLF, pos)+ CRLF.length();
+            }
+        }
+        if(beginVersionPos > 0){
+            int endVersionPos;
+            if(rfc822Flag == 0){
+                if(mimeFlag == 0){
+                        endVersionPos = (body.indexOf("END:MSG", beginVersionPos)
+                                        - CRLF.length());
+                    }
+                    else{
+                    endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos) - CRLF
+                                    .length());
+                    }
+                    return body.substring(beginVersionPos, endVersionPos);
+                }
+                else if(rfc822Flag == 1){
+                    endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos));
+                    body = body.substring(beginVersionPos, endVersionPos);
+                    int pos2 = body.indexOf(CRLF) + CRLF.length();
+                    while (pos2 > 0) {
+                        if(body.startsWith(CRLF, pos2) == true){
+                            beginVersionPos1 = pos2 + CRLF.length();
+                            break;
+                        }
+                        else{
+                            pos2 = body.indexOf(CRLF, pos2)+ CRLF.length();
+                        }
+                    }
+                    if(beginVersionPos1 > 0){
+                        int endVersionPos1 = (body.lastIndexOf(CRLF));
+                        return body.substring(beginVersionPos1, endVersionPos1);
+                    }
+                }
+        }
+        return null;
+    }
+    private String fetchContentType(String bmsg, String boundary) {
+        int pos1 = bmsg.indexOf("--"+boundary);
+        int pos = bmsg.indexOf("Content-Type:", pos1);
+        if (pos > 0) {
+
+            int beginVersionPos = pos + (("Content-Type:").length());
+            int endVersionPos = bmsg.indexOf(CRLF, beginVersionPos);
+            return bmsg.substring(beginVersionPos, endVersionPos);
+
+        } else {
+
+            return null;
+
+        }
+    }
     /**
      * fetchNumEnv
      *

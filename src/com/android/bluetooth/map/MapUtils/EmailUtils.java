@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -50,8 +51,8 @@ import com.android.bluetooth.map.BluetoothMasAppParams;
 
 public class EmailUtils {
 
-        public final String TAG = "EmailUtils";
-        public static final int BIT_SUBJECT = 0x1;
+    public final String TAG = "EmailUtils";
+    public static final int BIT_SUBJECT = 0x1;
     public static final int BIT_DATETIME = 0x2;
     public static final int BIT_SENDER_NAME = 0x4;
     public static final int BIT_SENDER_ADDRESSING = 0x8;
@@ -81,48 +82,60 @@ public class EmailUtils {
         Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
 
         if ( cr.moveToFirst()) {
-                do {
-                        Log.d(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
-                        int folderFlag = 0;
-                        for(int i=0; i< folderList.size(); i++){
-                        if(folderList.get(i).equalsIgnoreCase(cr.getString(0))){
-                            folderFlag = 1;
-                            break;
-                        }
+            do {
+                Log.d(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
+                int folderFlag = 0;
+                for(int i=0; i< folderList.size(); i++){
+                    if(folderList.get(i).equalsIgnoreCase(cr.getString(0))){
+                        folderFlag = 1;
+                        break;
+                    }
                 }
-                        if(cr.getString(0).equalsIgnoreCase("Drafts")){ //TODO need to remove this hardcoded value
-                                folderFlag = 1;
-                        }
-                        if(folderFlag == 0){
-                                folderList.add(cr.getString(0));
-                        }
+                if(cr.getString(0).equalsIgnoreCase("Drafts")){ //TODO need to remove this hardcoded value
+                    folderFlag = 1;
+                }
+                if(folderFlag == 0){
+                    folderList.add(cr.getString(0));
+                }
 
             } while ( cr.moveToNext());
         }
         Log.d(TAG, " Folder Listing of SMS,MMS and EMAIL: "+folderList);
 
         return folderList;
+    }
+    public List<String> folderListMns(Context context) {
+        String[] projection = new String[] {"displayName"};
+        Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
+        Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
+        List<String> folderList = new ArrayList<String>();
+        if ( cr.moveToFirst()) {
+                do {
+                        Log.d(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
+                        folderList.add(cr.getString(0));
+                } while ( cr.moveToNext());
+        }
+        Log.d(TAG, " Folder Listing of EMAIL: "+folderList);
+        return folderList;
 
     }
 
     public String getWhereIsQueryForTypeEmail(String folder, Context context) {
 
-        Log.d(TAG, ":: Inside getWhereIsQueryForTypeEmail ::"+ folder);
         String query = "mailboxKey = -1";
         String folderId;
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
 
         Cursor cr = context.getContentResolver().query(
-                                uri, null, "(UPPER(displayName) = '"+ folder.toUpperCase()+"')" , null, null);
+                uri, null, "(UPPER(displayName) = '"+ folder.toUpperCase()+"')" , null, null);
 
-                if ( cr.moveToFirst()) {
-                        do {
-                                Log.d(TAG, ":: Inside getWhereIsQueryForTypeEmail Folder Name ::"+ cr.getString(cr.getColumnIndex("displayName")));
-                        folderId = cr.getString(cr.getColumnIndex("_id"));
-                        query = "mailboxKey = "+ folderId;
-                        break;
-                        } while ( cr.moveToNext());
-                }
+        if ( cr.moveToFirst()) {
+            do {
+                folderId = cr.getString(cr.getColumnIndex("_id"));
+                query = "mailboxKey = "+ folderId;
+                break;
+            } while ( cr.moveToNext());
+        }
 
         return query;
     }
@@ -134,16 +147,16 @@ public class EmailUtils {
         String textContent;
         Uri uri = Uri.parse("content://com.android.email.provider/body");
 
-                Cursor cr = context.getContentResolver().query(
-                                uri, null, "messageKey = "+ messageId , null, null);
+        Cursor cr = context.getContentResolver().query(
+                uri, null, "messageKey = "+ messageId , null, null);
 
-                if ( cr.moveToFirst()) {
-                        do {
-                        textContent = cr.getString(cr.getColumnIndex("textContent"));
-                        msgSize = textContent.length();
-                        break;
-                        } while ( cr.moveToNext());
-                }
+        if ( cr.moveToFirst()) {
+            do {
+                textContent = cr.getString(cr.getColumnIndex("textContent"));
+                msgSize = textContent.length();
+                break;
+            } while ( cr.moveToNext());
+        }
 
         return msgSize;
     }
@@ -153,10 +166,10 @@ public class EmailUtils {
         Log.d(TAG, ":: Inside getFolderName ::"+ splitStringsEmail);
 
         if(splitStringsEmail[2].trim().equalsIgnoreCase("[Gmail]") || splitStringsEmail[2].trim().contains("Gmail")){
-                folderName = splitStringsEmail[2]+"/"+splitStringsEmail[3];
+            folderName = splitStringsEmail[2]+"/"+splitStringsEmail[3];
         }
         else{
-                folderName = splitStringsEmail[2];
+            folderName = splitStringsEmail[2];
         }
 
         Log.d(TAG, "folderName :: " + folderName);
@@ -169,16 +182,16 @@ public class EmailUtils {
 
         /* Filter readstatus: 0 no filtering, 0x01 get unread, 0x10 get read */
         if (appParams.FilterReadStatus != 0) {
-                Log.d(TAG, "##Inside Filter Read Status.....##:");
-                if ((appParams.FilterReadStatus & 0x1) != 0) {
+            Log.d(TAG, "##Inside Filter Read Status.....##:");
+            if ((appParams.FilterReadStatus & 0x1) != 0) {
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }
                 whereClauseEmail += " flagRead = 0 ";
             }
-                Log.d(TAG, "##Filter Read Status Value##:"+appParams.FilterReadStatus);
-                Log.d(TAG, "##Filter Read Status Condition Value##:"+(appParams.FilterReadStatus & 0x10));
-                if ((appParams.FilterReadStatus & 0x10) != 0) {
+            Log.d(TAG, "##Filter Read Status Value##:"+appParams.FilterReadStatus);
+            Log.d(TAG, "##Filter Read Status Condition Value##:"+(appParams.FilterReadStatus & 0x10));
+            if ((appParams.FilterReadStatus & 0x10) != 0) {
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }
@@ -191,24 +204,32 @@ public class EmailUtils {
         Log.d(TAG, "##Filter Recipient Condition 1 ##:"+(appParams.FilterRecipient != null));
         Log.d(TAG, "##Filter Recipient Condition 2 ##:"+(appParams.FilterRecipient != ""));
         //Filter Recipient
-        if ((appParams.FilterRecipient != null) && (appParams.FilterRecipient != "")  && (appParams.FilterRecipient.length() > 0)) {
+        if ((appParams.FilterRecipient != null) && (appParams.FilterRecipient != "")  
+                && (appParams.FilterRecipient.length() > 0)
+                && !(appParams.FilterRecipient.equalsIgnoreCase("*"))) {
+                if(appParams.FilterRecipient.contains("*")){
+                            appParams.FilterRecipient = appParams.FilterRecipient.replace('*', '%');
+                }
                 if (whereClauseEmail != "") {
-                whereClauseEmail += " AND ";
-            }
+                    whereClauseEmail += " AND ";
+                }
             whereClauseEmail += " toList LIKE '%"+appParams.FilterRecipient.trim()+"%'";
         }
 
         // TODO Filter Originator
 
         if ((appParams.FilterOriginator != null)
-                && (appParams.FilterOriginator.length() != 0)) {
-
+                && (appParams.FilterOriginator.length() > 0)
+                && !(appParams.FilterOriginator.equalsIgnoreCase("*"))) {
+                if(appParams.FilterOriginator.contains("*")){
+                        appParams.FilterOriginator = appParams.FilterOriginator.replace('*', '%');
+                }
             // For incoming message
-                if (whereClauseEmail != "") {
+            if (whereClauseEmail != "") {
                 whereClauseEmail += " AND ";
             }
-                String str1 = appParams.FilterOriginator;
-                whereClauseEmail += "fromList LIKE '%"+appParams.FilterOriginator.trim()+"%'";
+            String str1 = appParams.FilterOriginator;
+            whereClauseEmail += "fromList LIKE '%"+appParams.FilterOriginator.trim()+"%'";
         }
         Log.d(TAG, "##11 whereClauseEmail 11##:" + whereClauseEmail);
         // TODO Filter priority?
@@ -223,7 +244,7 @@ public class EmailUtils {
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }
-                whereClauseEmail += "timeStamp > " + time.toMillis(false);
+                whereClauseEmail += "timeStamp >= " + time.toMillis(false);
 
             } catch (TimeFormatException e) {
                 Log.d(TAG, "Bad formatted FilterPeriodBegin, Ignore"
@@ -270,7 +291,7 @@ public class EmailUtils {
             Log.d(TAG, "Fileter Subject Length ::"+appParams.SubjectLength);
             if ((subject != null && appParams.SubjectLength > 0)
                     && (subject.length() > appParams.SubjectLength)) {
-                 subject = subject.substring(0,
+                subject = subject.substring(0,
                         appParams.SubjectLength);
             }
             emailMsg.setSubject(subject.trim());
@@ -279,11 +300,11 @@ public class EmailUtils {
 
         if ((appParams.ParameterMask & BIT_DATETIME) != 0) {
             // TODO Clarify if OFFSET is needed.
-                emailMsg.setDatetime(datetimeStr);
+            emailMsg.setDatetime(datetimeStr);
         }
 
         if ((appParams.ParameterMask & BIT_SENDER_NAME) != 0) {
-                if(senderName.contains("")){
+            if(senderName.contains("")){
                 String[] senderStr = senderName.split("");
                 if(senderStr !=null && senderStr.length > 0){
                     Log.d(TAG, " ::Sender name split String 0:: " + senderStr[0]
@@ -297,7 +318,7 @@ public class EmailUtils {
        }
 
         if ((appParams.ParameterMask & BIT_SENDER_ADDRESSING) != 0) {
-                if(senderAddressing.contains("")){
+            if(senderAddressing.contains("")){
                 String[] senderAddrStr = senderAddressing.split("");
                 if(senderAddrStr !=null && senderAddrStr.length > 0){
                     Log.d(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
@@ -312,7 +333,7 @@ public class EmailUtils {
        }
 
         if ((appParams.ParameterMask & BIT_RECIPIENT_NAME) != 0) {
-                String multiRecepients = null;
+            String multiRecepients = null;
 
             if(recipientName.contains("")){
                 String[] recepientStr = recipientName.split("");
@@ -333,7 +354,7 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_RECIPIENT_ADDRESSING) != 0) {
-                String multiRecepientAddrs = null;
+            String multiRecepientAddrs = null;
 
             if(recipientAddressing.contains("")){
                 String[] recepientAddrStr = recipientAddressing.split("");
@@ -354,12 +375,12 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_TYPE) != 0) {
-                emailMsg.setType("EMAIL");
+            emailMsg.setType("EMAIL");
         }
 
         if ((appParams.ParameterMask & BIT_SIZE) != 0) {
-                int  msgSize = 0;
-                msgSize = getMessageSizeEmail(Integer.parseInt(msgId), context);
+            int  msgSize = 0;
+            msgSize = getMessageSizeEmail(Integer.parseInt(msgId), context);
             emailMsg.setSize(msgSize);
         }
 
@@ -382,7 +403,7 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_READ) != 0) {
-                Log.d(TAG, " ::Read Status:: " + readStatus);
+            Log.d(TAG, " ::Read Status:: " + readStatus);
             if (readStatus.equalsIgnoreCase("1")) {
                 emailMsg.setRead("yes");
             } else {
@@ -391,7 +412,7 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_SENT) != 0) {
-                // TODO Get sent status?
+            // TODO Get sent status?
             if (folderName.equalsIgnoreCase("sent") || folderName.toUpperCase().contains("SENT")) {
                 emailMsg.setSent("yes");
             } else {
@@ -405,8 +426,13 @@ public class EmailUtils {
 
         if ((appParams.ParameterMask & BIT_REPLYTO_ADDRESSING) != 0) {
                 //TODO need to test
-                Log.d(TAG, " ::Reply To addressing:: " + replyToStr);
-            emailMsg.setReplyTo_addressing(replyToStr);
+            Log.d(TAG, " ::Reply To addressing:: " + replyToStr);
+            if(replyToStr !=null && !replyToStr.equalsIgnoreCase("")){
+                emailMsg.setReplyTo_addressing(replyToStr);
+            }
+            else{
+                emailMsg.setReplyTo_addressing(emailMsg.getSender_addressing());
+            }
         }
 
         return emailMsg;
@@ -454,8 +480,8 @@ public class EmailUtils {
             if(senderName.contains("")){
                 String[] senderStr = senderName.split("");
                 if(senderStr !=null && senderStr.length > 0){
-                        bmsg.setOriginatorVcard_name(senderStr[1].trim());
-                        bmsg.setOriginatorVcard_email(senderStr[0].trim());
+                    bmsg.setOriginatorVcard_name(senderStr[1].trim());
+                    bmsg.setOriginatorVcard_email(senderStr[0].trim());
                 }
             }
             else{
@@ -469,7 +495,7 @@ public class EmailUtils {
             if(recipientName.contains("")){
                 String[] recepientStr = recipientName.split("");
                 if(recepientStr !=null && recepientStr.length > 0){
-                        bmsg.setRecipientVcard_name(recepientStr[1].trim());
+                    bmsg.setRecipientVcard_name(recepientStr[1].trim());
                     bmsg.setRecipientVcard_email(recepientStr[0].trim());
                 }
             }

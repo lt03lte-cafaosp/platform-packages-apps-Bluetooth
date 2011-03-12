@@ -33,7 +33,11 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.android.bluetooth.map.BluetoothMasAppParams;
 import android.content.Context;
+import android.text.format.Time;
+import android.util.Log;
+import android.util.TimeFormatException;
 
 public class CommonUtils {
 
@@ -79,5 +83,43 @@ public class CommonUtils {
         }
         return tempPath;
     }
+    public int validateFilterPeriods(BluetoothMasAppParams appParams) {
 
+        int filterPeriodValid = -1;
+        String periodStr = "";
+        /* Filter Period Begin */
+        if ((appParams.FilterPeriodBegin != null)
+                && (appParams.FilterPeriodBegin.length() > 0)) {
+            Time time = new Time();
+            try {
+                time.parse(appParams.FilterPeriodBegin);
+                if (periodStr != "") {
+                        periodStr += " AND ";
+                }
+                periodStr += "date >= " + time.toMillis(false);
+            } catch (TimeFormatException e) {
+                Log.d(TAG, "Bad formatted FilterPeriodBegin "
+                        + appParams.FilterPeriodBegin);
+                filterPeriodValid = 0;
+            }
+        }
+
+        /* Filter Period End */
+        if ((appParams.FilterPeriodEnd != null)
+                && (appParams.FilterPeriodEnd.length() > 0 )) {
+            Time time = new Time();
+            try {
+                time.parse(appParams.FilterPeriodEnd);
+                if (periodStr != "") {
+                        periodStr += " AND ";
+                }
+                periodStr += "date < " + time.toMillis(false);
+            } catch (TimeFormatException e) {
+                Log.d(TAG, "Bad formatted FilterPeriodEnd "
+                        + appParams.FilterPeriodEnd);
+                filterPeriodValid = 0;
+            }
+        }
+        return filterPeriodValid;
+    }
 }
