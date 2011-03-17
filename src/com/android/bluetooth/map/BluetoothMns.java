@@ -153,7 +153,9 @@ public class BluetoothMns {
     private long mTimestamp;
 
     public String deletedFolderName = null;
+    private EmailFolderContentObserverClass[] arrObj;
 
+    List<String> folderList;
     public BluetoothMns(Context context) {
         /* check Bluetooth enable status */
         /*
@@ -180,6 +182,9 @@ public class BluetoothMns {
             mHandlerThread.start();
             mSessionHandler = new EventHandler(mHandlerThread.getLooper());
         }
+        EmailUtils eu = new EmailUtils();
+        folderList = eu.folderListMns(mContext);
+        arrObj = new EmailFolderContentObserverClass[folderList.size()];
     }
 
     public Handler getHandler() {
@@ -523,53 +528,25 @@ public class BluetoothMns {
                 new String[] { "_id", "mailboxkey" }, null, null, "_id asc");
 
         EmailUtils eu = new EmailUtils();
-        String emailInboxCondition = eu.getWhereIsQueryForTypeEmail("inbox", mContext);
-        crEmailInboxA = mContext.getContentResolver().query(emailUri,
-                new String[] {  "_id", "mailboxkey"  }, emailInboxCondition, null, "_id asc");
-        crEmailInboxB = mContext.getContentResolver().query(emailUri,
-                new String[] {  "_id", "mailboxkey" }, emailInboxCondition, null, "_id asc");
-
-        String emailSentCondition = eu.getWhereIsQueryForTypeEmail("sent", mContext);
-        crEmailSentA = mContext.getContentResolver().query(emailUri,
-                new String[] {"_id", "mailboxkey" }, emailSentCondition, null, "_id asc");
-        crEmailSentB = mContext.getContentResolver().query(emailUri,
-                new String[] {"_id", "mailboxkey" }, emailSentCondition, null, "_id asc");
-
-        String emailDraftCondition = eu.getWhereIsQueryForTypeEmail("drafts", mContext);
-        crEmailDraftA = mContext.getContentResolver().query(emailUri,
-                new String[] {"_id", "mailboxkey"}, emailDraftCondition, null, "_id asc");
-        crEmailDraftB = mContext.getContentResolver().query(emailUri,
-                new String[] {"_id", "mailboxkey" }, emailDraftCondition, null, "_id asc");
-
-        String emailOutboxCondition = eu.getWhereIsQueryForTypeEmail("outbox", mContext);
-        crEmailOutboxA = mContext.getContentResolver().query(emailUri,
-                new String[] {"_id", "mailboxkey"}, emailOutboxCondition, null, "_id asc");
-        crEmailOutboxB = mContext.getContentResolver().query(emailUri,
-                new String[] { "_id", "mailboxkey"}, emailOutboxCondition, null, "_id asc");
-
         Uri emailObserverUri = Uri.parse("content://com.android.email.provider/message");
         mContext.getContentResolver().registerContentObserver(emailObserverUri,
                 true, emailContentObserver);
 
-        Uri emailInboxObserverUri = Uri.parse("content://com.android.email.provider/message");
-        mContext.getContentResolver().registerContentObserver(
-                        emailInboxObserverUri, true, emailInboxContentObserver);
-
-        Uri emailSentObserverUri = Uri.parse("content://com.android.email.provider/message");
-        mContext.getContentResolver().registerContentObserver(
-                emailSentObserverUri, true, emailSentContentObserver);
-
-        Uri emailDraftObserverUri = Uri.parse("content://com.android.email.provider/message");
-        mContext.getContentResolver().registerContentObserver(
-                        emailDraftObserverUri, true, emailDraftContentObserver);
-
-        Uri emailOutboxObserverUri = Uri.parse("content://com.android.email.provider/message");
-        mContext.getContentResolver().registerContentObserver(
-                        emailOutboxObserverUri, true, emailOutboxContentObserver);
-
-        //email end
-
-
+        if(folderList != null && folderList.size() > 0){
+            for(int i=0; i < folderList.size(); i++){
+                folderName = folderList.get(i);
+                String emailFolderCondition = eu.getWhereIsQueryForTypeEmail(folderName, mContext);
+                Cursor crEmailFolderA = mContext.getContentResolver().query(emailUri,
+                        new String[] {  "_id", "mailboxkey"  }, emailFolderCondition, null, "_id asc");
+                Cursor crEmailFolderB = mContext.getContentResolver().query(emailUri,
+                        new String[] {"_id", "mailboxkey" }, emailFolderCondition, null, "_id asc");
+                arrObj[i] = new EmailFolderContentObserverClass(folderName,
+                            crEmailFolderA, crEmailFolderB, CR_EMAIL_FOLDER_A);
+                Uri emailFolderObserverUri = Uri.parse("content://com.android.email.provider/message");
+                mContext.getContentResolver().registerContentObserver(
+                        emailFolderObserverUri, true, arrObj[i]);
+            }
+        }
         Uri smsInboxObserverUri = Uri.parse("content://mms-sms/inbox");
         mContext.getContentResolver().registerContentObserver(
                 smsInboxObserverUri, true, inboxContentObserver);
@@ -678,18 +655,13 @@ public class BluetoothMns {
             crEmailA.close();
             crEmailB.close();
             currentCREmail = CR_EMAIL_A;
-            crEmailOutboxA.close();
-            crEmailOutboxB.close();
-            currentCREmailOutbox = CR_EMAIL_OUTBOX_A;
-            crEmailDraftA.close();
-            crEmailDraftB.close();
-            currentCREmailDraft = CR_EMAIL_DRAFT_A;
-            crEmailInboxA.close();
-            crEmailInboxB.close();
-            currentCREmailInbox = CR_EMAIL_INBOX_A;
-            crEmailSentA.close();
-            crEmailSentB.close();
-            currentCREmailSent = CR_EMAIL_SENT_A;
+            if(arrObj != null && arrObj.length > 0){
+                for(int i=0; i < arrObj.length; i++){
+                        arrObj[i].crEmailFolderA.close();
+                        arrObj[i].crEmailFolderB.close();
+                        arrObj[i].currentCREmailFolder = CR_EMAIL_FOLDER_A;
+                }
+            }
             //email end
 
         }
@@ -705,11 +677,6 @@ public class BluetoothMns {
     private QueuedContentObserverClass queuedContentObserver = new QueuedContentObserverClass();
 
     private EmailContentObserverClass emailContentObserver = new EmailContentObserverClass();
-    private EmailInboxContentObserverClass emailInboxContentObserver = new EmailInboxContentObserverClass();
-    private EmailSentContentObserverClass emailSentContentObserver = new EmailSentContentObserverClass();
-    private EmailDraftContentObserverClass emailDraftContentObserver = new EmailDraftContentObserverClass();
-    private EmailOutboxContentObserverClass emailOutboxContentObserver = new EmailOutboxContentObserverClass();
-
     private Cursor crSmsA = null;
     private Cursor crSmsB = null;
     private Cursor crSmsInboxA = null;
@@ -739,14 +706,6 @@ public class BluetoothMns {
 
     private Cursor crEmailA = null;
     private Cursor crEmailB = null;
-    private Cursor crEmailOutboxA = null;
-    private Cursor crEmailOutboxB = null;
-    private Cursor crEmailDraftA = null;
-    private Cursor crEmailDraftB = null;
-    private Cursor crEmailInboxA = null;
-    private Cursor crEmailInboxB = null;
-    private Cursor crEmailSentA = null;
-    private Cursor crEmailSentB = null;
 
     private final int CR_SMS_A = 1;
     private final int CR_SMS_B = 2;
@@ -789,18 +748,10 @@ public class BluetoothMns {
     private final int CR_EMAIL_A = 1;
     private final int CR_EMAIL_B = 2;
     private int currentCREmail = CR_EMAIL_A;
-    private final int CR_EMAIL_OUTBOX_A = 1;
-    private final int CR_EMAIL_OUTBOX_B = 2;
-    private int currentCREmailOutbox = CR_EMAIL_OUTBOX_A;
-    private final int CR_EMAIL_DRAFT_A = 1;
-    private final int CR_EMAIL_DRAFT_B = 2;
-    private int currentCREmailDraft = CR_EMAIL_DRAFT_A;
-    private final int CR_EMAIL_INBOX_A = 1;
-    private final int CR_EMAIL_INBOX_B = 2;
-    private int currentCREmailInbox = CR_EMAIL_INBOX_A;
-    private final int CR_EMAIL_SENT_A = 1;
-    private final int CR_EMAIL_SENT_B = 2;
-    private int currentCREmailSent = CR_EMAIL_SENT_A;
+    private final int CR_EMAIL_FOLDER_A = 1;
+    private final int CR_EMAIL_FOLDER_B = 2;
+    private int currentCREmailFolder = CR_EMAIL_FOLDER_A;
+    public String folderName = "";
 
 
     /**
@@ -884,7 +835,7 @@ public class BluetoothMns {
                 new String[] { "_id", "mailboxKey" }, null, null, null);
         int folderId = -1;
         if (cr.moveToFirst()) {
-                folderId = cr.getInt(cr.getColumnIndex("mailboxKey"));
+            folderId = cr.getInt(cr.getColumnIndex("mailboxKey"));
         }
 
         Cursor cr1 = mContext.getContentResolver().query(
@@ -892,11 +843,11 @@ public class BluetoothMns {
                 new String[] { "_id", "displayName" }, "_id ="+ folderId, null, null);
         String folderName = null;
         if (cr1.moveToFirst()) {
-                folderName = cr1.getString(cr1.getColumnIndex("displayName"));
+            folderName = cr1.getString(cr1.getColumnIndex("displayName"));
         }
         if(folderName !=null && (folderName.equalsIgnoreCase("Trash") ||
-                        folderName.toUpperCase().contains("TRASH"))){
-                deletedFlag = 1;
+                folderName.toUpperCase().contains("TRASH"))){
+            deletedFlag = 1;
         }
         return deletedFlag;
     }
@@ -930,15 +881,23 @@ public class BluetoothMns {
             }
         }
     };
-
     /**
      * This class listens for changes in Email Content Provider's inbox table
      * It acts, only when a entry gets removed from the table
      */
-    private class EmailInboxContentObserverClass extends ContentObserver {
+    private class EmailFolderContentObserverClass extends ContentObserver {
+        private String folder;
+        private Cursor crEmailFolderA;
+        private Cursor crEmailFolderB;
+        private int currentCREmailFolder;
 
-        public EmailInboxContentObserverClass() {
+        public EmailFolderContentObserverClass(String folderName, Cursor crEmailFolderA,
+                        Cursor crEmailFolderB, int currentCREmailFolder) {
             super(null);
+            this.folder = folderName;
+            this.crEmailFolderA = crEmailFolderA;
+            this.crEmailFolderB = crEmailFolderB;
+            this.currentCREmailFolder = currentCREmailFolder;
         }
 
         @Override
@@ -947,26 +906,27 @@ public class BluetoothMns {
 
             int currentItemCount = 0;
             int newItemCount = 0;
+            Log.d(TAG,"Folder name in Observer class ::"+folderName);
+            Log.d(TAG,"Flag value name in Obsrever class ::"+currentCREmailFolder);
 
-            if (currentCREmailInbox == CR_EMAIL_INBOX_A) {
-                currentItemCount = crEmailInboxA.getCount();
-                crEmailInboxB.requery();
-                newItemCount = crEmailInboxB.getCount();
+            if (currentCREmailFolder == CR_EMAIL_FOLDER_A) {
+                currentItemCount = crEmailFolderA.getCount();
+                crEmailFolderB.requery();
+                newItemCount = crEmailFolderB.getCount();
             } else {
-                currentItemCount = crEmailInboxB.getCount();
-                crEmailInboxA.requery();
-                newItemCount = crEmailInboxA.getCount();
+                currentItemCount = crEmailFolderB.getCount();
+                crEmailFolderA.requery();
+                newItemCount = crEmailFolderA.getCount();
             }
 
-            Log.d(TAG, "EMAIL INBOX current " + currentItemCount + " new "
+            Log.d(TAG, "EMAIL Deleted folder current " + currentItemCount + " new "
                     + newItemCount);
-
             if (currentItemCount > newItemCount) {
-                crEmailInboxA.moveToFirst();
-                crEmailInboxB.moveToFirst();
+                crEmailFolderA.moveToFirst();
+                crEmailFolderB.moveToFirst();
 
-                CursorJoiner joiner = new CursorJoiner(crEmailInboxA,
-                        new String[] { "_id" }, crEmailInboxB,
+                CursorJoiner joiner = new CursorJoiner(crEmailFolderA,
+                        new String[] { "_id" }, crEmailFolderB,
                         new String[] { "_id" });
 
                 CursorJoiner.Result joinerResult;
@@ -975,26 +935,78 @@ public class BluetoothMns {
                     switch (joinerResult) {
                     case LEFT:
                         // handle case where a row in cursor1 is unique
-                        if (currentCREmailInbox == CR_EMAIL_INBOX_A) {
+                        if (currentCREmailFolder == CR_EMAIL_FOLDER_A) {
                             // The new query doesn't have this row; implies it
                             // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM INBOX ");
-                            String id = crEmailInboxA.getString(crEmailInboxA
+                            Log.d(TAG, " EMAIL DELETED FROM FOLDER ");
+                            String id = crEmailFolderA.getString(crEmailFolderA
                                     .getColumnIndex("_id"));
                             Log.d(TAG, " DELETED EMAIL ID " + id);
                             int deletedFlag = getDeletedFlagEmail(id); //TODO
                             if(deletedFlag == 1){
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
-
                                     sendMnsEvent(MESSAGE_DELETED, id,
-                                                "TELECOM/MSG/INBOX", null, "EMAIL");
+                                            "TELECOM/MSG/"+folder, null, "EMAIL");
                             }
                             else {
                                 Log.d(TAG, "Shouldn't reach here as you cannot "
                                         + "move msg from Inbox to any other folder");
-                            }
+                                if(folder != null && folder.equalsIgnoreCase("outbox")){
+                                        Cursor cr1 = null;
+                                    int folderId;
+                                    String containingFolder = null;
+                                    EmailUtils eu = new EmailUtils();
+                                    Uri uri1 = Uri.parse("content://com.android.email.provider/message");
+                                    String whereClause = " _id = " + id;
+                                    cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
+                                            null);
 
+                                    if (cr1.getCount() > 0) {
+                                        cr1.moveToFirst();
+                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    }
+                                    String newFolder = containingFolder;
+                                    id = Integer.toString(Integer.valueOf(id)+ EMAIL_HDLR_CONSTANT);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                                    .equalsIgnoreCase("outbox"))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                "TELECOM/MSG/" + newFolder,
+                                                "TELECOM/MSG/OUTBOX", "EMAIL");
+                                        if ( newFolder.equalsIgnoreCase("sent")) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    "TELECOM/MSG/" + newFolder,
+                                                    null, "EMAIL");
+                                        }
+                                    }
+                                }
+                                else if(folder !=null){
+                                        Cursor cr1 = null;
+                                    int folderId;
+                                    String containingFolder = null;
+                                    EmailUtils eu = new EmailUtils();
+                                    Uri uri1 = Uri.parse("content://com.android.email.provider/message");
+                                    String whereClause = " _id = " + id;
+                                    cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
+                                            null);
+
+                                    if (cr1.getCount() > 0) {
+                                        cr1.moveToFirst();
+                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    }
+                                    String newFolder = containingFolder;
+                                    id = Integer.toString(Integer.valueOf(id)
+                                            + EMAIL_HDLR_CONSTANT);
+                                    sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
+                                            + newFolder, "TELECOM/MSG/"+folder,
+                                            "EMAIL");
+                                 }
+                              }
                         } else {
                             // TODO - The current(old) query doesn't have this row;
                             // implies it was added
@@ -1002,11 +1014,11 @@ public class BluetoothMns {
                         break;
                     case RIGHT:
                         // handle case where a row in cursor2 is unique
-                        if (currentCREmailInbox == CR_EMAIL_INBOX_B) {
+                        if (currentCREmailFolder == CR_EMAIL_FOLDER_B) {
                             // The new query doesn't have this row; implies it
                             // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM INBOX ");
-                            String id = crEmailInboxB.getString(crEmailInboxB
+                            Log.d(TAG, " EMAIL DELETED FROM FOLDER ");
+                            String id = crEmailFolderB.getString(crEmailFolderB
                                     .getColumnIndex("_id"));
                             Log.d(TAG, " DELETED EMAIL ID " + id);
                             int deletedFlag = getDeletedFlagEmail(id); //TODO
@@ -1014,12 +1026,66 @@ public class BluetoothMns {
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
                                     sendMnsEvent(MESSAGE_DELETED, id,
-                                                "TELECOM/MSG/INBOX", null, "EMAIL");
+                                                "TELECOM/MSG/"+folder, null, "EMAIL");
                             }
                             else {
                                 Log.d(TAG, "Shouldn't reach here as you cannot "
                                         + "move msg from Inbox to any other folder");
-                            }
+                                if(folder != null && folder.equalsIgnoreCase("outbox")){
+                                        Cursor cr1 = null;
+                                    int folderId;
+                                    String containingFolder = null;
+                                    EmailUtils eu = new EmailUtils();
+                                    Uri uri1 = Uri.parse("content://com.android.email.provider/message");
+                                    String whereClause = " _id = " + id;
+                                    cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
+                                            null);
+
+                                    if (cr1.getCount() > 0) {
+                                        cr1.moveToFirst();
+                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    }
+                                    String newFolder = containingFolder;
+                                    id = Integer.toString(Integer.valueOf(id)+ EMAIL_HDLR_CONSTANT);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                                    .equalsIgnoreCase("outbox"))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                "TELECOM/MSG/" + newFolder,
+                                                "TELECOM/MSG/OUTBOX", "EMAIL");
+                                        if ( newFolder.equalsIgnoreCase("sent")) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    "TELECOM/MSG/" + newFolder,
+                                                    null, "EMAIL");
+                                        }
+                                    }
+                                }
+                                else if(folder !=null){
+                                        Cursor cr1 = null;
+                                    int folderId;
+                                    String containingFolder = null;
+                                    EmailUtils eu = new EmailUtils();
+                                    Uri uri1 = Uri.parse("content://com.android.email.provider/message");
+                                    String whereClause = " _id = " + id;
+                                    cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
+                                            null);
+
+                                    if (cr1.getCount() > 0) {
+                                        cr1.moveToFirst();
+                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    }
+                                    String newFolder = containingFolder;
+                                    id = Integer.toString(Integer.valueOf(id)
+                                            + EMAIL_HDLR_CONSTANT);
+                                    sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
+                                            + newFolder, "TELECOM/MSG/"+folder,
+                                            "EMAIL");
+                                }
+                           }
                         }
                         else {
                             // The current(old) query doesn't have this row;
@@ -1033,443 +1099,13 @@ public class BluetoothMns {
                     }
                 }
             }
-
-            if (currentCREmailInbox == CR_EMAIL_INBOX_A) {
-                currentCREmailInbox = CR_EMAIL_INBOX_B;
+            if (currentCREmailFolder == CR_EMAIL_FOLDER_A) {
+                currentCREmailFolder = CR_EMAIL_FOLDER_B;
             } else {
-                currentCREmailInbox = CR_EMAIL_INBOX_A;
+                currentCREmailFolder = CR_EMAIL_FOLDER_A;
             }
         }
     }
-    /**
-     * This class listens for changes in Email Content Provider's Sent table
-     * It acts, only when a entry gets removed from the table
-     */
-    private class EmailSentContentObserverClass extends ContentObserver {
-
-        public EmailSentContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            if (currentCREmailSent == CR_EMAIL_SENT_A) {
-                currentItemCount = crEmailSentA.getCount();
-                crEmailSentB.requery();
-                newItemCount = crEmailSentB.getCount();
-            } else {
-                currentItemCount = crEmailSentB.getCount();
-                crEmailSentA.requery();
-                newItemCount = crEmailSentA.getCount();
-            }
-
-            Log.d(TAG, "EMAIL SENT current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crEmailSentA.moveToFirst();
-                crEmailSentB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crEmailSentA,
-                        new String[] { "_id" }, crEmailSentB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCREmailSent == CR_EMAIL_SENT_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM SENT ");
-                            String id = crEmailSentA.getString(crEmailSentA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-
-                            int deletedFlag = getDeletedFlagEmail(id);
-                            if(deletedFlag == 1){
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/SENT", null, "EMAIL");
-                            } else {
-                                Log.d(TAG,"Shouldn't reach here as you cannot " +
-                                          "move msg from Sent to any other folder");
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCREmailSent == CR_EMAIL_SENT_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM SENT ");
-                            String id = crEmailSentB.getString(crEmailSentB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-                            int deletedFlag = getDeletedFlagEmail(id);
-                            if(deletedFlag == 1){
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/SENT", null, "EMAIL");
-                            } else {
-                                Log.d(TAG, "Shouldn't reach here as " +
-                                                "you cannot move msg from Sent to " +
-                                                "any other folder");
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCREmailSent == CR_EMAIL_SENT_A) {
-                currentCREmailSent = CR_EMAIL_SENT_B;
-            } else {
-                currentCREmailSent = CR_EMAIL_SENT_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Email Content Provider's Draft table
-     * It acts, only when a entry gets removed from the table
-     */
-    private class EmailDraftContentObserverClass extends ContentObserver {
-
-        public EmailDraftContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            if (currentCREmailDraft == CR_EMAIL_DRAFT_A) {
-                currentItemCount = crEmailDraftA.getCount();
-                crEmailDraftB.requery();
-                newItemCount = crEmailDraftB.getCount();
-            } else {
-                currentItemCount = crEmailDraftB.getCount();
-                crEmailDraftA.requery();
-                newItemCount = crEmailDraftA.getCount();
-            }
-
-            Log.d(TAG, "EMAIL DRAFT current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crEmailDraftA.moveToFirst();
-                crEmailDraftB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crEmailDraftA,
-                        new String[] { "_id" }, crEmailDraftB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCREmailDraft == CR_EMAIL_DRAFT_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM DRAFT ");
-                            String id = crEmailDraftA.getString(crEmailDraftA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-
-                            int deletedFlag = getDeletedFlagEmail(id);
-                            if(deletedFlag == 1){
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/DRAFT", null, "EMAIL");
-                            } else {
-                                Cursor cr1 = null;
-                                int folderId;
-                                String containingFolder = null;
-                                EmailUtils eu = new EmailUtils();
-                                Uri uri1 = Uri.parse("content://com.android.email.provider/message");
-                                String whereClause = " _id = " + id;
-                                cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
-                                        null);
-
-                                if (cr1.getCount() > 0) {
-                                    cr1.moveToFirst();
-                                    folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                    containingFolder = eu.getContainingFolderEmail(folderId, mContext);
-                                }
-
-                                String newFolder = containingFolder;
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/DRAFT",
-                                        "EMAIL");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "EMAIL");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCREmailDraft == CR_EMAIL_DRAFT_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM DRAFT ");
-                            String id = crEmailDraftB.getString(crEmailDraftB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-                            int deletedFlag = getDeletedFlagEmail(id);
-                            if(deletedFlag == 1){
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/DRAFT", null, "EMAIL");
-                            } else {
-                                Cursor cr1 = null;
-                                int folderId;
-                                String containingFolder = null;
-                                EmailUtils eu = new EmailUtils();
-                                Uri uri1 = Uri.parse("content://com.android.email.provider/message");
-                                String whereClause = " _id = " + id;
-                                cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
-                                        null);
-
-                                if (cr1.getCount() > 0) {
-                                    cr1.moveToFirst();
-                                    folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                    containingFolder = eu.getContainingFolderEmail(folderId, mContext);
-                                }
-
-                                String newFolder = containingFolder;
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/DRAFT",
-                                        "EMAIL");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "EMAIL");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCREmailDraft == CR_EMAIL_DRAFT_A) {
-                currentCREmailDraft = CR_EMAIL_DRAFT_B;
-            } else {
-                currentCREmailDraft = CR_EMAIL_DRAFT_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Sms Content Provider's Outbox table
-     * It acts only when a entry gets removed from the table
-     */
-    private class EmailOutboxContentObserverClass extends ContentObserver {
-
-        public EmailOutboxContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            if (currentCREmailOutbox == CR_EMAIL_OUTBOX_A) {
-                currentItemCount = crEmailOutboxA.getCount();
-                crEmailOutboxB.requery();
-                newItemCount = crEmailOutboxB.getCount();
-            } else {
-                currentItemCount = crEmailOutboxB.getCount();
-                crEmailOutboxA.requery();
-                newItemCount = crEmailOutboxA.getCount();
-            }
-
-            Log.d(TAG, "EMAIL OUTBOX current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crEmailOutboxA.moveToFirst();
-                crEmailOutboxB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crEmailOutboxA,
-                        new String[] { "_id" }, crEmailOutboxB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCREmailOutbox == CR_EMAIL_OUTBOX_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM OUTBOX ");
-                            String id = crEmailOutboxA.getString(crEmailOutboxA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-                            int deletedFlag = getDeletedFlagEmail(id);
-                            if(deletedFlag == 1){
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "EMAIL");
-                            } else {
-                                Cursor cr1 = null;
-                                int folderId;
-                                String containingFolder = null;
-                                EmailUtils eu = new EmailUtils();
-                                Uri uri1 = Uri.parse("content://com.android.email.provider/message");
-                                String whereClause = " _id = " + id;
-                                cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
-                                        null);
-
-                                if (cr1.getCount() > 0) {
-                                    cr1.moveToFirst();
-                                    folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                    containingFolder = eu.getContainingFolderEmail(folderId, mContext);
-                                }
-
-                                String newFolder = containingFolder;
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "EMAIL");
-                                    if ( newFolder.equalsIgnoreCase("sent")) {
-                                        sendMnsEvent(SENDING_SUCCESS, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                null, "EMAIL");
-                                    }
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCREmailOutbox == CR_EMAIL_OUTBOX_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM OUTBOX ");
-                            String id = crEmailOutboxB.getString(crEmailOutboxB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-                            int deletedFlag = getDeletedFlagEmail(id);
-                            if(deletedFlag == 1){
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "EMAIL");
-                            } else {
-                                Cursor cr1 = null;
-                                int folderId;
-                                String containingFolder = null;
-                                EmailUtils eu = new EmailUtils();
-                                Uri uri1 = Uri.parse("content://com.android.email.provider/message");
-                                String whereClause = " _id = " + id;
-                                cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
-                                        null);
-
-                                if (cr1.getCount() > 0) {
-                                    cr1.moveToFirst();
-                                    folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                    containingFolder = eu.getContainingFolderEmail(folderId, mContext);
-                                }
-
-                                String newFolder = containingFolder;
-                                id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "EMAIL");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCREmailOutbox == CR_EMAIL_OUTBOX_A) {
-                currentCREmailOutbox = CR_EMAIL_OUTBOX_B;
-            } else {
-                currentCREmailOutbox = CR_EMAIL_OUTBOX_A;
-            }
-        }
-    }
-
-
-
     /**
      * This class listens for changes in Sms Content Provider
      * It acts, only when a new entry gets added to database
@@ -1642,12 +1278,12 @@ public class BluetoothMns {
                             cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                     null);
                             if ( cr1.moveToFirst()) {
-                                        do {
-                                                for(int i=0;i<cr1.getColumnCount();i++){
-                                                        Log.d(TAG, " Column Name: "+ cr1.getColumnName(i) + " Value: " + cr1.getString(i));
-                                                }
-                                    } while ( cr1.moveToNext());
-                                }
+                                do {
+                                    for(int i=0;i<cr1.getColumnCount();i++){
+                                        Log.d(TAG, " Column Name: "+ cr1.getColumnName(i) + " Value: " + cr1.getString(i));
+                                    }
+                                } while ( cr1.moveToNext());
+                            }
 
                             if (cr1.getCount() > 0) {
                                 cr1.moveToFirst();

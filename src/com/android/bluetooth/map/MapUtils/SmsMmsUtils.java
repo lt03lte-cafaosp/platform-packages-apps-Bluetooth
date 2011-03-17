@@ -47,8 +47,8 @@ import com.android.bluetooth.map.BluetoothMasAppParams;
 
 public class SmsMmsUtils {
 
-        public final String TAG = "SmsMmsUtils";
-        public static final int BIT_SUBJECT = 0x1;
+    public final String TAG = "SmsMmsUtils";
+    public static final int BIT_SUBJECT = 0x1;
     public static final int BIT_DATETIME = 0x2;
     public static final int BIT_SENDER_NAME = 0x4;
     public static final int BIT_SENDER_ADDRESSING = 0x8;
@@ -68,7 +68,7 @@ public class SmsMmsUtils {
     public static final int BIT_PROTECTED = 0x4000;
     public static final int BIT_REPLYTO_ADDRESSING = 0x8000;
 
-        private final String Inbox = "inbox";
+    private final String Inbox = "inbox";
     private final String Outbox = "outbox";
     private final String Sent = "sent";
     private final String Deleted = "deleted";
@@ -93,15 +93,34 @@ public class SmsMmsUtils {
         public String tel = "";
         public String email = "";
     }
-
     public List<String> folderListSmsMms(List<String> folderList) {
         folderList.add(Inbox);
         folderList.add(Outbox);
         folderList.add(Sent);
         folderList.add(Deleted);
         folderList.add(Draft);
-
         return folderList;
+    }
+    public int getFolderTypeMms(String folder) {
+
+        int folderType = -5 ;
+
+        if (folder.equalsIgnoreCase(Inbox)) {
+            folderType = 1;
+        }
+        else if (folder.equalsIgnoreCase(Outbox)) {
+            folderType = 4;
+        }
+        else if (folder.equalsIgnoreCase(Sent)) {
+            folderType = 2;
+        }
+        else if (folder.equalsIgnoreCase(Draft) || folder.equalsIgnoreCase(Drafts)) {
+            folderType = 3;
+        }
+        else if (folder.equalsIgnoreCase(Deleted)) {
+            folderType = -1;
+        }
+        return folderType;
 
     }
     public String getWhereIsQueryForType(String folder) {
@@ -124,16 +143,16 @@ public class SmsMmsUtils {
             query = "thread_id = " + DELETED_THREAD_ID;
         }
         else{
-                query = "type = -1";
+            query = "type = -1";
         }
         return query;
 
     }
     public String getConditionStringSms(String folderName, BluetoothMasAppParams appParams) {
-         String whereClause = getWhereIsQueryForType(folderName);
+        String whereClause = getWhereIsQueryForType(folderName);
 
          /* Filter readstatus: 0 no filtering, 0x01 get unread, 0x10 get read */
-         if (appParams.FilterReadStatus != 0) {
+        if (appParams.FilterReadStatus != 0) {
              if ((appParams.FilterReadStatus & 0x1) != 0) {
                  if (whereClause != "") {
                      whereClause += " AND ";
