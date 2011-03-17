@@ -42,17 +42,21 @@ import android.text.TextUtils;
 import android.content.res.Resources;
 import android.os.IBinder;
 import android.os.Message;
-
+import android.os.Bundle;
 import com.android.bluetooth.R;
-
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-
 import java.io.IOException;
 import java.util.ArrayList;
-
 import javax.obex.ServerSession;
+import android.media.MediaScannerConnection;
+import android.media.MediaScannerConnection.MediaScannerConnectionClient;
+import android.net.Uri;
+import android.content.ContentResolver;
+import android.os.RemoteException;
+import android.provider.MediaStore;
+
 public class BluetoothFtpService extends Service {
      private static final String TAG = "BluetoothFtpService";
 
@@ -139,6 +143,10 @@ public class BluetoothFtpService extends Service {
 
     public static final int MSG_OBEX_AUTH_CHALL = 5007;
 
+    public static final int MSG_FILE_RECEIVED = 5008;
+
+    public static final int MSG_FILE_DELETED = 5009;
+
     private static final int MSG_INTERNAL_START_LISTENER = 1;
 
     private static final int MSG_INTERNAL_USER_TIMEOUT = 2;
@@ -155,6 +163,14 @@ public class BluetoothFtpService extends Service {
     private static final int NOTIFICATION_ID_ACCESS = -1000005;
 
     private static final int NOTIFICATION_ID_AUTH = -1000006;
+
+    private static final int FTP_MEDIA_SCANNED = 4;
+
+    private static final int FTP_MEDIA_SCANNED_FAILED = 5;
+
+    public static final int FTP_MEDIA_ADD = 6;
+
+    public static final int FTP_MEDIA_DELETE = 7;
 
     private WakeLock mWakeLock;
 
@@ -471,6 +487,23 @@ public class BluetoothFtpService extends Service {
             mAuth.notify();
         }
     }
+
+    private void notifyMediaScanner(Bundle obj,int op) {
+        new FtpMediaScannerNotifier(this,obj.getString("filepath"),
+                  obj.getString("mimetype"),mSessionStatusHandler,op);
+    }
+
+    private void notifyContentResolver(Uri uri) {
+        if (VERBOSE) Log.v(TAG,"FTP_MEDIA_SCANNED deleting uri "+uri);
+        try {
+            getContentResolver()
+                  .acquireContentProviderClient(MediaStore.AUTHORITY).delete(uri, null, null);
+        } catch(RemoteException e){
+            Log.e(TAG,e.toString());
+        }
+        if (VERBOSE) Log.v(TAG,"FTP_MEDIA_SCANNED deleted uri "+uri);
+    }
+
     /**
      * A thread that runs in the background waiting for remote rfcomm
      * connect.Once a remote socket connected, this thread shall be
@@ -565,6 +598,27 @@ public class BluetoothFtpService extends Service {
                     break;
                 case MSG_SESSION_DISCONNECTED:
                     break;
+                case MSG_FILE_RECEIVED:
+                    if (VERBOSE) Log.v(TAG,"MSG_FILE_RECEIVED");
+                    Bundle arguments = (Bundle) msg.obj;
+                    notifyMediaScanner(arguments,FTP_MEDIA_ADD);
+                    break;
+                case MSG_FILE_DELETED:
+                    if (VERBOSE) Log.v(TAG,"MSG_FILE_DELETED");
+                    Bundle delarguments = (Bundle) msg.obj;
+                    notifyMediaScanner(delarguments,FTP_MEDIA_DELETE);
+                    break;
+                case FTP_MEDIA_SCANNED:
+                    if (VERBOSE) Log.v(TAG,"FTP_MEDIA_SCANNED");
+                    Uri uri = (Uri)msg.obj;
+                    /* If the media scan was for a
+                     * Deleted file Delete the entry
+                     * from content resolver
+                     */
+                    if(msg.arg1 == FTP_MEDIA_DELETE) {
+                        notifyContentResolver(uri);
+                    }
+                    break;
                 default:
                     break;
             }
@@ -629,4 +683,68 @@ public class BluetoothFtpService extends Service {
         return sRemoteDeviceName;
     }
 
+    public static class FtpMediaScannerNotifier implements MediaScannerConnectionClient {
+
+        private MediaScannerConnection mConnection;
+
+        private Context mContext;
+
+        private Handler mCallback;
+
+        private String mFilename;
+
+        private String mMimetype;
+
+        private int mOp;
+
+        public FtpMediaScannerNotifier(Context context,final String filename,
+                                                 final String mimetype,Handler handler,int op) {
+            mContext = context;
+            mCallback = handler;
+            mFilename = filename;
+            mMimetype = mimetype;
+            mOp = op;
+            mConnection = new MediaScannerConnection(mContext, this);
+            if (VERBOSE) Log.v(TAG, "FTP Connecting to MediaScannerConnection ");
+            mConnection.connect();
+            if (VERBOSE) Log.v(TAG, "FTP MediaScannerConnection FtpMediaScannerNotifier mFilename ="
+                                + mFilename + " mMimetype = " + mMimetype +"operation " + mOp);
+        }
+
+        public void onMediaScannerConnected() {
+            if (VERBOSE) Log.v(TAG, "FTP MediaScannerConnection onMediaScannerConnected mFilename ="
+                                + mFilename + " mMimetype = " + mMimetype);
+            mConnection.scanFile(mFilename, mMimetype);
+        }
+
+        public void onScanCompleted(String path, Uri uri) {
+            try {
+                if (VERBOSE) {
+                    Log.v(TAG, "FTP MediaScannerConnection onScanCompleted");
+                    Log.v(TAG, "FTP MediaScannerConnection path is " + path);
+                    Log.v(TAG, "FTP MediaScannerConnection Uri is " + uri);
+                    Log.v(TAG, "FTP MediaScannerConnection mOp is " + mOp);
+                }
+                if (uri != null) {
+                    Message msg = Message.obtain();
+                    msg.setTarget(mCallback);
+                    msg.what = FTP_MEDIA_SCANNED;
+                    msg.arg1 = mOp;
+                    msg.obj = uri;
+                    msg.sendToTarget();
+                } else {
+                    Message msg = Message.obtain();
+                    msg.setTarget(mCallback);
+                    msg.what = FTP_MEDIA_SCANNED_FAILED;
+                    msg.arg1 = mOp;
+                    msg.sendToTarget();
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, "FTP !!!MediaScannerConnection exception: " + ex);
+            } finally {
+                if (VERBOSE) Log.v(TAG, "FTP MediaScannerConnection disconnect");
+                mConnection.disconnect();
+            }
+        }
+    };
 };

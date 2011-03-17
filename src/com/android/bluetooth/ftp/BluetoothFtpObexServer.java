@@ -35,6 +35,9 @@ import android.os.StatFs;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Log;
+import android.os.Bundle;
+import android.webkit.MimeTypeMap;
+
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -252,7 +255,9 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                        if (D) Log.d(TAG,"File delete unsuccessful");
                        return ResponseCodes.OBEX_HTTP_UNAUTHORIZED;
                    }
-               }
+                   sendMessage(BluetoothFtpService.MSG_FILE_DELETED,
+                                             deleteFile.getAbsolutePath());
+                }
            }
            else{
                if (D) Log.d(TAG,"File doesnot exist");
@@ -343,6 +348,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             if(fileinfo.exists() == true) {
                 if(fileinfo.canWrite()) {
                     fileinfo.delete();
+                    sendMessage(BluetoothFtpService.MSG_FILE_DELETED,
+                                                      fileinfo.getAbsolutePath());
                 } else {
                     /* if Readonly reject the replace */
                     if (D) Log.d(TAG,"File is readonly");
@@ -415,6 +422,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                 return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
             }
             if (D) Log.d(TAG,"close Stream <");
+
+            sendMessage(BluetoothFtpService.MSG_FILE_RECEIVED,fileinfo.getAbsolutePath());
 
         }catch (IOException e) {
             Log.e(TAG, "onPut headers error "+ e.toString());
@@ -643,6 +652,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                 } else {
                     if (D) Log.d(TAG,"File Delete =" + files[i].getName());
                     files[i].delete();
+                    sendMessage(BluetoothFtpService.MSG_FILE_DELETED,files[i].getAbsolutePath());
                 }
             }
         }
@@ -752,6 +762,47 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
            } catch(IOException e) {}
         }
         return len;
+    }
+
+    /* Send message to FTP Service */
+    private final void sendMessage(int msgtype, String name) {
+        /* Send a message to the FTP service to initiate a Media scanner connection */
+        if (mCallback != null) {
+            Message msg = Message.obtain(mCallback);
+            msg.what = msgtype;
+            Bundle args = new Bundle();
+            Log.e(TAG,"sendMessage "+name);
+            String path = "/" + "mnt"+ name;
+            String mimeType = null;
+
+            /* first we look for Mimetype in Android map */
+            String extension = null, type = null;
+            int dotIndex = name.lastIndexOf(".");
+            if (dotIndex < 0) {
+                if (D) Log.d(TAG, "There is no file extension");
+                return;
+            } else {
+                extension = name.substring(dotIndex + 1).toLowerCase();
+                MimeTypeMap map = MimeTypeMap.getSingleton();
+                type = map.getMimeTypeFromExtension(extension);
+                if (V) Log.v(TAG, "Mimetype guessed from extension " + extension + " is " + type);
+                if (type != null) {
+                    mimeType = type;
+                }
+            }
+            if (mimeType != null) {
+                mimeType = mimeType.toLowerCase();
+            } else {
+                //Mimetype is unknown hence we dont need a media scan
+                return;
+            }
+
+            args.putString("filepath", path);
+            args.putString("mimetype", mimeType);
+            msg.obj = args;
+            msg.sendToTarget();
+            if (V) Log.v(TAG,"msg" + msgtype  + "sent out.");
+        }
     }
 
     /** check whether path is legal */
