@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -898,6 +898,14 @@ public class BluetoothOppService extends Service {
         delNum = contentResolver.delete(BluetoothShare.CONTENT_URI,
                 WHERE_INVISIBLE_COMPLETE_INBOUND_FAILED, null);
         if (V) Log.v(TAG, "Deleted complete inbound failed shares, number = " + delNum);
+
+        // on boot : remove unconfirmed inbound shares.
+        final String WHERE_CONFIRMATION_PENDING_INBOUND = BluetoothShare.DIRECTION + "="
+                + BluetoothShare.DIRECTION_INBOUND + " AND " + BluetoothShare.USER_CONFIRMATION
+                + "=" + BluetoothShare.USER_CONFIRMATION_PENDING;
+        delNum = contentResolver.delete(BluetoothShare.CONTENT_URI,
+                 WHERE_CONFIRMATION_PENDING_INBOUND, null);
+        if (V) Log.v(TAG, "Deleted unconfirmed incoming shares, number = " + delNum);
 
         // Only keep the inbound and successful shares for LiverFolder use
         // Keep the latest 1000 to easy db query
