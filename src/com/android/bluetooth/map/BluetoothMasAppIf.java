@@ -65,6 +65,7 @@ import android.text.TextUtils;
 import android.text.format.Time;
 import android.util.Log;
 import android.util.TimeFormatException;
+import android.os.Binder;
 
 import com.android.bluetooth.map.MapUtils.BmessageConsts;
 import com.android.bluetooth.map.MapUtils.MapUtils;
@@ -170,11 +171,6 @@ public class BluetoothMasAppIf {
      */
     public boolean checkPath(boolean up, String name, boolean setPathFlag) {
         Log.d(TAG, "setPath called");
-        /*
-         * /* Up and empty string – cd .. Up and name - cd ../name Down and name
-         * - cd name Down and empty string – cd to root
-         */
-
         List<String> completeFolderList = new ArrayList<String>();
         EmailUtils eu = new EmailUtils();
 
@@ -1856,7 +1852,8 @@ public class BluetoothMasAppIf {
 
                     Log.d(TAG, "\nBroadcasting Intent to MmsSystemEventReceiver\n ");
                     Intent sendIntent = new Intent("android.intent.action.MMS_PUSH");
-                    context.sendBroadcast(sendIntent);
+                    context.enforcePermission("android.permission.MMS_PUSH", Binder.getCallingPid(), Binder.getCallingUid(), "Permission not provided");
+                    context.sendBroadcast(sendIntent, "android.permission.MMS_PUSH");
                     rsp.msgHandle = MmsHandle;
                     rsp.response = ResponseCodes.OBEX_HTTP_OK;
                     return rsp;
@@ -2570,6 +2567,11 @@ public class BluetoothMasAppIf {
                         + appParams.FilterPeriodEnd);
             }
         }
+        //Delivery report check
+        if (whereClause != "") {
+            whereClause += " AND ";
+        }
+        whereClause += "d_rpt > 0";
 
         return whereClause;
     }
