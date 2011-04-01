@@ -129,6 +129,10 @@ public class BluetoothMns {
 
     private static final int MSG_CP_QUEUED_TYPE = 6;
 
+    private static final int MSG_META_DATA_TYPE = 130;
+
+    private static final int MSG_DELIVERY_RPT_TYPE = 134;
+
     private Context mContext;
 
     private BluetoothAdapter mAdapter;
@@ -484,10 +488,10 @@ public class BluetoothMns {
 
         Uri mmsUri = Uri.parse("content://mms/");
         crMmsA = mContext.getContentResolver()
-                .query(mmsUri, new String[] { "_id", "read", "m_type" }, null,
+                .query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
                         null, "_id asc");
         crMmsB = mContext.getContentResolver()
-                .query(mmsUri, new String[] { "_id", "read", "m_type" }, null,
+                .query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
                         null, "_id asc");
 
         Uri mmsOutboxUri = Uri.parse("content://mms/outbox/");
@@ -506,10 +510,10 @@ public class BluetoothMns {
                         null, null, "_id asc");
         Uri mmsInboxUri = Uri.parse("content://mms/inbox/");
         crMmsInboxA = mContext.getContentResolver()
-                .query(mmsInboxUri, new String[] { "_id", "read", "m_type" },
+                .query(mmsInboxUri, new String[] { "_id", "read", "m_type", "m_id" },
                         null, null, "_id asc");
         crMmsInboxB = mContext.getContentResolver()
-                .query(mmsInboxUri, new String[] { "_id", "read", "m_type" },
+                .query(mmsInboxUri, new String[] { "_id", "read", "m_type", "m_id" },
                         null, null, "_id asc");
 
         Uri mmsSentUri = Uri.parse("content://mms/sent/");
@@ -822,6 +826,7 @@ public class BluetoothMns {
         if (cr.moveToFirst()) {
             return cr.getInt(cr.getColumnIndex("type"));
         }
+        cr.close();
         return -1;
     }
     /**
@@ -849,6 +854,8 @@ public class BluetoothMns {
                 folderName.toUpperCase().contains("TRASH"))){
             deletedFlag = 1;
         }
+        cr.close();
+        cr1.close();
         return deletedFlag;
     }
 
@@ -865,6 +872,7 @@ public class BluetoothMns {
         if (cr.moveToFirst()) {
             return getFolder(cr.getInt(cr.getColumnIndex("type")));
         }
+        cr.close();
         return newFolder;
     }
 
@@ -953,11 +961,15 @@ public class BluetoothMns {
                                 Log.d(TAG, "Shouldn't reach here as you cannot "
                                         + "move msg from Inbox to any other folder");
                                 if(folder != null && folder.equalsIgnoreCase("outbox")){
-                                        Cursor cr1 = null;
+                                    Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
                                     EmailUtils eu = new EmailUtils();
                                     Uri uri1 = Uri.parse("content://com.android.email.provider/message");
+                                    if(Integer.valueOf(id) > 200000){
+                                        id = Integer.toString(Integer.valueOf(id)
+                                                - EMAIL_HDLR_CONSTANT);
+                                    }
                                     String whereClause = " _id = " + id;
                                     cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                             null);
@@ -967,8 +979,10 @@ public class BluetoothMns {
                                         folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                         containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                                     }
+                                    cr1.close();
                                     String newFolder = containingFolder;
-                                    id = Integer.toString(Integer.valueOf(id)+ EMAIL_HDLR_CONSTANT);
+                                    id = Integer.toString(Integer.valueOf(id)
+                                            + EMAIL_HDLR_CONSTANT);
                                     if ((newFolder != null)
                                             && (!newFolder
                                                     .equalsIgnoreCase("outbox"))) {
@@ -985,7 +999,7 @@ public class BluetoothMns {
                                     }
                                 }
                                 else if(folder !=null){
-                                        Cursor cr1 = null;
+                                    Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
                                     EmailUtils eu = new EmailUtils();
@@ -999,6 +1013,7 @@ public class BluetoothMns {
                                         folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                         containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                                     }
+                                    cr1.close();
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
@@ -1032,11 +1047,15 @@ public class BluetoothMns {
                                 Log.d(TAG, "Shouldn't reach here as you cannot "
                                         + "move msg from Inbox to any other folder");
                                 if(folder != null && folder.equalsIgnoreCase("outbox")){
-                                        Cursor cr1 = null;
+                                    Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
                                     EmailUtils eu = new EmailUtils();
                                     Uri uri1 = Uri.parse("content://com.android.email.provider/message");
+                                    if(Integer.valueOf(id) > 200000){
+                                        id = Integer.toString(Integer.valueOf(id)
+                                                - EMAIL_HDLR_CONSTANT);
+                                    }
                                     String whereClause = " _id = " + id;
                                     cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                             null);
@@ -1046,8 +1065,10 @@ public class BluetoothMns {
                                         folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                         containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                                     }
+                                    cr1.close();
                                     String newFolder = containingFolder;
-                                    id = Integer.toString(Integer.valueOf(id)+ EMAIL_HDLR_CONSTANT);
+                                    id = Integer.toString(Integer.valueOf(id)
+                                            + EMAIL_HDLR_CONSTANT);
                                     if ((newFolder != null)
                                             && (!newFolder
                                                     .equalsIgnoreCase("outbox"))) {
@@ -1064,7 +1085,7 @@ public class BluetoothMns {
                                     }
                                 }
                                 else if(folder !=null){
-                                        Cursor cr1 = null;
+                                    Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
                                     EmailUtils eu = new EmailUtils();
@@ -1078,6 +1099,7 @@ public class BluetoothMns {
                                         folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                         containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                                     }
+                                    cr1.close();
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
@@ -1290,7 +1312,7 @@ public class BluetoothMns {
                                 folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                 containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                             }
-
+                            cr1.close();
                             if ( containingFolder != null ) {
                                 Log.d(TAG, " containingFolder:: "+containingFolder);
                                 id1 = Integer.toString(Integer.valueOf(id1)
@@ -1335,6 +1357,7 @@ public class BluetoothMns {
                                 folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                 containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                             }
+                            cr1.close();
                             if ( containingFolder != null ) {
                                 Log.d(TAG, " containingFolder:: "+containingFolder);
                                 id1 = Integer.toString(Integer.valueOf(id1)
@@ -1470,8 +1493,6 @@ public class BluetoothMns {
             }
         }
     }
-
-
 
     /**
      * This class listens for changes in Sms Content Provider's Sent table
@@ -2836,6 +2857,9 @@ public class BluetoothMns {
                         Log.d(TAG, " MMS DELETED FROM INBOX ");
                         String id = crMmsInboxA.getString(crMmsInboxA
                                 .getColumnIndex("_id"));
+                        int msgInfo = 0;
+                        msgInfo = crMmsInboxA.getInt(crMmsInboxA.getColumnIndex("m_type"));
+                        String mId = crMmsInboxA.getString(crMmsInboxA.getColumnIndex("m_id"));
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id));
                         if (msgType == -1) {
@@ -2843,8 +2867,12 @@ public class BluetoothMns {
                             id = Integer.toString(Integer.valueOf(id)
                                     + MMS_HDLR_CONSTANT);
                             Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/INBOX", null, "MMS");
+                            if( ((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                                    && (msgInfo != MSG_DELIVERY_RPT_TYPE))
+                                    && (mId != null && mId.length() > 0)){
+                                sendMnsEvent(MESSAGE_DELETED, id,
+                                        "TELECOM/MSG/INBOX", null, "MMS");
+                            }
                         } else {
                             Log.d(TAG, "Shouldn't reach here as you cannot "
                                     + "move msg from Inbox to any other folder");
@@ -2863,6 +2891,9 @@ public class BluetoothMns {
                         Log.d(TAG, " MMS DELETED FROM INBOX ");
                         String id = crMmsInboxB.getString(crMmsInboxB
                                 .getColumnIndex("_id"));
+                        int msgInfo = 0;
+                        msgInfo = crMmsInboxB.getInt(crMmsInboxB.getColumnIndex("m_type"));
+                        String mId = crMmsInboxB.getString(crMmsInboxB.getColumnIndex("m_id"));
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id));
                         if (msgType == -1) {
@@ -2870,8 +2901,12 @@ public class BluetoothMns {
                             id = Integer.toString(Integer.valueOf(id)
                                     + MMS_HDLR_CONSTANT);
                             Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/INBOX", null, "MMS");
+                            if(((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                                    && (msgInfo != MSG_DELIVERY_RPT_TYPE))
+                                    && (mId != null && mId.length() > 0)){
+                                sendMnsEvent(MESSAGE_DELETED, id,
+                                        "TELECOM/MSG/INBOX", null, "MMS");
+                            }
                         } else {
                             Log.d(TAG, "Shouldn't reach here as you cannot "
                                     + "move msg from Inbox to any other folder");
@@ -3037,6 +3072,9 @@ public class BluetoothMns {
                         Log.d(TAG, " MMS ADDED TO INBOX ");
                         String id1 = crMmsA.getString(crMmsA
                                 .getColumnIndex("_id"));
+                        int msgInfo = 0;
+                        msgInfo = crMmsA.getInt(crMmsA.getColumnIndex("m_type"));
+                        String mId = crMmsA.getString(crMmsA.getColumnIndex("m_id"));
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id1));
                         String folder = getMAPFolder(msgType);
@@ -3045,8 +3083,12 @@ public class BluetoothMns {
                             id1 = Integer.toString(Integer.valueOf(id1)
                                     + MMS_HDLR_CONSTANT);
                             Log.d(TAG, " ADDED MMS ID " + id1);
-                            sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
-                                    + folder, null, "MMS");
+                            if( ((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                                    && (msgInfo != MSG_DELIVERY_RPT_TYPE))
+                                    && (mId != null && mId.length() > 0)){
+                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                                        + folder, null, "MMS");
+                            }
                         } else {
                             Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
                         }
@@ -3063,6 +3105,9 @@ public class BluetoothMns {
                         Log.d(TAG, " MMS ADDED ");
                         String id1 = crMmsB.getString(crMmsB
                                 .getColumnIndex("_id"));
+                        int msgInfo = 0;
+                        msgInfo = crMmsB.getInt(crMmsB.getColumnIndex("m_type"));
+                        String mId = crMmsB.getString(crMmsB.getColumnIndex("m_id"));
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id1));
                         String folder = getMAPFolder(msgType);
@@ -3072,8 +3117,12 @@ public class BluetoothMns {
                                     + MMS_HDLR_CONSTANT);
 
                             Log.d(TAG, " ADDED MMS ID " + id1);
-                            sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
-                                    + folder, null, "MMS");
+                            if( ((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                                    && (msgInfo != MSG_DELIVERY_RPT_TYPE))
+                                    && (mId != null && mId.length() > 0)){
+                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                                        + folder, null, "MMS");
+                            }
                         } else {
                             Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
                         }

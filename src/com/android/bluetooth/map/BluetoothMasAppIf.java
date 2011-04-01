@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 import android.app.Activity;
@@ -1249,6 +1250,7 @@ public class BluetoothMasAppIf {
             return getMAPFolder(cr.getString(cr.getColumnIndex("type")),
                     cr.getString(cr.getColumnIndex("thread_id")));
         }
+        cr.close();
         return null;
     }
 
@@ -1460,7 +1462,7 @@ public class BluetoothMasAppIf {
             bmsg.setBody_length(22 + smsBody.length());
 
             bmsg.setBody_msg(smsBody);
-
+            cr.close();
 
             // Send a bMessage
             Log.d(TAG, "bMessageSMS test\n");
@@ -1589,6 +1591,7 @@ public class BluetoothMasAppIf {
 
             return (threadId);
         }
+        cr.close();
         return 0;
     }
 
@@ -1641,6 +1644,7 @@ public class BluetoothMasAppIf {
         Cursor cr;
         int folderId = 0;
         int accountId = 0;
+        int virtualMsgId;
         Time timeObj = new Time();
         timeObj.setToNow();
 
@@ -1652,8 +1656,7 @@ public class BluetoothMasAppIf {
             cr.moveToFirst();
             folderId = cr.getInt(cr.getColumnIndex("_id"));
         }
-
-
+        cr.close();
 
         Cursor cr1;
         String whereClause1 = "UPPER(emailAddress) LIKE  '"+OrigEmail.toUpperCase().trim()+"'";
@@ -1664,8 +1667,7 @@ public class BluetoothMasAppIf {
             cr1.moveToFirst();
             accountId = cr1.getInt(cr1.getColumnIndex("_id"));
         }
-
-
+        cr1.close();
 
         Log.d(TAG, "-------------");
         Log.d(TAG, "To address " + address);
@@ -1679,10 +1681,8 @@ public class BluetoothMasAppIf {
         Log.d(TAG, "Subject" + subject);
 
         ContentValues values = new ContentValues();
-        //Hardcoded values
-        values.put("syncServerId", "1");
-        //end Hardcoded values
-        values.put("syncServerTimeStamp", timeObj.toMillis(false));
+        values.put("syncServerTimeStamp", 0);
+        values.put("syncServerId", "5:65");
         values.put("displayName", OrigName.trim());
         values.put("timeStamp", timeObj.toMillis(false));
         values.put("subject", subject.trim());
@@ -1713,8 +1713,8 @@ public class BluetoothMasAppIf {
 
         Uri uri1 = context.getContentResolver().insert(
                 Uri.parse("content://com.android.email.provider/body"), valuesBody);
-
-        return splitStr[4];
+        virtualMsgId = Integer.valueOf(splitStr[4]) + EMAIL_HDLR_CONSTANT;
+        return Integer.toString(virtualMsgId);
 
     }
     public long getEmailAccountId(String email) {
@@ -1728,6 +1728,7 @@ public class BluetoothMasAppIf {
             cr1.moveToFirst();
             accountId = cr1.getInt(cr1.getColumnIndex("_id"));
         }
+        cr1.close();
         return accountId;
     }
 
@@ -1802,9 +1803,6 @@ public class BluetoothMasAppIf {
             rsp.response = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             return rsp;
         }
-
-
-
         byte[] readBytes = null;
         FileInputStream fis;
         try {
@@ -1852,8 +1850,7 @@ public class BluetoothMasAppIf {
 
                     Log.d(TAG, "\nBroadcasting Intent to MmsSystemEventReceiver\n ");
                     Intent sendIntent = new Intent("android.intent.action.MMS_PUSH");
-                    context.enforcePermission("android.permission.MMS_PUSH", Binder.getCallingPid(), Binder.getCallingUid(), "Permission not provided");
-                    context.sendBroadcast(sendIntent, "android.permission.MMS_PUSH");
+                    context.sendBroadcast(sendIntent);
                     rsp.msgHandle = MmsHandle;
                     rsp.response = ResponseCodes.OBEX_HTTP_OK;
                     return rsp;
@@ -2014,7 +2011,6 @@ public class BluetoothMasAppIf {
             Log.d(TAG, " Account id before Mail service:: "+accountId);
 
             Intent emailIn = new Intent();
-
             emailIn.setAction("com.android.email.intent.action.MAIL_SERVICE_WAKEUP");
             emailIn.putExtra("com.android.email.intent.extra.ACCOUNT", accountId);
             this.context.startService(emailIn);
@@ -2276,7 +2272,7 @@ public class BluetoothMasAppIf {
                 }
             } while ( cr1.moveToNext());
         }
-
+        cr1.close();
 
         //Query the message table for the given message id
         int emailMsgId = 0;
@@ -2318,7 +2314,7 @@ public class BluetoothMasAppIf {
             }
             return ResponseCodes.OBEX_HTTP_OK;
         }
-
+        cr.close();
 
         return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
     }
@@ -2331,6 +2327,7 @@ public class BluetoothMasAppIf {
             cr.moveToFirst();
             accountId = cr.getInt(cr.getColumnIndex("_id"));
         }
+        cr.close();
         return accountId;
 
     }
@@ -2911,7 +2908,7 @@ public class BluetoothMasAppIf {
             bmsg.setBody_msg(sb.toString());
             bmsg.setBody_length(sb.length() + 22);
             bmsg.setBody_encoding("8BIT");
-
+            cr.close();
             // Send a bMessage
             String str = mu.toBmessageMMS(bmsg);
             Log.d(TAG, str);
@@ -3143,6 +3140,7 @@ public class BluetoothMasAppIf {
                 cr.update(uri, values, whereClause, null);
             }
         }
+        crID.close();
     }
     /**
      * This method is used to take a Bmessage that was pushed and move it to the
@@ -3157,21 +3155,10 @@ public class BluetoothMasAppIf {
 
         /**
          * The PTS tester does not contain the same message format as CE4A This
-         * code /* looks at the pushed message and checks for RPI-Messaging. If
+         * code /* looks at the pushed message and checks for the message boundary. If
          * it does not /* find it then it then it assumes PTS tester format
          */
-
-        int beginPos = MmsText.indexOf("Content-Disposition:inline")
-        + "Content-Disposition:inline".length();
-        int endPos = MmsText.indexOf("--RPI-Messaging", beginPos);
-
-        if (endPos < 0) {
-            beginPos = 0;
-            endPos = MmsText.length();
-        }
-
-        MmsText = (MmsText.substring(beginPos, endPos)).trim();
-
+        MmsText = mu.fetchBodyEmail(MmsText);
         ContentValues values = new ContentValues();
         values.put("msg_box", 3);
         values.put("thread_id", createMMSThread(Address));
@@ -3275,21 +3262,11 @@ public class BluetoothMasAppIf {
 
         /**
          * The PTS tester does not contain the same message format as CE4A This
-         * code /* looks at the pushed message and checks for RPI-Messaging. If
+         * code /* looks at the pushed message and checks for the message boundary. If
          * it does not /* find it then it then it assumes PTS tester format
          */
-
-        int beginPos = MmsText.indexOf("Content-Disposition:inline")
-        + "Content-Disposition:inline".length();
-        int endPos = MmsText.indexOf("--RPI-Messaging", beginPos);
-
-        if (endPos < 0) {
-            beginPos = 0;
-            endPos = MmsText.length();
-        }
-
-        MmsText = (MmsText.substring(beginPos, endPos)).trim();
-
+        
+        MmsText = mu.fetchBodyEmail(MmsText);
         ContentValues values = new ContentValues();
         values.put("msg_box", folderType);
 
@@ -3396,29 +3373,38 @@ public class BluetoothMasAppIf {
         StringBuilder sb = new StringBuilder();
         String retString = null;
         if (msgType == MIME) {
+            Random randomGenerator = new Random();
+            int randomInt = randomGenerator.nextInt(1000);
+            String boundary = "MessageBoundary."+randomInt;
+            if(getMmsMsgTxt(msgID) != null){
+                while(getMmsMsgTxt(msgID).contains(boundary)){
+                    randomInt = randomGenerator.nextInt(1000);
+                    boundary = "MessageBoundary."+randomInt;
+                }
+            }
             sb.append("To:").append(bMsg.recipient_vcard_phone_number)
-            .append("\r\n");
+                    .append("\r\n");
             sb.append("Mime-Version: 1.0").append("\r\n");
             sb.append(
-                    "Content-Type: multipart/mixed; boundary=\"RPI-Messaging.42156.0\"")
+                    "Content-Type: multipart/mixed; boundary=\""+boundary+"\"")
                     .append("\r\n");
             sb.append("Content-Transfer-Encoding: 7bit").append("\r\n")
-            .append("\r\n");
+                    .append("\r\n");
             sb.append("MIME Message").append("\r\n");
-            sb.append("--RPI-Messaging.42156.0").append("\r\n");
+            sb.append("--"+boundary).append("\r\n");
             sb.append("Content-Type: text/plain").append("\r\n");
             sb.append("Content-Transfer-Encoding: 8bit").append("\r\n");
             sb.append("Content-Disposition:inline").append("\r\n")
-            .append("\r\n");
+                    .append("\r\n");
             sb.append(getMmsMsgTxt(msgID)).append("\r\n");
-            sb.append("--RPI-Messaging.42156.0--").append("\r\n")
-            .append("\r\n");
+            sb.append("--"+boundary+"--").append("\r\n")
+                    .append("\r\n");
             retString = sb.toString();
 
         } else {
             sb.append("Subject:").append("Not Implemented").append("\r\n");
             sb.append("From:").append(bMsg.originator_vcard_phone_number)
-            .append("\r\n");
+                    .append("\r\n");
             sb.append(getMmsMsgTxt(msgID)).append("\r\n").append("\r\n");
             retString = sb.toString();
         }

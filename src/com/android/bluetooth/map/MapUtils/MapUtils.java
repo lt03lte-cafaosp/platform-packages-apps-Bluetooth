@@ -1494,7 +1494,7 @@ public class MapUtils {
         }
     }
 
-    private String fetchBodyEmail(String body) {
+    public String fetchBodyEmail(String body) {
         Log.d("MapUtils", "inside fetch body Email ::"+body);
         int beginVersionPos = -1;
         int rfc822Flag = 0;

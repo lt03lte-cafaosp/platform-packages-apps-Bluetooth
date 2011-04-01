@@ -35,12 +35,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.text.Html;
 import android.text.format.Time;
 import android.util.Log;
 import android.util.TimeFormatException;
@@ -101,7 +103,7 @@ public class EmailUtils {
             } while ( cr.moveToNext());
         }
         Log.d(TAG, " Folder Listing of SMS,MMS and EMAIL: "+folderList);
-
+        cr.close();
         return folderList;
     }
     public List<String> folderListMns(Context context) {
@@ -116,6 +118,7 @@ public class EmailUtils {
                 } while ( cr.moveToNext());
         }
         Log.d(TAG, " Folder Listing of EMAIL: "+folderList);
+        cr.close();
         return folderList;
 
     }
@@ -136,7 +139,7 @@ public class EmailUtils {
                 break;
             } while ( cr.moveToNext());
         }
-
+        cr.close();
         return query;
     }
 
@@ -144,20 +147,28 @@ public class EmailUtils {
 
         Log.d(TAG, ":: Inside getMessageSizeEmail ::"+ messageId);
         int msgSize = 0;
-        String textContent;
+        String textContent, htmlContent;
         Uri uri = Uri.parse("content://com.android.email.provider/body");
 
         Cursor cr = context.getContentResolver().query(
                 uri, null, "messageKey = "+ messageId , null, null);
 
-        if ( cr.moveToFirst()) {
+        if (cr.moveToFirst()) {
             do {
                 textContent = cr.getString(cr.getColumnIndex("textContent"));
-                msgSize = textContent.length();
+                htmlContent = cr.getString(cr.getColumnIndex("htmlContent"));
+                if(textContent != null && !textContent.equalsIgnoreCase("")){
+                    msgSize = textContent.length();
+                }
+                else if(textContent == null){
+                    if(htmlContent != null && !htmlContent.equalsIgnoreCase("")){
+                        msgSize = htmlContent.length();
+                    }
+                }
                 break;
-            } while ( cr.moveToNext());
+            } while (cr.moveToNext());
         }
-
+        cr.close();
         return msgSize;
     }
 
@@ -195,7 +206,6 @@ public class EmailUtils {
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }
-                Log.d(TAG, "##Filter Read Status Value Appended to Query##:");
                 whereClauseEmail += " flagRead = 1 ";
             }
         }
@@ -294,7 +304,9 @@ public class EmailUtils {
                 subject = subject.substring(0,
                         appParams.SubjectLength);
             }
-            emailMsg.setSubject(subject.trim());
+            else if(subject != null){
+                emailMsg.setSubject(subject.trim());
+            }
             emailMsg.sendSubject = true;
        }
 
@@ -333,44 +345,83 @@ public class EmailUtils {
        }
 
         if ((appParams.ParameterMask & BIT_RECIPIENT_NAME) != 0) {
-            String multiRecepients = null;
-
-            if(recipientName.contains("")){
-                String[] recepientStr = recipientName.split("");
-                if(recepientStr !=null && recepientStr.length > 0){
-                    Log.d(TAG, " ::Recepient name split String 0:: " + recepientStr[0]
-                            + "::Recepient name split String 1:: " + recepientStr[1]);
-                    emailMsg.setRecepient_name(recepientStr[1].trim());
+            String multiRecepients = "";
+            if(recipientName != null){
+                if(recipientName.contains("")){
+                    List<String> recipientNameArr = new ArrayList<String>();
+                    List<String> recipientEmailArr = new ArrayList<String>();
+                    String[] multiRecipientStr = recipientName.split("");
+                    for(int i=0; i < multiRecipientStr.length ; i++){
+                        if(multiRecipientStr[i].contains("")){
+                            String[] recepientStr = multiRecipientStr[i].split("");
+                            recipientNameArr.add(recepientStr[1]);
+                            recipientEmailArr.add(recepientStr[0]);
+                        }
+                    }
+                    if(recipientNameArr != null && recipientNameArr.size() > 0){
+                        for(int i=0; i < recipientNameArr.size() ; i++){
+                            if(i < (recipientNameArr.size()-1)){
+                                multiRecepients += recipientNameArr.get(i)+";";
+                            }
+                            else{
+                                multiRecepients += recipientNameArr.get(i);
+                            }
+                        }
+                    }
+                    emailMsg.setRecepient_name(multiRecepients.trim());
                 }
-            }
-            else if(recipientName.contains("")){
-                multiRecepients = recipientName.replace('', ';');
-                Log.d(TAG, " ::Recepient name :: " + multiRecepients);
-                emailMsg.setRecepient_name(multiRecepients.trim());
-            }
-            else{
-                emailMsg.setRecepient_name(recipientName.trim());
+                else if(recipientName.contains("")){
+                    String[] recepientStr = recipientName.split("");
+                    if(recepientStr !=null && recepientStr.length > 0){
+                        Log.d(TAG, " ::Recepient name split String 0:: " + recepientStr[0]
+                                + "::Recepient name split String 1:: " + recepientStr[1]);
+                        emailMsg.setRecepient_name(recepientStr[1].trim());
+                    }
+                }
+                else{
+                    emailMsg.setRecepient_name(recipientName.trim());
+                }
             }
         }
 
         if ((appParams.ParameterMask & BIT_RECIPIENT_ADDRESSING) != 0) {
-            String multiRecepientAddrs = null;
+            String multiRecepientAddrs = "";
 
-            if(recipientAddressing.contains("")){
-                String[] recepientAddrStr = recipientAddressing.split("");
-                if(recepientAddrStr !=null && recepientAddrStr.length > 0){
-                    Log.d(TAG, " ::Recepient addressing split String 0:: " + recepientAddrStr[0]
-                            + "::Recepient addressing split String 1:: " + recepientAddrStr[1]);
-                    emailMsg.setRecepient_addressing(recepientAddrStr[0].trim());
+            if (recipientAddressing != null) {
+                if (recipientAddressing.contains("")) {
+                    List<String> recipientNameArr = new ArrayList<String>();
+                    List<String> recipientEmailArr = new ArrayList<String>();
+                    String[] multiRecipientStr = recipientName.split("");
+                    for (int i=0; i < multiRecipientStr.length ; i++) {
+                        if (multiRecipientStr[i].contains("")) {
+                            String[] recepientStr = multiRecipientStr[i].split("");
+                            recipientNameArr.add(recepientStr[1]);
+                            recipientEmailArr.add(recepientStr[0]);
+                        }
+                    }
+                    if (recipientEmailArr != null && recipientEmailArr.size() > 0) {
+                        for (int i=0; i < recipientEmailArr.size() ; i++) {
+                            if (i < (recipientEmailArr.size()-1)) {
+                                multiRecepientAddrs += recipientEmailArr.get(i)+";";
+                            } else {
+                                multiRecepientAddrs += recipientEmailArr.get(i);
+                            }
+                        }
+                    }
+                    emailMsg.setRecepient_addressing(multiRecepientAddrs.trim());
+                    emailMsg.setSendRecipient_addressing(true);
+                } else if (recipientAddressing.contains("")) {
+                    String[] recepientAddrStr = recipientAddressing.split("");
+                    if (recepientAddrStr !=null && recepientAddrStr.length > 0) {
+                        Log.d(TAG, " ::Recepient addressing split String 0:: " + recepientAddrStr[0]
+                                + "::Recepient addressing split String 1:: " + recepientAddrStr[1]);
+                        emailMsg.setRecepient_addressing(recepientAddrStr[0].trim());
+                        emailMsg.setSendRecipient_addressing(true);
+                    }
+                } else {
+                    emailMsg.setRecepient_addressing(recipientAddressing.trim());
+                    emailMsg.setSendRecipient_addressing(true);
                 }
-            }
-            else if(recipientAddressing.contains("")){
-                multiRecepientAddrs = recipientAddressing.replace('', ';');
-                Log.d(TAG, " ::Recepient Address:: " + multiRecepientAddrs);
-                emailMsg.setRecepient_addressing(multiRecepientAddrs.trim());
-           }
-            else{
-                emailMsg.setRecepient_addressing(recipientAddressing.trim());
             }
         }
 
@@ -425,12 +476,15 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_REPLYTO_ADDRESSING) != 0) {
-                //TODO need to test
+            //TODO need to test
             Log.d(TAG, " ::Reply To addressing:: " + replyToStr);
-            if(replyToStr !=null && !replyToStr.equalsIgnoreCase("")){
+            if (replyToStr !=null && !replyToStr.equalsIgnoreCase("")){
+                if (replyToStr.contains("")){
+                    String replyToStrArr[] = replyToStr.split("");
+                    replyToStr = replyToStrArr[0];
+                }
                 emailMsg.setReplyTo_addressing(replyToStr);
-            }
-            else{
+            } else{
                 emailMsg.setReplyTo_addressing(emailMsg.getSender_addressing());
             }
         }
@@ -509,32 +563,7 @@ public class EmailUtils {
                 bmsg.setRecipientVcard_name(recipientName.trim());
                 bmsg.setRecipientVcard_email(recipientName.trim());
             }
-
-
-            // TODO Set either Encoding or Native
-
-            // TODO how to get body for MMS? This is for SMS only
-
             StringBuilder sb = new StringBuilder();
-            Date date = new Date(Long.parseLong(timeStamp));
-            sb.append("Date: ").append(date.toString()).append("\r\n");
-            sb.append("To:").append(bmsg.getRecipientVcard_email()).append("\r\n");
-            sb.append("From:").append(bmsg.getOriginatorVcard_email()).append("\r\n");
-            sb.append("Subject:").append(subjectText).append("\r\n");
-
-            sb.append("Mime-Version: 1.0").append("\r\n");
-            sb.append(
-                    "Content-Type: multipart/mixed; boundary=\"RPI-Messaging.123456789.0\"")
-                    .append("\r\n");
-            sb.append("Content-Transfer-Encoding: 7bit").append("\r\n")
-                    .append("\r\n");
-            sb.append("MIME Message").append("\r\n");
-            sb.append("--RPI-Messaging.123456789.0").append("\r\n");
-            sb.append("Content-Type: text/plain; charset=\"UTF-8\"").append("\r\n");
-            sb.append("Content-Transfer-Encoding: 8bit").append("\r\n");
-            sb.append("Content-Disposition:inline").append("\r\n")
-                    .append("\r\n");
-
             //Query the body table for obtaining the message body
             Cursor cr2 = null;
             String emailBody = null;
@@ -546,19 +575,53 @@ public class EmailUtils {
             if (cr2.getCount() > 0) {
                 cr2.moveToFirst();
                 emailBody = cr2.getString(cr2.getColumnIndex("textContent"));
+                if (emailBody == null || emailBody.length() == 0 || emailBody.equalsIgnoreCase("")){
+                    String msgBody = cr2.getString(cr2.getColumnIndex("htmlContent"));
+                    if (msgBody != null){
+                        CharSequence msgText = Html.fromHtml(msgBody);
+                        emailBody = msgText.toString();
+                    }
+                }
             }
-            sb.append(emailBody).append("\r\n");
+            Random randomGenerator = new Random();
+            int randomInt = randomGenerator.nextInt(1000);
+            String boundary = "MessageBoundary."+randomInt;
+            if (emailBody != null){
+                while (emailBody.contains(boundary)){
+                    randomInt = randomGenerator.nextInt(1000);
+                    boundary = "MessageBoundary."+randomInt;
+                }
+            }
+            Date date = new Date(Long.parseLong(timeStamp));
+            sb.append("Date: ").append(date.toString()).append("\r\n");
+            sb.append("To:").append(bmsg.getRecipientVcard_email()).append("\r\n");
+            sb.append("From:").append(bmsg.getOriginatorVcard_email()).append("\r\n");
+            sb.append("Subject:").append(subjectText).append("\r\n");
 
-            sb.append("--RPI-Messaging.123456789.0--").append("\r\n");
+            sb.append("Mime-Version: 1.0").append("\r\n");
+            sb.append(
+                    "Content-Type: multipart/mixed; boundary=\""+boundary+"\"")
+                    .append("\r\n");
+            sb.append("Content-Transfer-Encoding: 7bit").append("\r\n")
+                    .append("\r\n");
+            sb.append("MIME Message").append("\r\n");
+            sb.append("--"+boundary).append("\r\n");
+            sb.append("Content-Type: text/plain; charset=\"UTF-8\"").append("\r\n");
+            sb.append("Content-Transfer-Encoding: 8bit").append("\r\n");
+            sb.append("Content-Disposition:inline").append("\r\n")
+                    .append("\r\n");
+            sb.append(emailBody).append("\r\n");
+            sb.append("--"+boundary+"--").append("\r\n");
             bmsg.setBody_msg(sb.toString());
             bmsg.setBody_length(sb.length() + 22);
-            Log.d(TAG, "bMessageEmail test 44444444\n");
             // Send a bMessage
             Log.d(TAG, "bMessageEmail test\n");
             Log.d(TAG, "=======================\n\n");
             str = mu.toBmessageEmail(bmsg);
             Log.d(TAG, str);
             Log.d(TAG, "\n\n");
+            cr1.close();
+            cr2.close();
      }
 
         return str;
@@ -580,6 +643,7 @@ public class EmailUtils {
             folderName = cr.getString(cr.getColumnIndex("displayName"));
             return folderName;
         }
+        cr.close();
         return null;
     }
 
