@@ -54,7 +54,9 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.content.res.Resources;
 
+import java.util.ArrayList;
 import javax.obex.*;
 
 
@@ -142,11 +144,11 @@ public class BluetoothMasService extends Service {
 
     public static final int MSG_OBEX_AUTH_CHALL = 5007;
 
-    private static final int START_LISTENER = 1;
+    private static final int MSG_INTERNAL_START_LISTENER = 1;
 
-    private static final int USER_TIMEOUT = 2;
+    private static final int MSG_INTERNAL_USER_TIMEOUT = 2;
 
-    private static final int AUTH_TIMEOUT = 3;
+    private static final int MSG_INTERNAL_AUTH_TIMEOUT = 3;
 
     private static final int PORT_NUM = 16;
 
@@ -195,6 +197,7 @@ public class BluetoothMasService extends Service {
             Log.e(TAG, "Map Service onCreate");
         Log.e(TAG, "Map Service onCreate");
 
+        mInterrupted = false;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
 
         if (!mHasStarted) {
@@ -205,7 +208,7 @@ public class BluetoothMasService extends Service {
             int state = mAdapter.getState();
             if (state == BluetoothAdapter.STATE_ON) {
                 mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
-                        .obtainMessage(START_LISTENER), TIME_TO_WAIT_VALUE);
+                        .obtainMessage(MSG_INTERNAL_START_LISTENER), TIME_TO_WAIT_VALUE);
             }
         }
     }
@@ -244,7 +247,7 @@ public class BluetoothMasService extends Service {
         boolean removeTimeoutMsg = true;
         if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
             removeTimeoutMsg = false;
-            if (state == BluetoothAdapter.STATE_OFF) {
+            if (state == BluetoothAdapter.STATE_TURNING_OFF) {
                 // Release all resources
                 closeService();
             }
@@ -253,7 +256,7 @@ public class BluetoothMasService extends Service {
             closeService();
         } else if (action.equals(ACCESS_ALLOWED_ACTION)) {
             if (intent.getBooleanExtra(EXTRA_ALWAYS_ALLOWED, false)) {
-                boolean result = true;
+                boolean result = mRemoteDevice.setTrust(true);
                 if (VERBOSE)
                     Log.v(TAG, "setTrust() result=" + result);
             }
@@ -278,7 +281,7 @@ public class BluetoothMasService extends Service {
         }
 
         if (removeTimeoutMsg) {
-            mSessionStatusHandler.removeMessages(USER_TIMEOUT);
+            mSessionStatusHandler.removeMessages(MSG_INTERNAL_USER_TIMEOUT);
         }
     }
 
@@ -299,7 +302,7 @@ public class BluetoothMasService extends Service {
     public IBinder onBind(Intent intent) {
         if (VERBOSE)
             Log.e(TAG, "Map Service onBind");
-        return null;// mBind;
+        return null;
     }
 
     private void startRfcommSocketListener() {
@@ -329,28 +332,12 @@ public class BluetoothMasService extends Service {
         // It's possible that create will fail in some cases. retry for 10 times
         for (int i = 0; i < CREATE_RETRY_TIME && !mInterrupted; i++) {
             try {
-                Method m = mAdapter.getClass().getMethod("listenUsingRfcommOn",
-                        new Class[] { int.class });
-                try {
-                    mServerSocket = (BluetoothServerSocket) m.invoke(mAdapter,
-                            PORT_NUM);
-                } catch (IllegalArgumentException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-
-            } catch (SecurityException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (NoSuchMethodException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                // It is mandatory for PSE to support initiation of bonding and
+                // encryption.
+                mServerSocket = mAdapter.listenUsingRfcommOn(PORT_NUM);
+            } catch (IOException e) {
+                Log.e(TAG, "Error create RfcommServerSocket " + e.toString());
+                initSocketOK = false;
             }
 
             if (!initSocketOK) {
@@ -442,9 +429,13 @@ public class BluetoothMasService extends Service {
         // acquire the wakeLock before start Obex transaction thread
         if (mWakeLock == null) {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            mWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK,
+            mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                     "StartingObexMapTransaction");
             mWakeLock.setReferenceCounted(false);
+        }
+
+        if(!mWakeLock.isHeld()) {
+            Log.e(TAG,"Acquire partial wake lock");
             mWakeLock.acquire();
         }
 
@@ -469,8 +460,13 @@ public class BluetoothMasService extends Service {
 
         // Release the wake lock if obex transaction is over
         if (mWakeLock != null) {
-            mWakeLock.release();
-            mWakeLock = null;
+            if (mWakeLock.isHeld()) {
+                Log.e(TAG,"Release full wake lock");
+                mWakeLock.release();
+                mWakeLock = null;
+            } else {
+                mWakeLock = null;
+            }
         }
 
         if (mServerSession != null) {
@@ -536,7 +532,7 @@ public class BluetoothMasService extends Service {
                     if (TextUtils.isEmpty(sRemoteDeviceName)) {
                         sRemoteDeviceName = getString(R.string.defaultname);
                     }
-                    boolean trust = true;
+                    boolean trust = mRemoteDevice.getTrustState();
                     if (VERBOSE)
                         Log.e(TAG, "GetTrustState() = " + trust);
 
@@ -553,9 +549,8 @@ public class BluetoothMasService extends Service {
                         createMapNotification(ACCESS_REQUEST_ACTION);
                         if (VERBOSE) Log.e(TAG, "incomming connection accepted from: "
                             + sRemoteDeviceName);
-                        mSessionStatusHandler.sendMessageDelayed(
-                            mSessionStatusHandler.obtainMessage(USER_TIMEOUT),
-                                USER_CONFIRM_TIMEOUT_VALUE);
+                        mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
+                                .obtainMessage(MSG_INTERNAL_USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
                     }
                     stopped = true; // job done ,close this thread;
                 } catch (IOException ex) {
@@ -581,39 +576,70 @@ public class BluetoothMasService extends Service {
                 Log.e(TAG, "Handler(): got msg=" + msg.what);
 
             switch (msg.what) {
-            case START_LISTENER:
-                if (mAdapter.isEnabled()) {
-                    startRfcommSocketListener();
-                } else {
-                    closeService();// release all resources
-                }
-                break;
-            case USER_TIMEOUT:
-                Intent intent = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
-                sendBroadcast(intent);
-                removeMapNotification(NOTIFICATION_ID_ACCESS);
-                break;
-            case AUTH_TIMEOUT:
-                Intent i = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
-                sendBroadcast(i);
-                removeMapNotification(NOTIFICATION_ID_AUTH);
-                notifyAuthCancelled();
-                break;
-            case MSG_SERVERSESSION_CLOSE:
-                stopObexServerSession();
-                break;
-            case MSG_SESSION_ESTABLISHED:
-                break;
-            case MSG_SESSION_DISCONNECTED:
-                // case MSG_SERVERSESSION_CLOSE will handle ,so just skip
-                break;
-            default:
-                break;
+                case MSG_INTERNAL_START_LISTENER:
+                    if (mAdapter.isEnabled()) {
+                        startRfcommSocketListener();
+                    } else {
+                        closeService();// release all resources
+                    }
+                    break;
+                case MSG_INTERNAL_USER_TIMEOUT:
+                    Intent intent = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
+                    sendBroadcast(intent);
+                    removeMapNotification(NOTIFICATION_ID_ACCESS);
+                    stopObexServerSession();
+                    break;
+                case MSG_INTERNAL_AUTH_TIMEOUT:
+                    Intent i = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
+                    sendBroadcast(i);
+                    removeMapNotification(NOTIFICATION_ID_AUTH);
+                    notifyAuthCancelled();
+                    stopObexServerSession();
+                    break;
+                case MSG_SERVERSESSION_CLOSE:
+                    stopObexServerSession();
+                    break;
+                case MSG_SESSION_ESTABLISHED:
+                    break;
+                case MSG_SESSION_DISCONNECTED:
+                    break;
+                default:
+                    break;
             }
         }
     };
-
     private void createMapNotification(String action) {
+        NotificationManager nm = (NotificationManager)
+        getSystemService(Context.NOTIFICATION_SERVICE);
+
+            // Create an intent triggered by clicking on the status icon.
+            Intent clickIntent = new Intent();
+            clickIntent.setClass(this, BluetoothMasActivity.class);
+            clickIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            clickIntent.setAction(action);
+
+            // Create an intent triggered by clicking on the
+            // "Clear All Notifications" button
+            Intent deleteIntent = new Intent();
+            deleteIntent.setClass(this, BluetoothMasReceiver.class);
+
+            Notification notification = null;
+            String name = getRemoteDeviceName();
+
+            if (action.equals(ACCESS_REQUEST_ACTION)) {
+                deleteIntent.setAction(ACCESS_DISALLOWED_ACTION);
+                notification = new Notification(android.R.drawable.stat_sys_data_bluetooth,
+                    getString(R.string.map_notif_ticker), System.currentTimeMillis());
+                notification.setLatestEventInfo(this, getString(R.string.map_notif_title),
+                        getString(R.string.map_notif_message, name), PendingIntent
+                                .getActivity(this, 0, clickIntent, 0));
+
+                notification.flags |= Notification.FLAG_AUTO_CANCEL;
+                notification.flags |= Notification.FLAG_ONLY_ALERT_ONCE;
+                notification.defaults = Notification.DEFAULT_SOUND;
+                notification.deleteIntent = PendingIntent.getBroadcast(this, 0, deleteIntent, 0);
+                nm.notify(NOTIFICATION_ID_ACCESS, notification);
+            }
     }
 
     private void removeMapNotification(int id) {

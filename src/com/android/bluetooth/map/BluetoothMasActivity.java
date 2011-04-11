@@ -53,13 +53,20 @@ import android.widget.TextView;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.Toast;
 
+import android.text.InputFilter;
+import android.text.TextWatcher;
+import android.text.InputFilter.LengthFilter;
+
+import com.android.internal.app.AlertActivity;
+import com.android.internal.app.AlertController;
+
 
 /**
  * MapActivity shows two dialogues: One for accepting incoming ftp request and
  * the other prompts the user to enter a session key for authentication with a
  * remote Bluetooth device.
  */
-public class BluetoothMasActivity extends Activity implements
+public class BluetoothMasActivity extends AlertActivity implements
         DialogInterface.OnClickListener, Preference.OnPreferenceChangeListener, TextWatcher {
     private static final String TAG = "BluetoothMasActivity";
 
@@ -68,8 +75,6 @@ public class BluetoothMasActivity extends Activity implements
     private static final int BLUETOOTH_OBEX_AUTHKEY_MAX_LENGTH = 16;
 
     private static final int DIALOG_YES_NO_CONNECT = 1;
-
-    private static final int DIALOG_YES_NO_AUTH = 2;
 
     private static final String KEY_USER_TIMEOUT = "user_timeout";
 
@@ -113,9 +118,6 @@ public class BluetoothMasActivity extends Activity implements
         if (action.equals(BluetoothMasService.ACCESS_REQUEST_ACTION)) {
             showMapDialog(DIALOG_YES_NO_CONNECT);
             mCurrentDialog = DIALOG_YES_NO_CONNECT;
-        } else if (action.equals(BluetoothMasService.AUTH_CHALL_ACTION)) {
-            showMapDialog(DIALOG_YES_NO_AUTH);
-            mCurrentDialog = DIALOG_YES_NO_AUTH;
         }
         else {
             Log.e(TAG, "Error: this activity may be started only with intent "
@@ -127,11 +129,34 @@ public class BluetoothMasActivity extends Activity implements
     }
 
     private void showMapDialog(int id) {
+        final AlertController.AlertParams p = mAlertParams;
+        switch (id) {
+            case DIALOG_YES_NO_CONNECT:
+                p.mIconId = android.R.drawable.ic_dialog_info;
+                p.mTitle = getString(R.string.map_acceptance_dialog_header);
+                p.mView = createView(DIALOG_YES_NO_CONNECT);
+                p.mPositiveButtonText = getString(android.R.string.yes);
+                p.mPositiveButtonListener = this;
+                p.mNegativeButtonText = getString(android.R.string.no);
+                p.mNegativeButtonListener = this;
+                mOkButton = mAlert.getButton(DialogInterface.BUTTON_POSITIVE);
+                setupAlert();
+                break;
+            default:
+                break;
+        }
     }
 
     private String createDisplayText(final int id) {
         String mRemoteName = BluetoothMasService.getRemoteDeviceName();
-        return null;
+        switch (id) {
+        case DIALOG_YES_NO_CONNECT:
+            String mMessage1 = getString(R.string.map_acceptance_dialog_title, mRemoteName,
+                    mRemoteName);
+            return mMessage1;
+        default:
+            return null;
+        }
     }
 
     private View createView(final int id) {
@@ -152,16 +177,6 @@ public class BluetoothMasActivity extends Activity implements
                     }
                 });
                 return mView;
-            case DIALOG_YES_NO_AUTH:
-                mView = getLayoutInflater().inflate(R.layout.auth, null);
-                messageView = (TextView)mView.findViewById(R.id.message);
-                messageView.setText(createDisplayText(id));
-                mKeyView = (EditText)mView.findViewById(R.id.text);
-                mKeyView.addTextChangedListener(this);
-                mKeyView.setFilters(new InputFilter[] {
-                    new LengthFilter(BLUETOOTH_OBEX_AUTHKEY_MAX_LENGTH)
-                });
-                return mView;
             default:
                 return null;
         }
@@ -172,10 +187,6 @@ public class BluetoothMasActivity extends Activity implements
             if (mCurrentDialog == DIALOG_YES_NO_CONNECT) {
                 sendIntentToReceiver(BluetoothMasService.ACCESS_ALLOWED_ACTION,
                         BluetoothMasService.EXTRA_ALWAYS_ALLOWED, mAlwaysAllowedValue);
-            } else if (mCurrentDialog == DIALOG_YES_NO_AUTH) {
-                sendIntentToReceiver(BluetoothMasService.AUTH_RESPONSE_ACTION,
-                        BluetoothMasService.EXTRA_SESSION_KEY, mSessionKey);
-                mKeyView.removeTextChangedListener(this);
             }
         }
         mTimeout = false;
@@ -185,9 +196,6 @@ public class BluetoothMasActivity extends Activity implements
     private void onNegative() {
         if (mCurrentDialog == DIALOG_YES_NO_CONNECT) {
             sendIntentToReceiver(BluetoothMasService.ACCESS_DISALLOWED_ACTION, null, null);
-        } else if (mCurrentDialog == DIALOG_YES_NO_AUTH) {
-            sendIntentToReceiver(BluetoothMasService.AUTH_CANCELLED_ACTION, null, null);
-            mKeyView.removeTextChangedListener(this);
         }
         finish();
     }
@@ -217,9 +225,6 @@ public class BluetoothMasActivity extends Activity implements
     public void onClick(DialogInterface dialog, int which) {
         switch (which) {
             case DialogInterface.BUTTON_POSITIVE:
-                if (mCurrentDialog == DIALOG_YES_NO_AUTH) {
-                    mSessionKey = mKeyView.getText().toString();
-                }
                 onPositive();
                 break;
 
@@ -232,6 +237,19 @@ public class BluetoothMasActivity extends Activity implements
     }
 
     private void onTimeout() {
+        mTimeout = true;
+        if (mCurrentDialog == DIALOG_YES_NO_CONNECT) {
+            if(mView != null) {
+                messageView.setText(getString(R.string.map_acceptance_timeout_message,
+                        BluetoothMasService.getRemoteDeviceName()));
+                mAlert.getButton(DialogInterface.BUTTON_NEGATIVE).setVisibility(View.GONE);
+                mAlwaysAllowed.setVisibility(View.GONE);
+                mAlwaysAllowed.clearFocus();
+            }
+        }
+
+        mTimeoutHandler.sendMessageDelayed(mTimeoutHandler.obtainMessage(DISMISS_TIMEOUT_DIALOG),
+                DISMISS_TIMEOUT_DIALOG_VALUE);
     }
 
     @Override
