@@ -115,6 +115,8 @@ public class BluetoothMasAppIf {
     public static final int MMS_HDLR_CONSTANT = 100000;
     public static final int EMAIL_HDLR_CONSTANT = 200000;
 
+    public static final int EMAIL_MAX_PUSHMSG_SIZE = 409600;
+
     private final String RootPath = "root";
 
     private String CurrentPath = null;
@@ -1807,8 +1809,15 @@ public class BluetoothMasAppIf {
         FileInputStream fis;
         try {
             fis = new FileInputStream(file);
-            readBytes = new byte[(int) file.length()];
-            fis.read(readBytes);
+            if(file.length() > EMAIL_MAX_PUSHMSG_SIZE){
+                rsp.response = ResponseCodes.OBEX_HTTP_ENTITY_TOO_LARGE;
+                rsp.msgHandle = null;
+                Log.d(TAG,"Message body is larger than the max length allowed");
+                return rsp;
+            } else{
+                readBytes = new byte[(int) file.length()];
+                fis.read(readBytes);
+            }
 
         } catch (FileNotFoundException e) {
             // TODO Auto-generated catch block
