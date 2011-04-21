@@ -1906,84 +1906,36 @@ public class BluetoothMasAppIf {
                 return rsp;
             }
 
-            PendingIntent sentPI = PendingIntent.getBroadcast(this.context, 0,
-                    new Intent(SENT), 0);
-
-            PendingIntent deliveredPI = PendingIntent.getBroadcast(this.context, 0,
-                    new Intent(DELIVERED), 0);
-
-            // ---when the SMS has been sent---
-            context.registerReceiver(new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context arg0, Intent arg1) {
-                    Log.d(TAG, "Sms SENT STATUS ");
-
-                    switch (getResultCode()) {
-                    case Activity.RESULT_OK:
-                        Log.d(TAG, "Sms Sent");
-                        moveToFolder(SmsHandle, Sent);
-                        break;
-                    case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
-                        Log.d(TAG, "Generic Failure");
-                        moveToFolder(SmsHandle, Failed);
-                        break;
-                    case SmsManager.RESULT_ERROR_NO_SERVICE:
-                        Log.d(TAG, "NO SERVICE ERROR");
-                        moveToFolder(SmsHandle, Queued);
-                        break;
-                    case SmsManager.RESULT_ERROR_NULL_PDU:
-                        Log.d(TAG, "Null PDU");
-                        moveToFolder(SmsHandle, Failed);
-                        break;
-                    case SmsManager.RESULT_ERROR_RADIO_OFF:
-                        Log.d(TAG, "RADIO OFF");
-                        moveToFolder(SmsHandle, Queued);
-                        break;
-                    }
-                    context.unregisterReceiver(this);
-                }
-            }, new IntentFilter(SENT));
-
-            // ---when the SMS has been delivered---
-            context.registerReceiver(new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context arg0, Intent arg1) {
-                    Log.d(TAG, "Sms SENT DELIVERED ");
-
-                    switch (getResultCode()) {
-                    case Activity.RESULT_OK:
-                        Log.d(TAG, "Sms Delivered");
-                        break;
-                    case Activity.RESULT_CANCELED:
-                        Log.d(TAG, "Sms NOT Delivered");
-                        break;
-                    }
-                    context.unregisterReceiver(this);
-                }
-            }, new IntentFilter(DELIVERED));
-
             SmsHandle = null;
             rsp.msgHandle = "";
 
             if(bluetoothMasAppParams.Transparent == 0) {
                 mnsClient.addMceInitiatedOperation("+");
-                SmsHandle = addToSmsFolder("outbox", PhoneAddress, SmsText);
+                SmsHandle = addToSmsFolder("queued", PhoneAddress, SmsText);
                 rsp.msgHandle = SmsHandle;
+                rsp.response = ResponseCodes.OBEX_HTTP_OK;
             }
-
-
-            SmsManager sms = SmsManager.getDefault();
+            else if(bluetoothMasAppParams.Transparent == 1){
+                ArrayList<String> parts = new ArrayList<String>();
+                SmsManager sms = SmsManager.getDefault();
+                parts = sms.divideMessage(SmsText);
+                mnsClient.addMceInitiatedOperation("+");
+                sms.sendMultipartTextMessage(PhoneAddress, null, parts, null, null);
+                rsp.msgHandle = "-1";
+                rsp.response = ResponseCodes.OBEX_HTTP_OK;
+                return rsp;
+            }
 
             Log.d(TAG, " Trying to send SMS ");
             Log.d(TAG, " Text " + SmsText + " address " + PhoneAddress);
 
             try {
-                sms.sendTextMessage(PhoneAddress, null, SmsText, sentPI,
-                        deliveredPI);
+                Intent sendIntentSms = new Intent("com.android.mms.transaction.SEND_MESSAGE");
+                sendIntentSms.putExtra(android.content.Intent.EXTRA_PHONE_NUMBER, PhoneAddress);
+                sendIntentSms.putExtra(android.content.Intent.EXTRA_TEXT, SmsText);
+                context.sendBroadcast(sendIntentSms);
             } catch (Exception e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
-
             }
         }
         else if(type!=null && type.equalsIgnoreCase("EMAIL")){
@@ -3247,8 +3199,8 @@ public class BluetoothMasAppIf {
         uri = Uri.parse("content://mms/" + msgID + "/addr");
         uri = cr.insert(uri, values);
         Log.d(TAG, " NEW URI " + uri.toString());
-
-        context.getContentResolver().delete(Uri.parse("content://sms/"), "address LIKE '" + Address + "'", null);
+        String whereClause = "address LIKE '" + Address + "' AND type = 125";
+        context.getContentResolver().delete(Uri.parse("content://sms/"), whereClause, null);
         String virtualMsgIdStr = String.valueOf(virtualMsgId);
         return virtualMsgIdStr;
 
@@ -3368,8 +3320,9 @@ public class BluetoothMasAppIf {
         Log.d(TAG, " NEW URI " + uri.toString());
 
         String virtualMsgIdStr = String.valueOf(virtualMsgId);
+        String whereClause = "address LIKE '" + Address + "' AND type = 125";
         if (folderName !=null && !folderName.equalsIgnoreCase("deleted")) {
-            context.getContentResolver().delete(Uri.parse("content://sms/"), "address LIKE '" + Address + "'", null);
+            context.getContentResolver().delete(Uri.parse("content://sms/"), whereClause, null);
         }
         return virtualMsgIdStr;
     }
@@ -3430,7 +3383,7 @@ public class BluetoothMasAppIf {
             Log.d(TAG, "Inside adress not null");
             ContentValues tempValue = new ContentValues();
             tempValue.put("address", address);
-            tempValue.put("type", 25);
+            tempValue.put("type", 125);
             Uri tempUri = context.getContentResolver().insert(
                     Uri.parse("content://sms/"), tempValue);
 
