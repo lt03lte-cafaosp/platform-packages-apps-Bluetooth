@@ -39,6 +39,9 @@ import javax.obex.ObexTransport;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothClass;
+import com.android.bluetooth.bpp.BluetoothBppTransfer;
+
 import android.content.BroadcastReceiver;
 import android.content.ContentUris;
 import android.content.ContentResolver;
@@ -104,9 +107,11 @@ public class BluetoothOppService extends Service {
 
     private ArrayList<BluetoothOppBatch> mBatchs;
 
-    private BluetoothOppTransfer mTransfer;
+    public static BluetoothOppTransfer mTransfer;
 
     private BluetoothOppTransfer mServerTransfer;
+
+    private BluetoothBppTransfer mBppTransfer;
 
     private int mBatchId;
 
@@ -606,10 +611,17 @@ public class BluetoothOppService extends Service {
                 newBatch.mId = mBatchId;
                 mBatchId++;
                 mBatchs.add(newBatch);
+
+                BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
+                BluetoothDevice  d = a.getRemoteDevice(info.mDestination);
+                BluetoothClass   c = d.getBluetoothClass();
+                if (V) Log.v(TAG, "BT Device Class: 0x" + Integer.toHexString(c.getDeviceClass()));
+
                 if (info.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
                     if (V) Log.v(TAG, "Service create new Batch " + newBatch.mId
                                 + " for OUTBOUND info " + info.mId);
                     mTransfer = new BluetoothOppTransfer(this, mPowerManager, newBatch);
+                    mBppTransfer = new BluetoothBppTransfer(this, mPowerManager, newBatch);
                 } else if (info.mDirection == BluetoothShare.DIRECTION_INBOUND) {
                     if (V) Log.v(TAG, "Service create new Batch " + newBatch.mId
                                 + " for INBOUND info " + info.mId);
@@ -620,7 +632,12 @@ public class BluetoothOppService extends Service {
                 if (info.mDirection == BluetoothShare.DIRECTION_OUTBOUND && mTransfer != null) {
                     if (V) Log.v(TAG, "Service start transfer new Batch " + newBatch.mId
                                 + " for info " + info.mId);
-                    mTransfer.start();
+                    if (c.getDeviceClass() == BluetoothClass.Device.IMAGING_PRINTER) {
+                        if (V) Log.v(TAG, "BT BPP Transfer Start!!");
+                        mBppTransfer.start();
+                    } else {
+                        mTransfer.start();
+                    }
                 } else if (info.mDirection == BluetoothShare.DIRECTION_INBOUND
                         && mServerTransfer != null) {
                     if (V) Log.v(TAG, "Service start server transfer new Batch " + newBatch.mId
