@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010,2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,7 +32,6 @@ import android.content.Context;
 import android.os.Message;
 import android.os.Handler;
 import android.os.StatFs;
-import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Log;
 import android.os.Bundle;
@@ -50,6 +49,7 @@ import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.util.Date;
+import java.util.List;
 import java.lang.StringBuffer;
 
 import javax.obex.ServerRequestHandler;
@@ -58,6 +58,7 @@ import javax.obex.ApplicationParameter;
 import javax.obex.ServerOperation;
 import javax.obex.Operation;
 import javax.obex.HeaderSet;
+import javax.obex.ObexHelper;
 
 public class BluetoothFtpObexServer extends ServerRequestHandler {
 
@@ -72,9 +73,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
     // type for list folder contents
     private static final String TYPE_LISTING = "x-obex/folder-listing";
 
-    private static final String ROOT_FOLDER_PATH = "/sdcard";
-
-   // record current path the client are browsing
+    // record current path the client are browsing
     private String mCurrentPath = "";
 
     private long mConnectionId;
@@ -84,6 +83,12 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
     private Context mContext;
 
     public static boolean sIsAborted = false;
+
+    public static final String ROOT_FOLDER_PATH = "/sdcard";
+
+    List<String> filenames;
+
+    List<String> types;
 
     // 128 bit UUID for FTP
     private static final byte[] FTP_TARGET = new byte[] {
@@ -102,6 +107,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         mContext = context;
         // set initial value when ObexServer created
         if (D) Log.d(TAG, "Initialize FtpObexServer");
+        filenames = new ArrayList<String>();
+        types = new ArrayList<String>();
     }
     /**
     * onConnect
@@ -205,6 +212,107 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         return ResponseCodes.OBEX_HTTP_OK;
     }
     /**
+     * Called when a COPY request is received.
+     *
+     * @param request contains the headers sent by the client;
+     *        request will never be null
+     * @param reply the headers that should be sent in the reply;
+     *        reply will never be null
+     * @return a response code defined in ResponseCodes that will
+     *         be returned to the client; if an invalid response code is
+     *         provided, the OBEX_HTTP_INTERNAL_ERROR response code
+     *         will be used
+     */
+    @Override
+    public int onCopy(HeaderSet request, HeaderSet reply) {
+        if (D) Log.d(TAG, "onCopy() +");
+        String name = "";
+        String destname = "";
+        try {
+            name = (String)request.getHeader(HeaderSet.NAME);
+            destname = (String)request.getHeader(HeaderSet.DEST_NAME);
+
+            if (D) Log.d(TAG,"Copy "+ name +" to "+destname);
+            File src = new File(mCurrentPath + "/" + name);
+            File dest = new File(mCurrentPath + "/" + destname);
+            /*If source file doesnt exist return*/
+            if(!src.exists()) {
+                return ResponseCodes.OBEX_HTTP_NOT_FOUND;
+            }
+
+            if (src.isFile()){
+                return FileUtils.copyFile(mCallback,src,dest);
+            } else if(src.isDirectory()) {
+                return FileUtils.copyFolders(mCallback,src,dest);
+            } else {
+                return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            }
+        }catch (IOException e) {
+            Log.e(TAG,"onCopy "+ e.toString());
+            if (D) Log.d(TAG, "Copy operation failed");
+            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        }
+    }
+
+    /**
+     * Called when a RENAME request is received.
+     *
+     * @param request contains the headers sent by the client;
+     *        request will never be null
+     * @param reply the headers that should be sent in the reply;
+     *        reply will never be null
+     * @return a response code defined in ResponseCodes that will
+     *         be returned to the client; if an invalid response code is
+     *         provided, the OBEX_HTTP_INTERNAL_ERROR response code
+     *         will be used
+     */
+    @Override
+    public int onRename(HeaderSet request, HeaderSet reply) {
+        if (D) Log.d(TAG, "onRename() +");
+        String name = "";
+        String destname = "";
+        try {
+            name = (String)request.getHeader(HeaderSet.NAME);
+            destname =  (String)request.getHeader(HeaderSet.DEST_NAME);
+
+            if(D)  Log.d(TAG,"Rename "+ name +" to "+destname);
+            File src = new File(mCurrentPath + "/" + name);
+            File dest = new File(mCurrentPath + "/" + destname);
+            /*If source file/folder doesnt exist return*/
+            if(!src.exists()) {
+                return ResponseCodes.OBEX_HTTP_NOT_FOUND;
+            }
+
+            /* Scan the source directory files and their mime types */
+            scanDirectory(src);
+            if(D) Log.d(TAG,"Scanning source folders is done");
+            if(src.renameTo(dest) == true) {
+                /* Send message to FTP Service about deletion of Source folder and its files*/
+                FileUtils.sendCustomMessage(mCallback,BluetoothFtpService.MSG_FILES_DELETED,
+                                        filenames.toArray(new String[filenames.size()]),
+                                        types.toArray(new String[types.size()]));
+                filenames.clear();
+                types.clear();
+                /* Scan the dest directory files and their mime types */
+                scanDirectory(dest);
+                /* Send message to FTP Service about addition of Dest folder and its files*/
+                FileUtils.sendCustomMessage(mCallback,BluetoothFtpService.MSG_FILES_RECEIVED,
+                                        filenames.toArray(new String[filenames.size()]),
+                                        types.toArray(new String[types.size()]));
+                filenames.clear();
+                types.clear();
+                return ResponseCodes.OBEX_HTTP_OK;
+            }
+            else
+                return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } catch (IOException e) {
+            Log.e(TAG,"onRename "+ e.toString());
+            if (D) Log.d(TAG, "Rename operation failed");
+            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        }
+    }
+
+    /**
     * onDelete
     *
     * Called when a DELETE request is received.
@@ -223,7 +331,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         if (D) Log.d(TAG, "onDelete() +");
         String name = "";
         /* Check if Card is mounted */
-        if(checkMountedState() == false) {
+        if(FileUtils.checkMountedState() == false) {
            Log.e(TAG,"SD card not Mounted");
            return ResponseCodes.OBEX_HTTP_NO_CONTENT;
         }
@@ -246,7 +354,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                }
 
                if(deleteFile.isDirectory()) {
-                   if(!deleteDirectory(deleteFile)) {
+                   if(!FileUtils.deleteDirectory(mCallback,deleteFile)) {
                        if (D) Log.d(TAG,"Directory  delete unsuccessful");
                        return ResponseCodes.OBEX_HTTP_UNAUTHORIZED;
                    }
@@ -255,7 +363,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                        if (D) Log.d(TAG,"File delete unsuccessful");
                        return ResponseCodes.OBEX_HTTP_UNAUTHORIZED;
                    }
-                   sendMessage(BluetoothFtpService.MSG_FILE_DELETED,
+                   FileUtils.sendMessage(mCallback,BluetoothFtpService.MSG_FILE_DELETED,
                                              deleteFile.getAbsolutePath());
                 }
            }
@@ -295,7 +403,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         String filetype = "";
         int obexResponse = ResponseCodes.OBEX_HTTP_OK;
 
-        if(checkMountedState() == false) {
+        if(FileUtils.checkMountedState() == false) {
             Log.e(TAG,"SD card not Mounted");
             return ResponseCodes.OBEX_HTTP_NO_CONTENT;
         }
@@ -316,6 +424,23 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             if (D) Log.d(TAG,"type = " + filetype + " name = " + name
                     + " Current Path = " + mCurrentPath + "length = " + length);
 
+            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                if (V) Log.v(TAG, "Local Device SRM: Capable");
+
+                Byte srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                    if (V) Log.v(TAG, "SRM status: Enabled");
+                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                } else {
+                    if (V) Log.v(TAG, "SRM status: Disabled");
+                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                }
+            }
+            else {
+                if (V) Log.v(TAG, "Local Device SRM: Incapable");
+                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+            }
+
             if (length == 0) {
                 if (D) Log.d(TAG, "length is 0,proceeding with the transfer");
             }
@@ -323,7 +448,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                 if (D) Log.d(TAG, "name is null or empty, reject the transfer");
                 return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             }
-            if(checkAvailableSpace(length) == false) {
+            if(FileUtils.checkAvailableSpace(length) == false) {
                 if (D) Log.d(TAG,"No Space Available");
                 return ResponseCodes.OBEX_HTTP_ENTITY_TOO_LARGE;
             }
@@ -348,8 +473,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             if(fileinfo.exists() == true) {
                 if(fileinfo.canWrite()) {
                     fileinfo.delete();
-                    sendMessage(BluetoothFtpService.MSG_FILE_DELETED,
-                                                      fileinfo.getAbsolutePath());
+                    fileinfo = null;
+                    fileinfo = new File(mCurrentPath+ "/" + name);
                 } else {
                     /* if Readonly reject the replace */
                     if (D) Log.d(TAG,"File is readonly");
@@ -423,7 +548,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             }
             if (D) Log.d(TAG,"close Stream <");
 
-            sendMessage(BluetoothFtpService.MSG_FILE_RECEIVED,fileinfo.getAbsolutePath());
+            FileUtils.sendMessage(mCallback,BluetoothFtpService.MSG_FILE_RECEIVED,
+                                                       fileinfo.getAbsolutePath());
 
         }catch (IOException e) {
             Log.e(TAG, "onPut headers error "+ e.toString());
@@ -461,7 +587,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         String current_path_tmp = mCurrentPath;
         String tmp_path = null;
         /* Check if Card is mounted */
-        if(checkMountedState() == false) {
+        if(FileUtils.checkMountedState() == false) {
            Log.e(TAG,"SD card not Mounted");
            return ResponseCodes.OBEX_HTTP_NO_CONTENT;
         }
@@ -504,7 +630,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
          * return ResponseCodes.OBEX_HTTP_NOT_FOUND
          */
         if ((current_path_tmp.length() != 0) &&
-                                  (!doesPathExist(current_path_tmp))) {
+                                  (!FileUtils.doesPathExist(current_path_tmp))) {
             if (D) Log.d(TAG, "Current path has valid length ");
             if (create) {
                 if (D) Log.d(TAG, "path create is not forbidden!");
@@ -557,7 +683,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         String type = "";
         String name = "";
         /* Check if Card is mounted */
-        if(checkMountedState() == false) {
+        if(FileUtils.checkMountedState() == false) {
            Log.e(TAG,"SD card not Mounted");
            return ResponseCodes.OBEX_HTTP_NO_CONTENT;
         }
@@ -581,6 +707,28 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             validName = false;
         }
         if (D) Log.d(TAG,"validName = " + validName);
+
+        try {
+            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                if (V) Log.v(TAG, "Local Device SRM: Capable");
+
+                Byte srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                    if (V) Log.v(TAG, "SRM status: Enabled");
+                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                } else {
+                    if (V) Log.v(TAG, "SRM status: Disabled");
+                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                }
+            }
+            else {
+                if (V) Log.v(TAG, "Local Device SRM: Incapable");
+                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+            }
+        } catch (IOException e) {
+            Log.e(TAG,"onGet "+ e.toString());
+            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        }
 
         if(type != null) {
             /* If type is folder listing then invoke the routine to package
@@ -633,33 +781,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         if (D) Log.d(TAG, "onGet() -");
         return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
     }
-    /**
-    * deleteDirectory
-    *
-    * Called when a PUT request is received to delete a non empty folder
-    *
-    * @param dir provides the handle to the directory to be deleted
-    * @return a TRUE if operation was succesful or false otherwise
-    */
-    private final boolean deleteDirectory(File dir) {
-        if (D) Log.d(TAG, "deleteDirectory() +");
-        if(dir.exists()) {
-            File [] files = dir.listFiles();
-            for(int i = 0; i < files.length;i++) {
-                if(files[i].isDirectory()) {
-                    deleteDirectory(files[i]);
-                    if (D) Log.d(TAG,"Dir Delete =" + files[i].getName());
-                } else {
-                    if (D) Log.d(TAG,"File Delete =" + files[i].getName());
-                    files[i].delete();
-                    sendMessage(BluetoothFtpService.MSG_FILE_DELETED,files[i].getAbsolutePath());
-                }
-            }
-        }
 
-        if (D) Log.d(TAG, "deleteDirectory() -");
-        return( dir.delete() );
-    }
     /**
     * sendFileContents
     *
@@ -748,6 +870,80 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         }
     }
 
+    /**
+    * scanDirectory
+    *
+    * Scans a directory recursively for files and their mimetypes
+    * and adds them into a global list of filenames and their
+    * corresponding mime type list.
+    *
+    * @param dir File handle to file/folder
+    * @return none
+    */
+
+    private final void scanDirectory(File dir) {
+        Log.d(TAG,"scanDirectory Dest "+dir);
+        if(dir.isFile()) {
+            String mimeType = null;
+            /* first we look for Mimetype in Android map */
+            String extension = null, type = null;
+            String name = dir.getAbsolutePath();
+            int dotIndex = name.lastIndexOf(".");
+            if (dotIndex < 0) {
+                if (D) Log.d(TAG, "There is no file extension");
+            } else {
+                 extension = name.substring(dotIndex + 1).toLowerCase();
+                 MimeTypeMap map = MimeTypeMap.getSingleton();
+                 type = map.getMimeTypeFromExtension(extension);
+                 if (V) Log.v(TAG, "Mimetype guessed from extension " + extension + " is " + type);
+                 if (type != null) {
+                     mimeType = type;
+                 }
+                 if (mimeType != null) {
+                     mimeType = mimeType.toLowerCase();
+                     if (D) Log.d(TAG, "Adding file path"+" /mnt" + dir.getAbsolutePath());
+                     filenames.add("/mnt" + dir.getAbsolutePath());
+                     if (D) Log.d(TAG, "Adding type" +mimeType);
+                     types.add(mimeType);
+                 }
+            }
+            return;
+        }
+
+        File [] files = dir.listFiles();
+        for(int i = 0; i < files.length; i++) {
+            if (D) Log.d(TAG,"Files =" + files[i]);
+            if(files[i].isDirectory()) {
+                scanDirectory(files[i]);
+            } else if (files[i].isFile()) {
+                String mimeType = null;
+                /* first we look for Mimetype in Android map */
+                String extension = null, type = null;
+                String name = files[i].getAbsolutePath();
+                int dotIndex = name.lastIndexOf(".");
+                if (dotIndex < 0) {
+                    if (D) Log.d(TAG, "There is no file extension");
+                } else {
+                    extension = name.substring(dotIndex + 1).toLowerCase();
+                    MimeTypeMap map = MimeTypeMap.getSingleton();
+                    type = map.getMimeTypeFromExtension(extension);
+                    if (V) Log.v(TAG, "Mimetype guessed from extension " + extension + " is "
+                                                                                           + type);
+                    if (type != null) {
+                        mimeType = type;
+                    }
+                    if (mimeType != null) {
+                        mimeType = mimeType.toLowerCase();
+                        if (D) Log.d(TAG, "Adding file path"+" /mnt" + files[i].getAbsolutePath());
+                        filenames.add("/mnt" + files[i].getAbsolutePath());
+                        if (D) Log.d(TAG, "Adding type" +mimeType);
+                        types.add(mimeType);
+                    }
+                }
+            }
+        }
+    }
+
     /* Extract the length from header */
     private final long extractLength(HeaderSet request) {
         long len = 0;
@@ -762,82 +958,6 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
            } catch(IOException e) {}
         }
         return len;
-    }
-
-    /* Send message to FTP Service */
-    private final void sendMessage(int msgtype, String name) {
-        /* Send a message to the FTP service to initiate a Media scanner connection */
-        if (mCallback != null) {
-            Message msg = Message.obtain(mCallback);
-            msg.what = msgtype;
-            Bundle args = new Bundle();
-            Log.e(TAG,"sendMessage "+name);
-            String path = "/" + "mnt"+ name;
-            String mimeType = null;
-
-            /* first we look for Mimetype in Android map */
-            String extension = null, type = null;
-            int dotIndex = name.lastIndexOf(".");
-            if (dotIndex < 0) {
-                if (D) Log.d(TAG, "There is no file extension");
-                return;
-            } else {
-                extension = name.substring(dotIndex + 1).toLowerCase();
-                MimeTypeMap map = MimeTypeMap.getSingleton();
-                type = map.getMimeTypeFromExtension(extension);
-                if (V) Log.v(TAG, "Mimetype guessed from extension " + extension + " is " + type);
-                if (type != null) {
-                    mimeType = type;
-                }
-            }
-            if (mimeType != null) {
-                mimeType = mimeType.toLowerCase();
-            } else {
-                //Mimetype is unknown hence we dont need a media scan
-                return;
-            }
-
-            args.putString("filepath", path);
-            args.putString("mimetype", mimeType);
-            msg.obj = args;
-            msg.sendToTarget();
-            if (V) Log.v(TAG,"msg" + msgtype  + "sent out.");
-        }
-    }
-
-    /** check whether path is legal */
-    private final boolean doesPathExist(final String str) {
-        if (D) Log.d(TAG,"doesPathExist + = " + str );
-        File searchfolder = new File(str);
-        if(searchfolder.exists())
-            return true;
-        return false;
-    }
-
-    /** Check the Mounted State of External Storage */
-    private final boolean checkMountedState() {
-        String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state)) {
-            return true;
-        } else {
-            if (D) Log.d(TAG,"SD card Media not mounted");
-            return false;
-        }
-    }
-
-    /** Check the Available Space on External Storage */
-    private final boolean checkAvailableSpace(long filelength) {
-        StatFs stat = new StatFs(ROOT_FOLDER_PATH);
-        if (D) Log.d(TAG,"stat.getAvailableBlocks() "+ stat.getAvailableBlocks());
-        if (D) Log.d(TAG,"stat.getBlockSize() ="+ stat.getBlockSize());
-        long availabledisksize = stat.getBlockSize() * ((long)stat.getAvailableBlocks() - 4);
-        if (D) Log.d(TAG,"Disk size = " + availabledisksize + "File length = " + filelength);
-        if (stat.getBlockSize() * ((long)stat.getAvailableBlocks() - 4) <  filelength) {
-            if (D) Log.d(TAG,"Not Enough Space hence can't receive the file");
-            return false;
-        } else {
-            return true;
-        }
     }
 
     /** Function to send folder listing data to client */
