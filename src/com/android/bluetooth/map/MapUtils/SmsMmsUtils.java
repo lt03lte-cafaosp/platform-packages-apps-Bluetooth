@@ -173,7 +173,7 @@ public class SmsMmsUtils {
                  && (appParams.FilterPeriodBegin.length() > 0)) {
              Time time = new Time();
              try {
-                 time.parse(appParams.FilterPeriodBegin);
+                 time.parse(appParams.FilterPeriodBegin.trim());
                  if (whereClause != "") {
                      whereClause += " AND ";
                  }
@@ -189,7 +189,7 @@ public class SmsMmsUtils {
                  && (appParams.FilterPeriodEnd.length() > 0 )) {
              Time time = new Time();
              try {
-                 time.parse(appParams.FilterPeriodEnd);
+                 time.parse(appParams.FilterPeriodEnd.trim());
                  if (whereClause != "") {
                      whereClause += " AND ";
                  }

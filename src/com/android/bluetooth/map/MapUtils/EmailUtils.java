@@ -218,7 +218,7 @@ public class EmailUtils {
                 && (appParams.FilterRecipient.length() > 0)
                 && !(appParams.FilterRecipient.equalsIgnoreCase("*"))) {
                 if(appParams.FilterRecipient.contains("*")){
-                            appParams.FilterRecipient = appParams.FilterRecipient.replace('*', '%');
+                    appParams.FilterRecipient = appParams.FilterRecipient.replace('*', '%');
                 }
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
@@ -232,7 +232,7 @@ public class EmailUtils {
                 && (appParams.FilterOriginator.length() > 0)
                 && !(appParams.FilterOriginator.equalsIgnoreCase("*"))) {
                 if(appParams.FilterOriginator.contains("*")){
-                        appParams.FilterOriginator = appParams.FilterOriginator.replace('*', '%');
+                    appParams.FilterOriginator = appParams.FilterOriginator.replace('*', '%');
                 }
             // For incoming message
             if (whereClauseEmail != "") {
@@ -250,7 +250,7 @@ public class EmailUtils {
             Time time = new Time();
 
             try {
-                time.parse(appParams.FilterPeriodBegin);
+                time.parse(appParams.FilterPeriodBegin.trim());
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }
@@ -267,7 +267,7 @@ public class EmailUtils {
                 && (appParams.FilterPeriodEnd != "")) {
             Time time = new Time();
             try {
-                time.parse(appParams.FilterPeriodEnd);
+                time.parse(appParams.FilterPeriodEnd.trim());
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }

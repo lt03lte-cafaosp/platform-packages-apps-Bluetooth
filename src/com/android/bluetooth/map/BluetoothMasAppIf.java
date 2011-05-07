@@ -777,7 +777,7 @@ public class BluetoothMasAppIf {
                                     }
                                     if ((appParams.FilterRecipient != null)
                                             && (appParams.FilterRecipient.length() != 0)) {
-                                        filterString = appParams.FilterRecipient;
+                                        filterString = appParams.FilterRecipient.trim();
                                         Log.d(TAG, "appParams.FilterRecipient"
                                                 + appParams.FilterRecipient);
                                     }
@@ -791,7 +791,7 @@ public class BluetoothMasAppIf {
                                     }
                                     if ((appParams.FilterOriginator != null)
                                             && (appParams.FilterOriginator.length() != 0)) {
-                                        filterString = appParams.FilterOriginator;
+                                        filterString = appParams.FilterOriginator.trim();
                                         Log.d(TAG, "appParams.FilterOriginator"
                                                 + appParams.FilterOriginator);
                                     }
@@ -991,7 +991,9 @@ public class BluetoothMasAppIf {
                         if (name.equalsIgnoreCase("draft")) {
                             name = "drafts";
                         }
-
+                        if(this.list == null){
+                            this.list = new ArrayList<VcardContent>();
+                        }
                         if (getNumMmsMsgs(name) != 0) {
                             MsgListingConsts mmsl = new MsgListingConsts();
                             List<Integer> list = getMmsMsgMIDs(bldMmsWhereClause(
@@ -2499,7 +2501,7 @@ public class BluetoothMasAppIf {
                 && (appParams.FilterPeriodBegin.length() > 0)) {
             Time time = new Time();
             try {
-                time.parse(appParams.FilterPeriodBegin);
+                time.parse(appParams.FilterPeriodBegin.trim());
                 if (whereClause != "") {
                     whereClause += " AND ";
                 }
@@ -2515,7 +2517,7 @@ public class BluetoothMasAppIf {
                 && (appParams.FilterPeriodEnd.length() > 0)) {
             Time time = new Time();
             try {
-                time.parse(appParams.FilterPeriodEnd);
+                time.parse(appParams.FilterPeriodEnd.trim());
                 if (whereClause != "") {
                     whereClause += " AND ";
                 }

@@ -251,7 +251,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_PERIOD_BEGIN:
                     i += 1;
                     appParams.FilterPeriodBegin = new String("");
-                    for (int j = 1; j < params[i]; j++) {
+                    for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterPeriodBegin += (char) params[i + j];
                     }
                     Log.d(TAG, "FilterPeriodBegin "
@@ -263,7 +263,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_PERIOD_END:
                     i += 1;
                     appParams.FilterPeriodEnd = new String("");
-                    for (int j = 1; j < params[i]; j++) {
+                    for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterPeriodEnd += (char) params[i + j];
                     }
                     Log.d(TAG, "FilterPeriodEnd " + appParams.FilterPeriodEnd);
@@ -274,7 +274,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_RECIPIENT:
                     i += 1;
                     appParams.FilterRecipient = new String("");
-                    for (int j = 1; j < params[i]; j++) {
+                    for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterRecipient += (char)params[i + j];
 
                     }
@@ -287,7 +287,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_ORIGINATOR:
                     i += 1;
                     appParams.FilterOriginator = new String("");
-                    for (int j = 1; j < params[i]; j++) {
+                    for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterOriginator += (char) params[i+ j];
                     }
                     Log.d(TAG, "FilterPeriodOriginator "
