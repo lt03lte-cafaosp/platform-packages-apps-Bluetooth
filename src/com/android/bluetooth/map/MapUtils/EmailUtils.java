@@ -49,6 +49,7 @@ import android.util.TimeFormatException;
 
 import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasMessageRsp;
 import com.android.bluetooth.map.BluetoothMasAppParams;
+import com.android.bluetooth.map.BluetoothMasAppIf;
 
 
 public class EmailUtils {
@@ -85,7 +86,9 @@ public class EmailUtils {
 
         if ( cr.moveToFirst()) {
             do {
-                Log.d(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
+                }
                 int folderFlag = 0;
                 for(int i=0; i< folderList.size(); i++){
                     if(folderList.get(i).equalsIgnoreCase(cr.getString(0))){
@@ -102,7 +105,9 @@ public class EmailUtils {
 
             } while ( cr.moveToNext());
         }
-        Log.d(TAG, " Folder Listing of SMS,MMS and EMAIL: "+folderList);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " Folder Listing of SMS,MMS and EMAIL: "+folderList);
+        }
         cr.close();
         return folderList;
     }
@@ -112,12 +117,16 @@ public class EmailUtils {
         Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
         List<String> folderList = new ArrayList<String>();
         if ( cr.moveToFirst()) {
-                do {
-                        Log.d(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
-                        folderList.add(cr.getString(0));
-                } while ( cr.moveToNext());
+            do {
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
+                }
+                folderList.add(cr.getString(0));
+            } while ( cr.moveToNext());
         }
-        Log.d(TAG, " Folder Listing of EMAIL: "+folderList);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " Folder Listing of EMAIL: "+folderList);
+        }
         cr.close();
         return folderList;
 
@@ -128,7 +137,9 @@ public class EmailUtils {
         String query = "mailboxKey = -1";
         String folderId;
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
-
+        if(folder != null && folder.contains("'")){
+            folder = folder.replace("'", "''");
+        }
         Cursor cr = context.getContentResolver().query(
                 uri, null, "(UPPER(displayName) = '"+ folder.toUpperCase()+"')" , null, null);
 
@@ -144,8 +155,9 @@ public class EmailUtils {
     }
 
     public int getMessageSizeEmail(int messageId, Context context) {
-
-        Log.d(TAG, ":: Inside getMessageSizeEmail ::"+ messageId);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, ":: Message Id in getMessageSizeEmail ::"+ messageId);
+        }
         int msgSize = 0;
         String textContent, htmlContent;
         Uri uri = Uri.parse("content://com.android.email.provider/body");
@@ -174,17 +186,18 @@ public class EmailUtils {
 
     public String getFolderName(String[] splitStringsEmail) {
         String folderName;
-        Log.d(TAG, ":: Inside getFolderName ::"+ splitStringsEmail);
-
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, ":: Split Strings Array in getFolderName ::"+ splitStringsEmail);
+        }
         if(splitStringsEmail[2].trim().equalsIgnoreCase("[Gmail]") || splitStringsEmail[2].trim().contains("Gmail")){
             folderName = splitStringsEmail[2]+"/"+splitStringsEmail[3];
         }
         else{
             folderName = splitStringsEmail[2];
         }
-
-        Log.d(TAG, "folderName :: " + folderName);
-
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "folderName :: " + folderName);
+        }
         return folderName;
     }
 
@@ -193,15 +206,16 @@ public class EmailUtils {
 
         /* Filter readstatus: 0 no filtering, 0x01 get unread, 0x10 get read */
         if (appParams.FilterReadStatus != 0) {
-            Log.d(TAG, "##Inside Filter Read Status.....##:");
             if ((appParams.FilterReadStatus & 0x1) != 0) {
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
                 }
                 whereClauseEmail += " flagRead = 0 ";
             }
-            Log.d(TAG, "##Filter Read Status Value##:"+appParams.FilterReadStatus);
-            Log.d(TAG, "##Filter Read Status Condition Value##:"+(appParams.FilterReadStatus & 0x10));
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "Filter Read Status Value:"+appParams.FilterReadStatus);
+                Log.v(TAG, "Filter Read Status Condition Value:"+(appParams.FilterReadStatus & 0x10));
+            }
             if ((appParams.FilterReadStatus & 0x10) != 0) {
                 if (whereClauseEmail != "") {
                     whereClauseEmail += " AND ";
@@ -209,10 +223,11 @@ public class EmailUtils {
                 whereClauseEmail += " flagRead = 1 ";
             }
         }
-
-        Log.d(TAG, "##Filter Recipient Value##:"+appParams.FilterRecipient);
-        Log.d(TAG, "##Filter Recipient Condition 1 ##:"+(appParams.FilterRecipient != null));
-        Log.d(TAG, "##Filter Recipient Condition 2 ##:"+(appParams.FilterRecipient != ""));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Filter Recipient Value:"+appParams.FilterRecipient);
+            Log.v(TAG, "Filter Recipient Condition 1 :"+(appParams.FilterRecipient != null));
+            Log.v(TAG, "Filter Recipient Condition 2 :"+(appParams.FilterRecipient != ""));
+        }
         //Filter Recipient
         if ((appParams.FilterRecipient != null) && (appParams.FilterRecipient != "")  
                 && (appParams.FilterRecipient.length() > 0)
@@ -241,8 +256,9 @@ public class EmailUtils {
             String str1 = appParams.FilterOriginator;
             whereClauseEmail += "fromList LIKE '%"+appParams.FilterOriginator.trim()+"%'";
         }
-        Log.d(TAG, "##11 whereClauseEmail 11##:" + whereClauseEmail);
-        // TODO Filter priority?
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "whereClauseEmail :" + whereClauseEmail);
+        }// TODO Filter priority?
 
         /* Filter Period Begin */
         if ((appParams.FilterPeriodBegin != null)
@@ -298,7 +314,9 @@ public class EmailUtils {
 
         if ((appParams.ParameterMask & BIT_SUBJECT) != 0) {
 
-            Log.d(TAG, "Fileter Subject Length ::"+appParams.SubjectLength);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "Fileter Subject Length ::"+appParams.SubjectLength);
+            }
             if ((subject != null && appParams.SubjectLength > 0)
                     && (subject.length() > appParams.SubjectLength)) {
                 subject = subject.substring(0,
@@ -311,7 +329,8 @@ public class EmailUtils {
        }
 
         if ((appParams.ParameterMask & BIT_DATETIME) != 0) {
-            // TODO Clarify if OFFSET is needed.
+            /*emailMsg.setDatetime(time.toString().substring(0, 15)
+                    + "-0700");*/
             emailMsg.setDatetime(datetimeStr);
         }
 
@@ -319,8 +338,10 @@ public class EmailUtils {
             if(senderName.contains("")){
                 String[] senderStr = senderName.split("");
                 if(senderStr !=null && senderStr.length > 0){
-                    Log.d(TAG, " ::Sender name split String 0:: " + senderStr[0]
-                            + "::Sender name split String 1:: " + senderStr[1]);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " ::Sender name split String 0:: " + senderStr[0]
+                                + "::Sender name split String 1:: " + senderStr[1]);
+                    }
                     emailMsg.setSender_name(senderStr[1].trim());
                 }
             }
@@ -333,8 +354,10 @@ public class EmailUtils {
             if(senderAddressing.contains("")){
                 String[] senderAddrStr = senderAddressing.split("");
                 if(senderAddrStr !=null && senderAddrStr.length > 0){
-                    Log.d(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
-                            + "::Sender Addressing split String 1:: " + senderAddrStr[1]);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
+                                + "::Sender Addressing split String 1:: " + senderAddrStr[1]);
+                    }
                     emailMsg.setSender_addressing(senderAddrStr[0].trim());
                 }
             }
@@ -373,8 +396,10 @@ public class EmailUtils {
                 else if(recipientName.contains("")){
                     String[] recepientStr = recipientName.split("");
                     if(recepientStr !=null && recepientStr.length > 0){
-                        Log.d(TAG, " ::Recepient name split String 0:: " + recepientStr[0]
-                                + "::Recepient name split String 1:: " + recepientStr[1]);
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                            Log.v(TAG, " ::Recepient name split String 0:: " + recepientStr[0]
+                                    + "::Recepient name split String 1:: " + recepientStr[1]);
+                        }
                         emailMsg.setRecepient_name(recepientStr[1].trim());
                     }
                 }
@@ -413,8 +438,10 @@ public class EmailUtils {
                 } else if (recipientAddressing.contains("")) {
                     String[] recepientAddrStr = recipientAddressing.split("");
                     if (recepientAddrStr !=null && recepientAddrStr.length > 0) {
-                        Log.d(TAG, " ::Recepient addressing split String 0:: " + recepientAddrStr[0]
-                                + "::Recepient addressing split String 1:: " + recepientAddrStr[1]);
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                            Log.v(TAG, " ::Recepient addressing split String 0:: " + recepientAddrStr[0]
+                                    + "::Recepient addressing split String 1:: " + recepientAddrStr[1]);
+                        }
                         emailMsg.setRecepient_addressing(recepientAddrStr[0].trim());
                         emailMsg.setSendRecipient_addressing(true);
                     }
@@ -454,7 +481,9 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_READ) != 0) {
-            Log.d(TAG, " ::Read Status:: " + readStatus);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " ::Read Status:: " + readStatus);
+            }
             if (readStatus.equalsIgnoreCase("1")) {
                 emailMsg.setRead("yes");
             } else {
@@ -477,7 +506,9 @@ public class EmailUtils {
 
         if ((appParams.ParameterMask & BIT_REPLYTO_ADDRESSING) != 0) {
             //TODO need to test
-            Log.d(TAG, " ::Reply To addressing:: " + replyToStr);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " ::Reply To addressing:: " + replyToStr);
+            }
             if (replyToStr !=null && !replyToStr.equalsIgnoreCase("")){
                 if (replyToStr.contains("")){
                     String replyToStrArr[] = replyToStr.split("");
@@ -492,8 +523,7 @@ public class EmailUtils {
         return emailMsg;
     }
     public String bldEmailBmsg(int msgHandle, BluetoothMasMessageRsp rsp, Context context, MapUtils mu) {
-         Log.d(TAG, "Inside bldEmailBmsg:");
-         String str = null;
+        String str = null;
 
         //Query the message table for obtaining the message related details
         Cursor cr1 = null;
@@ -525,7 +555,8 @@ public class EmailUtils {
                 bmsg.setStatus("UNREAD");
             }
 
-            bmsg.setFolder("TELECOM/MSG/" + containingFolder);
+            bmsg.setFolder(BluetoothMasAppIf.Telecom + "/" + BluetoothMasAppIf.Msg +
+                        "/" + containingFolder);
 
             bmsg.setVcard_version("2.1");
 
@@ -555,7 +586,9 @@ public class EmailUtils {
             }
             else if(recipientName.contains("")){
                 multiRecepients = recipientName.replace('', ';');
-                Log.d(TAG, " ::Recepient name :: " + multiRecepients);
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " ::Recepient name :: " + multiRecepients);
+                }
                 bmsg.setRecipientVcard_name(multiRecepients.trim());
                 bmsg.setRecipientVcard_email(multiRecepients.trim());
             }
@@ -615,11 +648,15 @@ public class EmailUtils {
             bmsg.setBody_msg(sb.toString());
             bmsg.setBody_length(sb.length() + 22);
             // Send a bMessage
-            Log.d(TAG, "bMessageEmail test\n");
-            Log.d(TAG, "=======================\n\n");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "bMessageEmail test\n");
+                Log.v(TAG, "=======================\n\n");
+            }
             str = mu.toBmessageEmail(bmsg);
-            Log.d(TAG, str);
-            Log.d(TAG, "\n\n");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, str);
+                Log.v(TAG, "\n\n");
+            }
             cr1.close();
             cr2.close();
      }

@@ -101,6 +101,15 @@ public class SmsMmsUtils {
         folderList.add(Draft);
         return folderList;
     }
+    public List<String> folderListSmsMmsMns(List<String> folderList) {
+        folderList.add(Inbox);
+        folderList.add(Outbox);
+        folderList.add(Sent);
+        folderList.add(Draft);
+        folderList.add(Failed);
+        folderList.add(Queued);
+        return folderList;
+    }
     public int getFolderTypeMms(String folder) {
 
         int folderType = -5 ;

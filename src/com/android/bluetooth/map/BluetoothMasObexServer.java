@@ -220,9 +220,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_MAX_LIST_COUNT:
                     i += 2;
                     appParams.MaxListCount = getUint16BigEndian(params[i], params[i + 1]);
-                    Log.d(TAG, " params i " + params[i] + " params i+1"
-                            + params[i + 1] + " maxlistcount "
-                            + appParams.MaxListCount);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " params i+1"
+                                + params[i + 1] + " maxlistcount "
+                                + appParams.MaxListCount);
+                    }
                     if(validateTag((long)appParams.MaxListCount, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_MAX_LIST_COUNT_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_MAX_LIST_COUNT_MAX_VAL,
@@ -236,9 +238,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     i += 2;
                     appParams.ListStartOffset = getUint16BigEndian(params[i],
                             params[i + 1]);
-                    Log.d(TAG, " params i " + params[i] + " params i+1"
-                            + params[i + 1] + " maxlistcount "
-                            + appParams.ListStartOffset);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " params i+1"
+                                + params[i + 1] + " maxlistcount "
+                                + appParams.ListStartOffset);
+                    }
                     if(validateTag((long)appParams.ListStartOffset, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_LIST_START_OFFSET_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_LIST_START_OFFSET_MAX_VAL,
@@ -254,8 +258,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterPeriodBegin += (char) params[i + j];
                     }
-                    Log.d(TAG, "FilterPeriodBegin "
-                            + appParams.FilterPeriodBegin);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "FilterPeriodBegin "
+                                + appParams.FilterPeriodBegin);
+                    }
                     i += params[i];
                     i += 1;
                     break;
@@ -266,7 +272,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterPeriodEnd += (char) params[i + j];
                     }
-                    Log.d(TAG, "FilterPeriodEnd " + appParams.FilterPeriodEnd);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "FilterPeriodEnd " + appParams.FilterPeriodEnd);
+                    }
                     i += params[i];
                     i += 1;
                     break;
@@ -278,8 +286,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                         appParams.FilterRecipient += (char)params[i + j];
 
                     }
-                    Log.d(TAG, "FilterPeriodRecipient "
-                            + appParams.FilterRecipient);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "FilterPeriodRecipient "
+                                + appParams.FilterRecipient);
+                    }
                     i += params[i];
                     i += 1;
                     break;
@@ -290,8 +300,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterOriginator += (char) params[i+ j];
                     }
-                    Log.d(TAG, "FilterPeriodOriginator "
-                            + appParams.FilterOriginator);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "FilterPeriodOriginator "
+                                + appParams.FilterOriginator);
+                    }
                     i += params[i];
                     i += 1;
                     break;
@@ -299,8 +311,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_MESSAGE_TYPE:
                     i += 2;
                     appParams.FilterMessageType = params[i];
-                    Log.d(TAG, " params i " + params[i] + " FilterMessageType "
-                            + appParams.FilterMessageType);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " FilterMessageType "
+                                + appParams.FilterMessageType);
+                    }
                     if(validateTag((long)appParams.FilterMessageType, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_FILTER_MESSAGE_TYPE_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_FILTER_MESSAGE_TYPE_MAX_VAL,
@@ -313,8 +327,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_READ_STATUS:
                     i += 2;
                     appParams.FilterReadStatus = params[i];
-                    Log.d(TAG, " params i " + params[i] + " FilterReadStatus "
-                            + appParams.FilterReadStatus);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " FilterReadStatus "
+                                + appParams.FilterReadStatus);
+                    }
                     if(validateTag((long)appParams.FilterReadStatus, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_FILTER_READ_STATUS_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_FILTER_READ_STATUS_MAX_VAL,
@@ -327,8 +343,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_PRIORITY:
                     i += 2;
                     appParams.FilterPriority = params[i];
-                    Log.d(TAG, " params i " + params[i] + " FilterPriority "
-                            + appParams.FilterPriority);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " FilterPriority "
+                                + appParams.FilterPriority);
+                    }
                     if(validateTag((long)appParams.FilterPriority, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_FILTER_PRIORITY_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_FILTER_PRIORITY_MAX_VAL,
@@ -341,8 +359,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_STATUS_INDICATOR:
                     i += 2;
                     appParams.StatusIndicator = params[i];
-                    Log.d(TAG, " params i " + params[i] + " StatusIndicator "
-                            + appParams.StatusIndicator);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " StatusIndicator "
+                                + appParams.StatusIndicator);
+                    }
                     if(validateTag((long)appParams.StatusIndicator, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_STATUS_INDICATOR_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_STATUS_INDICATOR_MAX_VAL,
@@ -355,8 +375,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_STATUS_VALUE:
                     i += 2;
                     appParams.StatusValue = params[i];
-                    Log.d(TAG, " params i " + params[i] + " StatusValue "
-                            + appParams.StatusValue);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " StatusValue "
+                                + appParams.StatusValue);
+                    }
                     if(validateTag((long)appParams.StatusValue, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_STATUS_VALUE_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_STATUS_VALUE_MAX_VAL,
@@ -369,8 +391,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_SUBJECT_LENGTH:
                     i += 2;
                     appParams.SubjectLength = (short)(params[i] & 0x00FF);
-                    Log.d(TAG, " params i " + params[i] + " SubjectLen "
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " SubjectLen "
                                 + appParams.SubjectLength);
+                    }
                     if(validateTag((long)appParams.SubjectLength, (long) params[i-1],
                                          (long) BluetoothMasSpecParams.MAS_TAG_SUBJECT_LENGTH_MIN_VAL,
                                          (long) BluetoothMasSpecParams.MAS_TAG_SUBJECT_LENGTH_MAX_VAL,
@@ -388,10 +412,12 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                         // If it is 0, send all parameters
                         appParams.ParameterMask = BluetoothMasSpecParams.MAS_DEFAULT_PARAMETER_MASK;
                     }
-                    Log.d(TAG, " params i " + params[i] + " params i+1"
-                            + params[i + 1] + "params[i+2]" + params[i + 2]
-                            + "params[i+3" + params[i + 3] + " ParameterMask "
-                            + appParams.ParameterMask);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " params i+1"
+                                + params[i + 1] + "params[i+2]" + params[i + 2]
+                                + "params[i+3" + params[i + 3] + " ParameterMask "
+                                + appParams.ParameterMask);
+                    }
                     if(validateTag((long)appParams.ParameterMask, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_PARAMETER_MASK_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_PARAMETER_MASK_MAX_VAL,
@@ -404,8 +430,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_CHARSET:
                     i += 2;
                     appParams.Charset = params[i];
-                    Log.d(TAG, " params i " + params[i] + " Charset "
-                    + appParams.Charset);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " Charset "
+                                + appParams.Charset);
+                    }
                     if(validateTag((long)appParams.Charset, (long) params[i-1],
                                           (long) BluetoothMasSpecParams.MAS_TAG_CHARSET_MIN_VAL,
                                           (long) BluetoothMasSpecParams.MAS_TAG_CHARSET_MAX_VAL,
@@ -418,8 +446,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_TRANSPARENT:
                     i += 2;
                     appParams.Transparent = params[i];
-                    Log.d(TAG, " params i " + params[i] + " Transparent "
-                            + appParams.Transparent);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " Transparent "
+                                + appParams.Transparent);
+                    }
                     if(validateTag((long)appParams.Transparent, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_TRANSPARENT_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_TRANSPARENT_MAX_VAL,
@@ -432,8 +462,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_RETRY:
                     i += 2;
                     appParams.Retry = params[i];
-                    Log.d(TAG, " params i " + params[i] + " Retry "
-                            + appParams.Retry);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " Retry "
+                                + appParams.Retry);
+                    }
                     if(validateTag((long)appParams.Retry, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_RETRY_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_RETRY_MAX_VAL,
@@ -446,8 +478,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_ATTACHMENT:
                     i += 2;
                     appParams.Attachment = params[i];
-                    Log.d(TAG, " params i " + params[i] + " Attachment "
-                            + appParams.Attachment);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " Attachment "
+                                + appParams.Attachment);
+                    }
                     if(validateTag((long)appParams.Attachment, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_ATTACHMENT_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_ATTACHMENT_MAX_VAL,
@@ -460,8 +494,10 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FRACTION_REQUEST:
                     i += 2;
                     appParams.FractionRequest = params[i];
-                    Log.d(TAG, " params i " + params[i] + " Fraction Request "
-                            + appParams.FractionRequest);
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " params i " + params[i] + " Fraction Request "
+                                + appParams.FractionRequest);
+                    }
                     if(validateTag((long)appParams.FractionRequest, (long) params[i-1],
                                    (long) BluetoothMasSpecParams.MAS_TAG_FRACTION_REQUEST_MIN_VAL,
                                    (long) BluetoothMasSpecParams.MAS_TAG_FRACTION_REQUEST_MAX_VAL,
@@ -503,7 +539,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         mContext = context;
         mRemoteDevice = remoteDevice;
 
-        Log.d(TAG, "BlueoothMasObexServer const called");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "BlueoothMasObexServer const called");
+        }
         // set initial value when ObexServer created
         if (D) Log.d(TAG, "Initialize MasObexServer");
     }

@@ -121,30 +121,24 @@ public class BluetoothMasAppIf {
 
     private String CurrentPath = null;
 
-    private final String Telecom = "telecom";
-    private final String Msg = "msg";
+    public static final String Telecom = "telecom";
+    public static final String Msg = "msg";
 
-    private final String Inbox = "inbox";
-    private final String Outbox = "outbox";
-    private final String Sent = "sent";
-    private final String Deleted = "deleted";
-    private final String Draft = "draft";
-    private final String Drafts = "drafts";
-    private final String Undelivered = "undelivered";
-    private final String Failed = "failed";
-    private final String Queued = "queued";
+    public static final String Inbox = "inbox";
+    public static final String Outbox = "outbox";
+    public static final String Sent = "sent";
+    public static final String Deleted = "deleted";
+    public static final String Draft = "draft";
+    public static final String Drafts = "drafts";
+    public static final String Undelivered = "undelivered";
+    public static final String Failed = "failed";
+    public static final String Queued = "queued";
 
     private final int DELETED_THREAD_ID = -1;
 
     private final boolean mnsServiceEnabled = false;
 
-
-    // root -> telecom -> msg -> (FolderList) includes inbox, outbox, sent, etc
-    // For SMS/MMS FolderList[] = { Inbox, Outbox, Sent, Deleted, Draft };
-
-    //added email
     List<String> folderList = new ArrayList<String>();
-    //end email
 
     private final MapUtils mu;
 
@@ -162,7 +156,9 @@ public class BluetoothMasAppIf {
         SmsMmsUtils smu = new SmsMmsUtils();
         folderList = smu.folderListSmsMms(folderList);
 
-        Log.d(TAG, "Constructor called");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Constructor called");
+        }
     }
 
     /**
@@ -173,7 +169,9 @@ public class BluetoothMasAppIf {
      * @return true if the path exists, and could be accessed.
      */
     public boolean checkPath(boolean up, String name, boolean setPathFlag) {
-        Log.d(TAG, "setPath called");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "setPath called");
+        }
         List<String> completeFolderList = new ArrayList<String>();
         EmailUtils eu = new EmailUtils();
 
@@ -187,8 +185,10 @@ public class BluetoothMasAppIf {
             completeFolderList = eu.folderListEmail(folderList, context);
         }
 
-        Log.d(TAG, "CurrentPath::"+CurrentPath);
-        Log.d(TAG, "name::"+name);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "CurrentPath::"+CurrentPath);
+            Log.v(TAG, "name::"+name);
+        }
         if ((up == false)) {
             if(name == null) {
                 CurrentPath = (setPathFlag) ? null : CurrentPath;
@@ -246,7 +246,7 @@ public class BluetoothMasAppIf {
             break;
         case 2:
             for (String FolderName : completeFolderList) {
-                    //added second condition for gmail sent folder
+                //added second condition for gmail sent folder
                 if (FolderName.equalsIgnoreCase(name)) {
                     CurrentPath += (setPathFlag) ? ("/" + name) : "";
                     Result = true;
@@ -278,7 +278,9 @@ public class BluetoothMasAppIf {
      * @return number of messages; -1 if error
      */
     public int folderListingSize() {
-        Log.d(TAG, "folderListingSize called, current path " + CurrentPath);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "folderListingSize called, current path " + CurrentPath);
+        }
 
         List<String> completeFolderList = new ArrayList<String>();
         EmailUtils eu = new EmailUtils();
@@ -318,7 +320,9 @@ public class BluetoothMasAppIf {
      * @return XML listing of the folders
      */
     public String folderListing(BluetoothMasAppParams appParam) {
-        Log.d(TAG, "folderListing called, current path " + CurrentPath);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "folderListing called, current path " + CurrentPath);
+        }
 
         List<String> list = new ArrayList<String>();
 
@@ -427,6 +431,14 @@ public class BluetoothMasAppIf {
         public String email = "";
     }
 
+    public class BluetoothMsgListRsp {
+        public int writeCount = 0;
+        public int processCount = 0;
+        public int messageListingSize = 0;
+        BluetoothMasMessageListingRsp rsp;
+        public List<MsgListingConsts> msgList = new ArrayList<MsgListingConsts>();
+    }
+
     static final int PHONELOOKUP_ID_COLUMN_INDEX = 0;
     static final int PHONELOOKUP_LOOKUP_KEY_COLUMN_INDEX = 1;
     static final int PHONELOOKUP_DISPLAY_NAME_COLUMN_INDEX = 2;
@@ -496,10 +508,14 @@ public class BluetoothMasAppIf {
                 list.add(vCard);
                 found = true;
                 foundEntry = vCard;
-                Log.d(TAG, " NEW VCARD ADDED " + vCard.tel + vCard.name
-                        + vCard.email);
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " NEW VCARD ADDED " + vCard.tel + vCard.name
+                            + vCard.email);
+                }
             } else {
-                Log.d(TAG, "VCARD NOT FOUND ERROR");
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, "VCARD NOT FOUND ERROR");
+                }
             }
         }
 
@@ -603,7 +619,7 @@ public class BluetoothMasAppIf {
      */
     public String getOwnerName() {
         // TODO
-        if ( ownerInfo == null ) {
+        if (ownerInfo == null) {
             ownerInfo = getOwnerInfo();
         }
         return ownerInfo.Name;
@@ -614,7 +630,7 @@ public class BluetoothMasAppIf {
      */
     public String getOwnerNumber() {
         // TODO
-        if ( ownerInfo == null ) {
+        if (ownerInfo == null) {
             ownerInfo = getOwnerInfo();
         }
         return ownerInfo.Number;
@@ -676,8 +692,12 @@ public class BluetoothMasAppIf {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        Log.d(TAG, "appParams.FilterMessageType ::"+ appParams.FilterMessageType);
-        Log.d(TAG, "Condition result::"+ (appParams.FilterMessageType & 0x09));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "appParams.FilterMessageType ::"+ appParams.FilterMessageType);
+        }
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Condition result::"+ (appParams.FilterMessageType & 0x09));
+        }
         // TODO: Take care of subfolders
         // TODO: Check only for SMS_GSM
         // Look for messages only if both SMS/MMS are not filtered out
@@ -688,21 +708,15 @@ public class BluetoothMasAppIf {
 
             // TODO: Take care of subfolders
 
-            Log.d(TAG, "splitString[2] = " + splitStrings[2]);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "splitString[2] = " + splitStrings[2]);
+            }
             int filterPeriodValid = -1;
             filterPeriodValid = cu.validateFilterPeriods(appParams);
             if (filterPeriodValid == 0) {
                 rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
                 return rsp;
             }
-
-            // TODO Assuming only for SMS.
-            String url = "content://sms/";
-            Uri uri = Uri.parse(url);
-            ContentResolver cr = context.getContentResolver();
-            SmsMmsUtils smu = new SmsMmsUtils();
-
-            String whereClause  = smu.getConditionStringSms(splitStrings[2], appParams);
 
             if (appParams.FilterReadStatus > 0x02) {
                 rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
@@ -722,267 +736,22 @@ public class BluetoothMasAppIf {
                     || appParams.FilterPriority == 0x02) {
                 if(mode !=null && (mode.equalsIgnoreCase("SMS") || mode.equalsIgnoreCase("SMS_MMS") || mode.equalsIgnoreCase("SMS_MMS_EMAIL"))){
                     if ((appParams.FilterMessageType & 0x01) == 0) {
-                        Cursor cursor = cr.query(uri, null, whereClause, null,
-                        "date desc");
-
-                        int idInd = cursor.getColumnIndex("_id");
-                        int addressInd = cursor.getColumnIndex("address");
-                        int personInd = cursor.getColumnIndex("person");
-                        int dateInd = cursor.getColumnIndex("date");
-                        int readInd = cursor.getColumnIndex("read");
-                        int statusInd = cursor.getColumnIndex("status");
-                        int subjectInd = cursor.getColumnIndex("subject");
-                        int typeInd = cursor.getColumnIndex("type");
-                        int bodyInd = cursor.getColumnIndex("body");
-
-                        Log.d(TAG, "move to First" + cursor.moveToFirst());
-                        Log.d(TAG,
-                                "move to Liststartoffset"
-                                + cursor.moveToPosition(appParams.ListStartOffset));
-
                         this.list = new ArrayList<VcardContent>();
-
-                        if (cursor.moveToFirst()) {
-
-                            do {
-                                /*
-                                 * Apply remaining filters
-                                 */
-
-                                /*
-                                 * For incoming message, originator is the remote
-                                 * contact For outgoing message, originator is the
-                                 * owner.
-                                 */
-                                String filterString = null;
-                                String oname = getOwnerName();
-                                String onumber = getOwnerNumber();
-
-                                int msgType = cursor.getInt(typeInd);
-                                String regExpOrig = null;
-                                String regExpRecipient = null;
-                                if (appParams.FilterOriginator != null) {
-                                    regExpOrig = appParams.FilterOriginator.replace("*", ".*[0-9A-Za-z].*");
-                                }
-                                if (appParams.FilterRecipient != null) {
-                                    regExpRecipient = appParams.FilterRecipient.replace("*", ".*[0-9A-Za-z].*");
-                                }
-                                // TODO Filter Recipient
-                                if (isOutgoingSMSMessage(msgType) == true) {
-                                    if ((appParams.FilterOriginator != null)
-                                            && (appParams.FilterOriginator.length() != 0)
-                                            && !(oname.matches(".*"+regExpOrig+".*"))
-                                            && !(onumber.matches(".*"+regExpOrig+".*"))) {
-                                        continue;
-                                    }
-                                    if ((appParams.FilterRecipient != null)
-                                            && (appParams.FilterRecipient.length() != 0)) {
-                                        filterString = appParams.FilterRecipient.trim();
-                                        Log.d(TAG, "appParams.FilterRecipient"
-                                                + appParams.FilterRecipient);
-                                    }
-                                }
-                                if (isOutgoingSMSMessage(msgType) == false) {
-                                    if ((appParams.FilterRecipient != null)
-                                            && (appParams.FilterRecipient.length() != 0)
-                                            && !(oname.matches(".*"+regExpRecipient+".*"))
-                                            && !(onumber.matches(".*"+regExpRecipient+".*"))) {
-                                        continue;
-                                    }
-                                    if ((appParams.FilterOriginator != null)
-                                            && (appParams.FilterOriginator.length() != 0)) {
-                                        filterString = appParams.FilterOriginator.trim();
-                                        Log.d(TAG, "appParams.FilterOriginator"
-                                                + appParams.FilterOriginator);
-                                    }
-                                }
-
-                                if (filterString != null) {
-                                    Log.d(TAG, "filterString = " + filterString);
-                                    if (allowEntry(cursor.getString(addressInd),
-                                            filterString) == true) {
-                                        Log.d(TAG,
-                                                "+++ ALLOWED +++++++++ "
-                                                + cursor.getString(addressInd)
-                                                + " - " + cursor.getPosition());
-                                    } else {
-                                        Log.d(TAG,
-                                                "+++ DENIED +++++++++ "
-                                                + cursor.getString(addressInd)
-                                                + " - " + cursor.getPosition());
-                                        continue;
-                                    }
-                                }
-                                Log.d(TAG, " msgListSize " + messageListingSize
-                                        + "write count " + writeCount);
-
-                                messageListingSize++;
-
-                                /*
-                                 * Don't want the listing; just send the listing size
-                                 * after applying all the filters.
-                                 */
-                                if (appParams.MaxListCount == 0) {
-                                    continue;
-                                }
-
-                                processCount++;
-
-                                MsgListingConsts ml = new MsgListingConsts();
-                                ml.setMsg_handle(Integer.valueOf(cursor
-                                        .getString(idInd)));
-
-                                Time time = new Time();
-                                time.set(Long.valueOf(cursor.getString(dateInd)));
-
-                                String datetimeStr = time.toString().substring(0, 15);
-
-                                ml.msgInfo.setDateTime(datetimeStr);
-
-                                if ((appParams.ParameterMask & BIT_SUBJECT) != 0) {
-                                    /* SMS doesn't have subject. Append Body
-                                     * so that remote client doesn't have to do
-                                     * GetMessage
-                                     */
-                                    ml.setSendSubject(true);
-                                    String subject = cursor.getString(bodyInd);
-                                    if (subject != null && subject.length() > appParams.SubjectLength ) {
-                                        subject = subject.substring(0,
-                                                appParams.SubjectLength);
-                                    }
-                                    ml.setSubject(subject);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_DATETIME) != 0) {
-                                    ml.setDatetime(datetimeStr);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_SENDER_NAME) != 0) {
-                                    // TODO Query the Contacts database
-                                    String senderName = null;
-                                    if (isOutgoingSMSMessage(msgType) == true) {
-                                        senderName = getOwnerName();
-                                    } else {
-                                        senderName = getContactName(cursor
-                                                .getString(addressInd));
-                                    }
-                                    ml.setSender_name(senderName);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_SENDER_ADDRESSING) != 0) {
-                                    // TODO In case of a SMS this is
-                                    // the sender's phone number in canonical form
-                                    // (chapter
-                                    // 2.4.1 of [5]).
-                                    String senderAddressing = null;
-                                    if (isOutgoingSMSMessage(msgType) == true) {
-                                        senderAddressing = getOwnerNumber();
-                                    } else {
-                                        senderAddressing = cursor.getString(addressInd);
-                                    }
-                                    ml.setSender_addressing(senderAddressing);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_RECIPIENT_NAME) != 0) {
-                                    // TODO "recipient_name" is the name of the
-                                    // recipient of
-                                    // the message, when it is known
-                                    // by the MSE device.
-                                    String recipientName = null;
-                                    if (isOutgoingSMSMessage(msgType) == false) {
-                                        recipientName = getOwnerName();
-                                    } else {
-                                        recipientName = getContactName(cursor
-                                                .getString(addressInd));
-                                    }
-                                    ml.setRecepient_name(recipientName);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_RECIPIENT_ADDRESSING) != 0) {
-                                    // TODO In case of a SMS this is the recipient's
-                                    // phone
-                                    // number in canonical form (chapter 2.4.1 of [5])
-                                    String recipientAddressing = null;
-                                    if (isOutgoingSMSMessage(msgType) == false) {
-                                        recipientAddressing = getOwnerNumber();
-                                    } else {
-                                        recipientAddressing = cursor
-                                                .getString(addressInd);
-                                    }
-                                    ml.setRecepient_addressing(recipientAddressing);
-                                    ml.setSendRecipient_addressing(true);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_TYPE) != 0) {
-                                    // TODO GSM or CDMA SMS?
-                                    ml.setType("SMS_GSM");
-                                }
-
-                                if ((appParams.ParameterMask & BIT_SIZE) != 0) {
-                                    ml.setSize(cursor.getString(bodyInd).length());
-                                }
-
-                                if ((appParams.ParameterMask & BIT_RECEPTION_STATUS) != 0) {
-                                    ml.setReception_status("complete");
-                                }
-
-                                if ((appParams.ParameterMask & BIT_TEXT) != 0) {
-                                    // TODO Set text to "yes"
-                                    ml.setContains_text("yes");
-                                }
-
-                                if ((appParams.ParameterMask & BIT_ATTACHMENT_SIZE) != 0) {
-                                    ml.setAttachment_size(0);
-                                }
-
-                                if ((appParams.ParameterMask & BIT_PRIORITY) != 0) {
-                                    // TODO Get correct priority
-                                    ml.setPriority("no");
-                                }
-
-                                if ((appParams.ParameterMask & BIT_READ) != 0) {
-                                    if (cursor.getString(readInd).equalsIgnoreCase("1")) {
-                                        ml.setRead("yes");
-                                    } else {
-                                        ml.setRead("no");
-                                    }
-                                }
-
-                                if ((appParams.ParameterMask & BIT_SENT) != 0) {
-                                    // TODO Get sent status?
-                                    if (cursor.getInt(typeInd) == 2) {
-                                        ml.setSent("yes");
-                                    } else {
-                                        ml.setSent("no");
-                                    }
-                                }
-
-                                if ((appParams.ParameterMask & BIT_PROTECTED) != 0) {
-                                    ml.setMsg_protected("no");
-                                }
-
-                                // TODO replyto_addressing is used only for email
-
-                                // New Message?
-                                if ((rsp.newMessage == 0)
-                                        && (cursor.getInt(readInd) == 0)) {
-                                    rsp.newMessage = 1;
-                                }
-
-                                msgList.add(ml);
-                                writeCount++;
-                            } while (cursor.moveToNext());
-
-                            cursor.close();
-                        }
+                        BluetoothMsgListRsp bmlrSms = msgListSms(msgList, messageListingSize, 
+                                processCount, writeCount, splitStrings[2], rsp, 
+                                appParams);
+                        msgList = bmlrSms.msgList;
+                        messageListingSize = bmlrSms.messageListingSize;
+                        processCount = bmlrSms.processCount;
+                        writeCount = bmlrSms.writeCount;
+                        rsp = bmlrSms.rsp;
                     }
                 }
-                if(mode !=null && (mode.equalsIgnoreCase("SMS_MMS") || mode.equalsIgnoreCase("SMS_MMS_EMAIL"))){
+                if (mode !=null && (mode.equalsIgnoreCase("SMS_MMS") || mode.equalsIgnoreCase("SMS_MMS_EMAIL"))){
                     // Now that all of the SMS messages have been listed. Look for
                     // any
                     // MMS messages and provide them
                     if((appParams.FilterMessageType & 0x08) == 0) {
-
                         String splitStringsMms[] = tempPath.split("/");
                         name = splitStringsMms[2];
 
@@ -994,128 +763,28 @@ public class BluetoothMasAppIf {
                         if(this.list == null){
                             this.list = new ArrayList<VcardContent>();
                         }
-                        if (getNumMmsMsgs(name) != 0) {
-                            MsgListingConsts mmsl = new MsgListingConsts();
-                            List<Integer> list = getMmsMsgMIDs(bldMmsWhereClause(
-                                    appParams, getMMSFolderType(name)));
-                            for (int msgId : list) {
-                                Log.d(TAG, "\n MMS Text message ==> "
-                                        + getMmsMsgTxt(msgId));
-                                Log.d(TAG, "\n MMS message subject ==> "
-                                        + getMmsMsgSubject(msgId));
-
-                                String datetime = getMmsMsgDate(msgId);
-                                Time time = new Time();
-                                Date dt = new Date(Long.valueOf(datetime));
-                                time.set((dt.getTime() * 1000));
-
-                                String datetimeStr = time.toString().substring(0, 15);
-
-                                mmsl = bldMmsMsgLstItem(msgId, appParams, name, datetimeStr);
-                                mmsl.msgInfo.setDateTime(datetimeStr);
-
-                                if ((rsp.newMessage == 0)
-                                        && (getMmsMsgReadStatus(msgId).equalsIgnoreCase("no"))) {
-                                    rsp.newMessage = 1;
-                                }
-
-                                msgList.add(mmsl);
-                                messageListingSize++;
-                            }
-                        }
+                        BluetoothMsgListRsp bmlrMms = msgListMms(msgList,
+                                messageListingSize, name, rsp, appParams);
+                        msgList = bmlrMms.msgList;
+                        messageListingSize = bmlrMms.messageListingSize;
+                        rsp = bmlrMms.rsp;
                     }
                 }
                 if(mode !=null && (mode.equalsIgnoreCase("EMAIL")
                         || mode.equalsIgnoreCase("SMS_MMS_EMAIL"))){
                     //Email messages
                     if((appParams.FilterMessageType & 0x04) == 0){
-                        EmailUtils eu = new EmailUtils();
-                        String folderName;
-
-                        String splitStringsEmail[] = tempPath.split("/");
-                        Log.d(TAG, "splitStringsEmail[2] = " + splitStringsEmail[2]);
-                        // TODO: Take care of subfolders
-
-                        folderName = eu.getFolderName(splitStringsEmail);
-                        if(folderName != null && folderName.equalsIgnoreCase("draft")){
-                            folderName = "Drafts";
-                        }
-
-                        String urlEmail = "content://com.android.email.provider/message";
-                        Uri uriEmail = Uri.parse(urlEmail);
-                        ContentResolver crEmail = context.getContentResolver();
-
-                        String whereClauseEmail  = eu.getConditionString(folderName, context, appParams);
-
-                        Log.d(TAG, "## whereClauseEmail ##:" + whereClauseEmail);
-                        Cursor cursor = crEmail.query(uriEmail, null, whereClauseEmail, null, "timeStamp desc");
-
-                        int idInd = cursor.getColumnIndex("_id");
-                        int fromIndex = cursor.getColumnIndex("fromList");
-                        int toIndex = cursor.getColumnIndex("toList");
-                        int dateInd = cursor.getColumnIndex("timeStamp");
-                        int readInd = cursor.getColumnIndex("flagRead");
-                        int subjectInd = cursor.getColumnIndex("subject");
-                        int replyToInd = cursor.getColumnIndex("replyToList");
-
-                        Log.d(TAG, "move to First" + cursor.moveToFirst());
-                        Log.d(TAG, "move to Liststartoffset"
-                                + cursor.moveToPosition(appParams.ListStartOffset));
-
-
-                        if (cursor.moveToFirst()) {
-
-                            do {
-                                /*
-                                 * Apply remaining filters
-                                 */
-
-                                Log.d(TAG, " msgListSize " + messageListingSize
-                                        + "write count " + writeCount);
-
-                                messageListingSize++;
-
-                                String subject = cursor.getString(subjectInd);
-                                String timestamp = cursor.getString(dateInd);
-                                String senderName = cursor.getString(fromIndex);
-                                String senderAddressing = cursor.getString(fromIndex);
-                                String recipientName = cursor.getString(toIndex);
-                                String recipientAddressing = cursor.getString(toIndex);
-                                String msgId = cursor.getString(idInd);
-                                String readStatus = cursor.getString(readInd);
-                                String replyToStr = cursor.getString(replyToInd);
-
-                                /*
-                                 * Don't want the listing; just send the listing size after
-                                 * applying all the filters.
-                                 */
-
-                                processCount++;
-                                /*
-                                 * TODO Skip the first ListStartOffset record(s). Don't write
-                                 * more than MaxListCount record(s).
-                                 */
-
-                                MsgListingConsts emailMsg = new MsgListingConsts();
-                                emailMsg = eu.bldEmailMsgLstItem(context, folderName, appParams,
-                                        subject, timestamp, senderName, senderAddressing,
-                                        recipientName, recipientAddressing,
-                                        msgId, readStatus, replyToStr);
-
-                                // New Message?
-                                if ((rsp.newMessage == 0) && (cursor.getInt(readInd) == 0)) {
-                                    rsp.newMessage = 1;
-                                }
-                                msgList.add(emailMsg);
-                                writeCount++;
-                            } while (cursor.moveToNext());
-
-                            cursor.close();
-                        }
+                        BluetoothMsgListRsp bmlrEmail = msgListEmail(msgList, 
+                                messageListingSize, processCount, writeCount, 
+                                tempPath, rsp, appParams);
+                        msgList = bmlrEmail.msgList;
+                        messageListingSize = bmlrEmail.messageListingSize;
+                        processCount = bmlrEmail.processCount;
+                        writeCount = bmlrEmail.writeCount;
+                        rsp = bmlrEmail.rsp;
                     }//end email Messages if
                 }
-            }
-            else {
+            } else {
                 if (appParams.FilterPriority > 0x02) {
                     rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
                 }
@@ -1150,7 +819,9 @@ public class BluetoothMasAppIf {
         // TODO Undo the following check
         int pos = str.indexOf(" msg handle=\"");
         while (pos > 0) {
-            Log.d(TAG, " Msg listing str modified");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " Msg listing str modified");
+            }
             String str2 = str.substring(0, pos);
             str2 += str.substring(pos + 1);
             str = str2;
@@ -1168,10 +839,11 @@ public class BluetoothMasAppIf {
         }
         msgList.clear();
 
-        Log.d(TAG, "");
-
-        Log.d(TAG, " MESSAGE LISTING FULL ( total length)" + str.length());
-        Log.d(TAG, str);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "");
+            Log.v(TAG, " MESSAGE LISTING FULL ( total length)" + str.length());
+            Log.v(TAG, str);
+        }
 
         byte[] readBytes = new byte[10];
         try {
@@ -1194,7 +866,7 @@ public class BluetoothMasAppIf {
             rsp.file = file;
         }
         rsp.msgListingSize = messageListingSize;
-
+        rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
         return rsp;
     }
 
@@ -1210,12 +882,14 @@ public class BluetoothMasAppIf {
      */
     private String getMAPFolder(String type, String threadId) {
         String folder = null;
-        if ( type == null || threadId == null){
-            Log.d(TAG, "getMapFolder cannot parse folder type");
+        if (type == null || threadId == null){
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "getMapFolder cannot parse folder type");
+            }
             return folder;
         }
 
-        if ( Integer.valueOf(threadId) == DELETED_THREAD_ID){
+        if (Integer.valueOf(threadId) == DELETED_THREAD_ID){
             folder = Deleted;
         } else {
             switch (Integer.valueOf(type)) {
@@ -1248,7 +922,7 @@ public class BluetoothMasAppIf {
 
         cr = context.getContentResolver().query(
                 Uri.parse("content://sms/" + msgHandle),
-                new String[] { "_id", "type", "thread_id" }, null, null, null);
+                new String[] { "_id", "type", "thread_id"}, null, null, null);
         if (cr.getCount() > 0) {
             cr.moveToFirst();
             return getMAPFolder(cr.getString(cr.getColumnIndex("type")),
@@ -1282,7 +956,7 @@ public class BluetoothMasAppIf {
         int tZone15offset = tempInt / 15;
 
         tZone15offset += (Integer.valueOf(tZoneStr.substring(tZoneStr.length()-5, tZoneStr.length()-3)) * 4);
-        if ( timeStr.charAt(timeStr.length()-6) == '-'){
+        if (timeStr.charAt(timeStr.length()-6) == '-'){
             tZone15offset = tZone15offset | 0x80;
         }
 
@@ -1298,7 +972,7 @@ public class BluetoothMasAppIf {
 
         // Swap the nibble
         String encodedTimeStr = "";
-        for ( int i=0; i<tempTimeStr.length(); i=i+2){
+        for (int i=0; i<tempTimeStr.length(); i=i+2){
             encodedTimeStr += tempTimeStr.substring(i+1, i+2);
             encodedTimeStr += tempTimeStr.substring(i, i+1);
         }
@@ -1310,9 +984,11 @@ public class BluetoothMasAppIf {
 
         // Extract only digits out of the phone address
         StringBuffer strbufAddress = new StringBuffer(address.length() + 1);
-        for ( int i=0; i<address.length(); i++){
-            Log.d(TAG, " VAL " + address.substring(i, i+1));
-            if ( byteAddress[i] >= 48 && byteAddress[i] <= 57 ){
+        for (int i=0; i<address.length(); i++){
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " VAL " + address.substring(i, i+1));
+            }
+            if (byteAddress[i] >= 48 && byteAddress[i] <= 57){
                 strbufAddress.append(Integer.parseInt(address.substring(i, i+1)));
             }
         }
@@ -1334,7 +1010,7 @@ public class BluetoothMasAppIf {
         byte[] msg = SmsMessage.getSubmitPdu(null, strAddress, smsBody, false).encodedMessage;
 
         int addLength = Integer.valueOf(msg[2]);
-        if ( addLength %2 != 0){
+        if (addLength %2 != 0){
             addLength++;
         }
         addLength = addLength / 2;
@@ -1355,7 +1031,7 @@ public class BluetoothMasAppIf {
         }
 
         int encodedAddressLength = strAddress.length() / 2;
-        if ( strAddress.length() % 2 != 0){
+        if (strAddress.length() % 2 != 0){
             encodedAddressLength++;
         }
 
@@ -1400,178 +1076,24 @@ public class BluetoothMasAppIf {
             rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             return rsp;
         }
-
-        Cursor cr = null;
-        Uri uri = Uri.parse("content://sms/");
-        String whereClause = " _id = " + msgHandle;
-        try {
-            cr = context.getContentResolver().query(uri, null, whereClause, null,
-                    null);
-        } catch (Exception e){
-            rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
-            return rsp;
-        }
-
-        if (cr.getCount() > 0) {
-            cr.moveToFirst();
-            String containingFolder = getContainingFolder(msgHandle);
-            BmessageConsts bmsg = new BmessageConsts();
-
-            // Create a bMessage
-
-            // TODO Get Current type
-            bmsg.setType("SMS_GSM");
-
-            bmsg.setBmsg_version("1.0");
-            if (cr.getString(cr.getColumnIndex("read")).equalsIgnoreCase("1")) {
-                bmsg.setStatus("READ");
-            } else {
-                bmsg.setStatus("UNREAD");
-            }
-
-            bmsg.setFolder("TELECOM/MSG/" + containingFolder);
-
-            bmsg.setVcard_version("2.1");
-            VcardContent vcard = getVcardContent(cr.getString(cr
-                    .getColumnIndex("address")));
-
-            String type = cr.getString(cr.getColumnIndex("type"));
-            // Inbox is type 1.
-            if (type.equalsIgnoreCase("1")) {
-                // The address in database is of originator
-                bmsg.setOriginatorVcard_name(vcard.name);
-                bmsg.setOriginatorVcard_phone_number(vcard.tel);
-                bmsg.setRecipientVcard_name(getOwnerName());
-                bmsg.setRecipientVcard_phone_number(getOwnerNumber());
-            } else {
-                bmsg.setRecipientVcard_name(vcard.name);
-                bmsg.setRecipientVcard_phone_number(vcard.tel);
-                bmsg.setOriginatorVcard_name(getOwnerName());
-                bmsg.setOriginatorVcard_phone_number(getOwnerNumber());
-            }
-
-            String smsBody = " ";
-
-            if ( (int)bluetoothMasAppParams.Charset == 1){
-                bmsg.setBody_charset("UTF-8");
-                smsBody = cr.getString(cr.getColumnIndex("body"));
-            }
-
-            if ( (int)bluetoothMasAppParams.Charset == 0){
-                bmsg.setBody_encoding("G-7BIT");
-                String smsBodyUnicode = cr.getString(cr.getColumnIndex("body"));
-                smsBody = getSMSDeliverPdu(smsBodyUnicode, cr.getString(cr.getColumnIndex("date")), vcard.tel);
-            }
-
-            bmsg.setBody_length(22 + smsBody.length());
-
-            bmsg.setBody_msg(smsBody);
-            cr.close();
-
-            // Send a bMessage
-            Log.d(TAG, "bMessageSMS test\n");
-            Log.d(TAG, "=======================\n\n");
-            String str = mu.toBmessageSMS(bmsg);
-            Log.d(TAG, str);
-            Log.d(TAG, "\n\n");
-
-            if (str != null && (str.length() > 0)) {
-                final String FILENAME = "message";
-                // BufferedOutputStream bos = null;
-                FileOutputStream bos = null;
-                File file = new File(context.getFilesDir() + "/" + FILENAME);
-                file.delete();
-
-                try {
-                    bos = context
-                            .openFileOutput(FILENAME, Context.MODE_PRIVATE);
-                    bos.write(str.getBytes());
-                    bos.flush();
-                    bos.close();
-                } catch (FileNotFoundException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-
-                File fileR = new File(context.getFilesDir() + "/" + FILENAME);
-                if (fileR.exists() == true) {
-                    rsp.file = fileR;
-                    rsp.fractionDeliver = 1;
-                }
-
-            }
-
-        }
-        else{
-
-            // No SMS message was discovered with that handle, now look for an
-            // MMS message
-
+        if (msgHandle != null && (Integer.valueOf(msgHandle) > 0 && 
+                Integer.valueOf(msgHandle) < 100000)){
+            rsp = getMessageSms(msgHandle, context, rsp, bluetoothMasAppParams);
+        } else if (msgHandle != null && (Integer.valueOf(msgHandle) > 100000 && 
+                Integer.valueOf(msgHandle) < 200000)){
             /*
-             * Spec 5.6.4 says MSE shall reject request with value native
-             * for MMS and Email
-             */
-            if ( (int)bluetoothMasAppParams.Charset == 0 ) {
+            * Spec 5.6.4 says MSE shall reject request with value native
+            * for MMS and Email
+            */
+            if ((int)bluetoothMasAppParams.Charset == 0) {
                 rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
                 return rsp;
             }
-            int mmsMsgID = 0;
-            try {
-                mmsMsgID = getMmsMsgHndToID(Integer.valueOf(msgHandle));
-            } catch (Exception e) {
-                rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
-                return rsp;
-            }
-            if (mmsMsgID > 0) {
-                bldMmsBmsg(mmsMsgID, rsp);
-            }
-            else{ //No SMS and MMS messages were discovered. now look for email messages
-                Log.d(TAG, "Inside email :");
-                // Email message
-                int emailMsgID = 0;
-                EmailUtils eu = new EmailUtils();
-
-                emailMsgID = (Integer.valueOf(msgHandle) - EMAIL_HDLR_CONSTANT);
-                String str = eu.bldEmailBmsg(emailMsgID, rsp, context, mu);
-
-                Log.d(TAG, str);
-                Log.d(TAG, "\n\n");
-
-                if (str != null && (str.length() > 0)) {
-                    final String FILENAME = "message";
-                    FileOutputStream bos = null;
-                    File file = new File(context.getFilesDir() + "/" + FILENAME);
-                    file.delete();
-
-                    try {
-                        bos = context.openFileOutput(FILENAME, Context.MODE_PRIVATE);
-                        bos.write(str.getBytes());
-                        bos.flush();
-                        bos.close();
-                    } catch (FileNotFoundException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-
-                    File fileR = new File(context.getFilesDir() + "/" + FILENAME);
-                    if (fileR.exists() == true) {
-                        rsp.file = fileR;
-                        rsp.fractionDeliver = 1;
-                    }
-                    else {
-                        rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
-                    }
-
-                }
-            }
+            rsp = getMessageMms(msgHandle, rsp);
+        } else if (msgHandle != null && (Integer.valueOf(msgHandle) > 200000)){
+            // Email message
+            rsp = getMessageEmail(msgHandle, rsp);
         }
-
         return rsp;
     }
 
@@ -1591,9 +1113,11 @@ public class BluetoothMasAppIf {
         if (cr.moveToFirst()) {
             int threadId = Integer.valueOf(cr.getString(cr
                     .getColumnIndex("thread_id")));
-            Log.d(TAG, " Found the entry, thread id = " + threadId);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " Found the entry, thread id = " + threadId);
+            }
 
-            return (threadId);
+            return(threadId);
         }
         cr.close();
         return 0;
@@ -1606,10 +1130,11 @@ public class BluetoothMasAppIf {
     public String addToSmsFolder(String folder, String address, String text) {
 
         int threadId = getThreadId(address);
-        Log.d(TAG, "-------------");
-        Log.d(TAG, "address " + address + " TEXT " + text + " Thread ID "
-                + threadId);
-
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "-------------");
+            Log.v(TAG, "address " + address + " TEXT " + text + " Thread ID "
+                    + threadId);
+        }
         ContentValues values = new ContentValues();
         values.put("thread_id", threadId);
         values.put("body", text);
@@ -1627,11 +1152,15 @@ public class BluetoothMasAppIf {
         values.put("error_code", 0);
         Uri uri = context.getContentResolver().insert(
                 Uri.parse("content://sms/" + folder), values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         String str = uri.toString();
         String[] splitStr = str.split("/");
-        Log.d(TAG, " NEW HANDLE " + splitStr[3]);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW HANDLE " + splitStr[3]);
+        }
         return splitStr[3];
     }
     /**
@@ -1640,10 +1169,11 @@ public class BluetoothMasAppIf {
 
     public String addToEmailFolder(String folder, String address, String text, String subject, String OrigEmail, String OrigName) {
 
-        Log.d(TAG, "-------------");
-        Log.d(TAG, "address " + address);
-        Log.d(TAG, "TEXT " + text);
-
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "-------------");
+            Log.v(TAG, "address " + address);
+            Log.v(TAG, "TEXT " + text);
+        }
         //TODO need to insert a row in the body table and update the mailbox table with the no of messages unread
         Cursor cr;
         int folderId = 0;
@@ -1673,17 +1203,18 @@ public class BluetoothMasAppIf {
         }
         cr1.close();
 
-        Log.d(TAG, "-------------");
-        Log.d(TAG, "To address " + address);
-        Log.d(TAG, "Text " + text);
-        Log.d(TAG, "Originator email address:: " + OrigEmail);
-        Log.d(TAG, "Originator email name:: " + OrigName);
-        Log.d(TAG, "Time Stamp:: " + timeObj.toMillis(false));
-        Log.d(TAG, "Account Key:: " + accountId);
-        Log.d(TAG, "Folder Id:: " + folderId);
-        Log.d(TAG, "Folder Name:: " + folder);
-        Log.d(TAG, "Subject" + subject);
-
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "-------------");
+            Log.v(TAG, "To address " + address);
+            Log.v(TAG, "Text " + text);
+            Log.v(TAG, "Originator email address:: " + OrigEmail);
+            Log.v(TAG, "Originator email name:: " + OrigName);
+            Log.v(TAG, "Time Stamp:: " + timeObj.toMillis(false));
+            Log.v(TAG, "Account Key:: " + accountId);
+            Log.v(TAG, "Folder Id:: " + folderId);
+            Log.v(TAG, "Folder Name:: " + folder);
+            Log.v(TAG, "Subject" + subject);
+        }
         ContentValues values = new ContentValues();
         values.put("syncServerTimeStamp", 0);
         values.put("syncServerId", "5:65");
@@ -1704,11 +1235,15 @@ public class BluetoothMasAppIf {
 
         Uri uri = context.getContentResolver().insert(
                 Uri.parse("content://com.android.email.provider/message"), values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         String str = uri.toString();
         String[] splitStr = str.split("/");
-        Log.d(TAG, " NEW HANDLE " + splitStr[4]);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW HANDLE " + splitStr[4]);
+        }
 
         //TODO need to insert into the body table --seems like body table gets updated automatically
         ContentValues valuesBody = new ContentValues();
@@ -1797,13 +1332,10 @@ public class BluetoothMasAppIf {
         rsp.response = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
         rsp.msgHandle = null;
 
-        final String SENT = "Sent";
-        final String DELIVERED = "Delivered";
-
         if(!checkPath(false, name, false) ||
                 CurrentPath == null ||
                 CurrentPath.equals("telecom") ||
-                (CurrentPath.equals("telecom/msg") && (name == null)) ) {
+                (CurrentPath.equals("telecom/msg") && (name == null))) {
             rsp.response = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             return rsp;
         }
@@ -1834,18 +1366,22 @@ public class BluetoothMasAppIf {
         String readStr = new String(readBytes);
         MapUtils mu = new MapUtils();
         String type = mu.fetchType(readStr);
-        if(type!=null && (type.equalsIgnoreCase("SMS_GSM") || type.equalsIgnoreCase("MMS"))){
-            BmessageConsts bMsg = mu.fromBmessageSMS(readStr);
-            PhoneAddress = bMsg.getRecipientVcard_phone_number();
-            SmsText = bMsg.getBody_msg();
-
+        if (type!=null && (type.equalsIgnoreCase("SMS_GSM") 
+                || type.equalsIgnoreCase("MMS"))){
             String tmpPath = "";
             tmpPath = (name == null) ? CurrentPath : CurrentPath + "/" + name;
+
+            if (type.equalsIgnoreCase("SMS_GSM")){
+                BmessageConsts bMsg = mu.fromBmessageSMS(readStr);
+                PhoneAddress = bMsg.getRecipientVcard_phone_number();
+                SmsText = bMsg.getBody_msg();
+                rsp = pushMessageSms(rsp, tmpPath, name, bluetoothMasAppParams);
+            }
+
             // If the message to be pushed is an MMS message, extract any text,
             // discard
             // any attachments and convert the message to an SMS
-
-            if ((bMsg.getType()).equals("MMS")) {
+            if (type.equalsIgnoreCase("MMS")) {
                 /*
                  * The pair of calls below is used to send the MMS message out to
                  * the network.You need to first move the message to the drafts
@@ -1855,130 +1391,10 @@ public class BluetoothMasAppIf {
                  * then send the message out to the network the next time it is
                  * scheduled to run
                  */
-                if (tmpPath.equalsIgnoreCase("telecom/msg/outbox")) {
-                    MmsHandle = moveMMStoDrafts(readStr);
-                    moveMMSfromDraftstoOutbox();
-
-                    Log.d(TAG, "\nBroadcasting Intent to MmsSystemEventReceiver\n ");
-                    Intent sendIntent = new Intent("android.intent.action.MMS_PUSH");
-                    context.sendBroadcast(sendIntent);
-                    rsp.msgHandle = MmsHandle;
-                    rsp.response = ResponseCodes.OBEX_HTTP_OK;
-                    return rsp;
-                } else {
-                    String splitStrings[] = CurrentPath.split("/");
-                    mnsClient.addMceInitiatedOperation("+");
-                    int tmp = splitStrings.length;
-                    String folderName;
-                    if (name != null) {
-                        if (name.equals("")) {
-                            folderName = splitStrings[tmp - 1];
-                        } else {
-                            folderName = name;
-                        }
-                    } else {
-                        folderName = splitStrings[tmp - 1];
-                    }
-                    MmsHandle = addToMmsFolder(folderName, readStr);
-                    rsp.msgHandle = MmsHandle;
-                    rsp.response = ResponseCodes.OBEX_HTTP_OK;
-                    return rsp;
-                }
-
+                rsp = pushMessageMms(rsp, tmpPath, readStr, name);
             }
-
-
-            if(!tmpPath.equalsIgnoreCase("telecom/msg/outbox")) {
-                String splitStrings[] = CurrentPath.split("/");
-                mnsClient.addMceInitiatedOperation("+");
-                int tmp = splitStrings.length;
-                String folderName;
-                if (name != null) {
-                    if (name.equals("")){
-                        folderName = splitStrings[tmp - 1];
-                    } else {
-                        folderName = name;
-                    }
-                } else {
-                    folderName = splitStrings[tmp - 1];
-                }
-                SmsHandle = addToSmsFolder(folderName, PhoneAddress, SmsText);
-                rsp.msgHandle = SmsHandle;
-                rsp.response = ResponseCodes.OBEX_HTTP_OK;
-                return rsp;
-            }
-
-            SmsHandle = null;
-            rsp.msgHandle = "";
-
-            if(bluetoothMasAppParams.Transparent == 0) {
-                mnsClient.addMceInitiatedOperation("+");
-                SmsHandle = addToSmsFolder("queued", PhoneAddress, SmsText);
-                rsp.msgHandle = SmsHandle;
-                rsp.response = ResponseCodes.OBEX_HTTP_OK;
-            }
-            else if(bluetoothMasAppParams.Transparent == 1){
-                ArrayList<String> parts = new ArrayList<String>();
-                SmsManager sms = SmsManager.getDefault();
-                parts = sms.divideMessage(SmsText);
-                mnsClient.addMceInitiatedOperation("+");
-                sms.sendMultipartTextMessage(PhoneAddress, null, parts, null, null);
-                rsp.msgHandle = "-1";
-                rsp.response = ResponseCodes.OBEX_HTTP_OK;
-                return rsp;
-            }
-
-            Log.d(TAG, " Trying to send SMS ");
-            Log.d(TAG, " Text " + SmsText + " address " + PhoneAddress);
-
-            try {
-                Intent sendIntentSms = new Intent("com.android.mms.transaction.SEND_MESSAGE");
-                sendIntentSms.putExtra(android.content.Intent.EXTRA_PHONE_NUMBER, PhoneAddress);
-                sendIntentSms.putExtra(android.content.Intent.EXTRA_TEXT, SmsText);
-                context.sendBroadcast(sendIntentSms);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        else if(type!=null && type.equalsIgnoreCase("EMAIL")){
-            Log.d(TAG, " Before fromBmessageemail method:: "+readStr);
-            BmessageConsts bMsg = mu.fromBmessageEmail(readStr);
-            EmailAddress = bMsg.getRecipientVcard_email();
-            EmailText = bMsg.getBody_msg();
-            EmailSubject = bMsg.getSubject();
-            EmailOriginator = bMsg.getOriginatorVcard_email();
-            EmailOrigName = bMsg.getOriginatorVcard_name();
-
-            String tmpPath = "";
-            tmpPath = (name == null) ? CurrentPath : CurrentPath + "/" + name;
-
-            String splitStrings[] = CurrentPath.split("/");
-            mnsClient.addMceInitiatedOperation("+");
-            int tmp = splitStrings.length;
-            String folderName;
-            if (name != null) {
-                if (name.equals("")) {
-                    folderName = splitStrings[tmp - 1];
-                } else {
-                    folderName = name;
-                }
-            } else {
-                folderName = splitStrings[tmp - 1];
-            }
-            EmailHandle = addToEmailFolder(folderName, EmailAddress, EmailText, EmailSubject,
-                    EmailOriginator, EmailOrigName);
-            rsp.msgHandle = EmailHandle;
-            rsp.response = ResponseCodes.OBEX_HTTP_OK;
-
-            long accountId = getAccountId();
-            Log.d(TAG, " Account id before Mail service:: "+accountId);
-
-            Intent emailIn = new Intent();
-            emailIn.setAction("com.android.email.intent.action.MAIL_SERVICE_WAKEUP");
-            emailIn.putExtra("com.android.email.intent.extra.ACCOUNT", accountId);
-            this.context.startService(emailIn);
-
-            return rsp;
+        } else if (type!=null && type.equalsIgnoreCase("EMAIL")){
+            rsp = pushMessageEmail(rsp, readStr, name);
         }
         rsp.response = ResponseCodes.OBEX_HTTP_OK;
         return rsp;
@@ -1992,9 +1408,9 @@ public class BluetoothMasAppIf {
 
     private void deleteMMS(String msgHandle){
         Cursor cr = context.getContentResolver().query(Uri.parse("content://mms/" + msgHandle), null, null, null, null);
-        if ( cr.moveToFirst()){
+        if (cr.moveToFirst()){
             int threadId = cr.getInt(cr.getColumnIndex(("thread_id")));
-            if ( threadId != DELETED_THREAD_ID){
+            if (threadId != DELETED_THREAD_ID){
                 // Move to deleted folder
                 updateMMSThreadId(msgHandle, Integer.valueOf(DELETED_THREAD_ID));
             } else {
@@ -2015,8 +1431,10 @@ public class BluetoothMasAppIf {
 
             // Make sure that the message is in delete folder
             String currentThreadId = cr.getString(cr.getColumnIndex("thread_id"));
-            if ( currentThreadId != null && Integer.valueOf(currentThreadId) != -1){
-                Log.d(TAG, " Not in delete folder");
+            if (currentThreadId != null && Integer.valueOf(currentThreadId) != -1){
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " Not in delete folder");
+                }
                 return;
             }
 
@@ -2029,10 +1447,11 @@ public class BluetoothMasAppIf {
             if (crThreadId.moveToFirst()) {
                 // A thread for the given message ID exists in the database
                 String threadIdStr = crThreadId.getString(crThreadId.getColumnIndex("thread_id"));
-                Log.d(TAG, " THREAD ID " + threadIdStr);
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " THREAD ID " + threadIdStr);
+                }
                 updateMMSThreadId(msgHandle, Integer.valueOf(threadIdStr));
-            }
-            else
+            } else
             {
                 /* No thread for the given address
                  * Create a fake message to obtain the thread, use that thread_id
@@ -2043,7 +1462,7 @@ public class BluetoothMasAppIf {
                 tempValue.put("type", "20");
                 Uri tempUri = context.getContentResolver().insert( Uri.parse("content://sms/"), tempValue);
 
-                if ( tempUri != null ) {
+                if (tempUri != null) {
                     String tempMsgId = tempUri.getLastPathSegment();
                     Cursor tempCr = context.getContentResolver().query(tempUri, null, null, null, null);
                     tempCr.moveToFirst();
@@ -2053,16 +1472,18 @@ public class BluetoothMasAppIf {
                     updateMMSThreadId(msgHandle, Integer.valueOf(newThreadIdStr));
 
                     context.getContentResolver().delete(tempUri, null, null);
-                }
-                else {
-                    Log.d(TAG, "Error in undelete");
+                } else {
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "Error in undelete");
+                    }
                 }
             }
             crThreadId.close();
-        }
-        else
+        } else
         {
-            Log.d(TAG, "msgHandle not found");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "msgHandle not found");
+            }
         }
         cr.close();
     }
@@ -2075,9 +1496,9 @@ public class BluetoothMasAppIf {
 
     private void deleteSMS(String msgHandle){
         Cursor cr = context.getContentResolver().query(Uri.parse("content://sms/" + msgHandle), null, null, null, null);
-        if ( cr.moveToFirst()){
+        if (cr.moveToFirst()){
             int threadId = cr.getInt(cr.getColumnIndex(("thread_id")));
-            if ( threadId != DELETED_THREAD_ID){
+            if (threadId != DELETED_THREAD_ID){
                 // Move to deleted folder
                 updateSMSThreadId(msgHandle, Integer.valueOf(DELETED_THREAD_ID));
             } else {
@@ -2097,8 +1518,10 @@ public class BluetoothMasAppIf {
 
             // Make sure that the message is in delete folder
             String currentThreadId = cr.getString(cr.getColumnIndex("thread_id"));
-            if ( currentThreadId != null && Integer.valueOf(currentThreadId) != -1){
-                Log.d(TAG, " Not in delete folder");
+            if (currentThreadId != null && Integer.valueOf(currentThreadId) != -1){
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " Not in delete folder");
+                }
                 return;
             }
 
@@ -2111,10 +1534,11 @@ public class BluetoothMasAppIf {
             if (crThreadId.moveToFirst()){
                 // A thread for the given address exists in the database
                 String threadIdStr = crThreadId.getString(crThreadId.getColumnIndex("thread_id"));
-                Log.d(TAG, " THREAD ID " + threadIdStr);
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " THREAD ID " + threadIdStr);
+                }
                 updateSMSThreadId(msgHandle, Integer.valueOf(threadIdStr));
-            }
-            else
+            } else
             {
                 /* No thread for the given address
                  * Create a fake message to obtain the thread, use that thread_id
@@ -2125,7 +1549,7 @@ public class BluetoothMasAppIf {
                 tempValue.put("type", "20");
                 Uri tempUri = context.getContentResolver().insert( Uri.parse("content://sms/"), tempValue);
 
-                if ( tempUri != null ) {
+                if (tempUri != null) {
                     String tempMsgId = tempUri.getLastPathSegment();
                     Cursor tempCr = context.getContentResolver().query(tempUri, null, null, null, null);
                     tempCr.moveToFirst();
@@ -2138,10 +1562,11 @@ public class BluetoothMasAppIf {
                 }
             }
             crThreadId.close();
-        }
-        else
+        } else
         {
-            Log.d(TAG, "msgHandle not found");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "msgHandle not found");
+            }
         }
         cr.close();
     }
@@ -2164,121 +1589,18 @@ public class BluetoothMasAppIf {
                 && (bluetoothMasAppParams.StatusValue != 1)) {
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
         }
-
-        Uri uri = Uri.parse("content://sms/" + name);
-
-        Cursor cr = context.getContentResolver().query(uri, null, null, null,
-                null);
-        if (cr.moveToFirst()) {
-            if (bluetoothMasAppParams.StatusIndicator == 0) {
-                /* Read Status */
-                ContentValues values = new ContentValues();
-                values.put("read", bluetoothMasAppParams.StatusValue);
-                context.getContentResolver().update(uri, values, null, null);
-            } else {
-                if (bluetoothMasAppParams.StatusValue == 1) {
-                    deleteSMS(name);
-                } else if (bluetoothMasAppParams.StatusValue == 0) {
-                    unDeleteSMS(name);
-                }
-            }
-            return ResponseCodes.OBEX_HTTP_OK;
+        if(name != null && (Integer.valueOf(name) > 0 && 
+                Integer.valueOf(name) < 100000)){
+            return setMsgStatusSms(name, bluetoothMasAppParams);
         }
         // MMS MessageStatus processing begins here
-        cr.close();
-        String whereClause = " _id= " + getMmsMsgHndToID(Integer.valueOf(name));
-        uri = Uri.parse("content://mms/");
-        if(getMmsMsgHndToID(Integer.valueOf(name)) > 0){
-            cr = context.getContentResolver().query(uri, null, null, null, null);
+        else if(name != null && (Integer.valueOf(name) > 100000 && 
+                Integer.valueOf(name) < 200000)){
+            return setMsgStatusMms(name, bluetoothMasAppParams);
         }
-        if (cr.getCount() > 0) {
-            cr.moveToFirst();
-            if (bluetoothMasAppParams.StatusIndicator == 0) {
-                /* Read Status */
-                ContentValues values = new ContentValues();
-                values.put("read", bluetoothMasAppParams.StatusValue);
-                int rowUpdate = context.getContentResolver().update(uri,
-                        values, whereClause, null);
-                Log.d(TAG, "\nRows updated => " + Integer.toString(rowUpdate));
-                return ResponseCodes.OBEX_HTTP_OK;
-            } else {
-                if (bluetoothMasAppParams.StatusValue == 1) {
-                    deleteMMS(Integer.toString(getMmsMsgHndToID(Integer.valueOf(name))));
-                } else if (bluetoothMasAppParams.StatusValue == 0) {
-                    unDeleteMMS(Integer.toString(getMmsMsgHndToID(Integer.valueOf(name))));
-                }
-
-                return ResponseCodes.OBEX_HTTP_OK;
-            }
+        else if(name != null && (Integer.valueOf(name) > 200000)){
+            return setMsgStatusEmail(name, bluetoothMasAppParams);
         }
-        cr.close();
-
-        //Email
-        //Query the mailbox table to get the id values for Inbox and Trash folder
-        Uri uri1 = Uri.parse("content://com.android.email.provider/mailbox");
-
-        Cursor cr1 = context.getContentResolver().query(uri1, null,
-                "(UPPER(displayName) = 'INBOX' OR UPPER(displayName) LIKE '%TRASH%')", null, null);
-        int inboxFolderId = 0;
-        int deletedFolderId = 0;
-        int msgFolderId = 0;
-        String folderName;
-        if (cr1.getCount() > 0) {
-            cr1.moveToFirst();
-            do {
-                folderName = cr1.getString(cr1.getColumnIndex("displayName"));
-                if(folderName.equalsIgnoreCase("INBOX")){
-                    inboxFolderId = cr1.getInt(cr1.getColumnIndex("_id"));
-                }
-                else{
-                    deletedFolderId = cr1.getInt(cr1.getColumnIndex("_id"));
-                }
-            } while ( cr1.moveToNext());
-        }
-        cr1.close();
-
-        //Query the message table for the given message id
-        int emailMsgId = 0;
-        Log.d(TAG, "\n name ::=> " + (Integer.valueOf(name)));
-        emailMsgId = (Integer.valueOf(name) - EMAIL_HDLR_CONSTANT);
-
-        Uri uri2 = Uri.parse("content://com.android.email.provider/message/"+emailMsgId);
-        cr = context.getContentResolver().query(uri2, null, null, null,
-                null);
-        if (cr.moveToFirst()) {
-
-            if (bluetoothMasAppParams.StatusIndicator == 0) {
-                /* Read Status */
-                ContentValues values = new ContentValues();
-                values.put("flagRead", bluetoothMasAppParams.StatusValue);
-                context.getContentResolver().update(uri2, values, null, null);
-            }
-            else {
-                if (bluetoothMasAppParams.StatusValue == 1) { //if the email is deleted
-                    msgFolderId = cr.getInt(cr.getColumnIndex("mailboxKey"));
-                    if(msgFolderId == deletedFolderId){
-                        //TODO need to add notification for deleted email here
-                        mnsClient.addMceInitiatedOperation(name);
-                        context.getContentResolver().delete(
-                                Uri.parse("content://com.android.email.provider/message/"
-                                + emailMsgId), null, null);
-                    }
-                    else{
-                        ContentValues values = new ContentValues();
-                        values.put("mailboxKey", deletedFolderId);
-                        context.getContentResolver().update(uri2, values, null, null);
-                    }
-                }
-                else{ // if the email is undeleted
-                    ContentValues values = new ContentValues();
-                    values.put("mailboxKey", inboxFolderId);
-                    context.getContentResolver().update(uri2, values, null, null);
-                }
-            }
-            return ResponseCodes.OBEX_HTTP_OK;
-        }
-        cr.close();
-
         return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
     }
     public long getAccountId() {
@@ -2301,10 +1623,14 @@ public class BluetoothMasAppIf {
      */
     public int msgUpdate(String name,
             BluetoothMasAppParams bluetoothMasAppParams) {
-        Log.d(TAG, "Message Update");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Message Update");
+        }
 
         long accountId = getAccountId();
-        Log.d(TAG, " Account id for Inbox Update:: "+accountId);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " Account id for Inbox Update:: "+accountId);
+        }
 
         Intent emailIn = new Intent();
 
@@ -2354,7 +1680,9 @@ public class BluetoothMasAppIf {
      * Start an MNS obex client session and push notification whenever available
      */
     public void startMnsSession(BluetoothDevice remoteDevice) {
-        Log.d(TAG, "Start MNS Client");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Start MNS Client");
+        }
         mnsClient.getHandler()
         .obtainMessage(BluetoothMns.MNS_CONNECT, -1, -1, remoteDevice)
         .sendToTarget();
@@ -2364,7 +1692,9 @@ public class BluetoothMasAppIf {
      * Stop pushing notifications and disconnect MNS obex session
      */
     public void stopMnsSession(BluetoothDevice remoteDevice) {
-        Log.d(TAG, "Stop MNS Client");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Stop MNS Client");
+        }
         mnsClient.getHandler()
                 .obtainMessage(BluetoothMns.MNS_DISCONNECT, -1, -1,
                 remoteDevice).sendToTarget();
@@ -2375,7 +1705,9 @@ public class BluetoothMasAppIf {
      */
     private void sendMnsEvent(String msg, String handle, String folder,
             String old_folder, String msgType) {
-        Log.d(TAG, "Send MNS Event");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Send MNS Event");
+        }
         mnsClient.sendMnsEvent(msg, handle, folder, old_folder, msgType);
     }
 
@@ -2816,8 +2148,7 @@ public class BluetoothMasAppIf {
     /**
      * Build an MMS bMessage when given a message handle
      */
-    private String bldMmsBmsg(int msgID, BluetoothMasMessageRsp rsp) {
-        String bMessage = null;
+    private BluetoothMasMessageRsp bldMmsBmsg(int msgID, BluetoothMasMessageRsp rsp) {
         Cursor cr = null;
         Uri uri = Uri.parse("content://mms/");
         String whereClause = " _id = " + msgID;
@@ -2841,7 +2172,7 @@ public class BluetoothMasAppIf {
                 bmsg.setStatus("UNREAD");
             }
 
-            bmsg.setFolder("TELECOM/MSG/" + containingFolder);
+            bmsg.setFolder(Telecom + "/" + Msg + "/" + containingFolder);
 
             bmsg.setVcard_version("2.1");
             VcardContent vcard = getVcardContent(getMmsMsgAddress(msgID));
@@ -2874,9 +2205,10 @@ public class BluetoothMasAppIf {
             cr.close();
             // Send a bMessage
             String str = mu.toBmessageMMS(bmsg);
-            Log.d(TAG, str);
-            Log.d(TAG, "\n\n");
-
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, str);
+                Log.v(TAG, "\n\n");
+            }
             if (str != null && (str.length() > 0)) {
                 final String FILENAME = "message";
                 FileOutputStream bos = null;
@@ -2906,7 +2238,7 @@ public class BluetoothMasAppIf {
 
             }
         }
-        return bMessage;
+        return rsp;
     }
 
     private boolean isOutgoingMMSMessage( int mmsMsgID) {
@@ -3146,7 +2478,9 @@ public class BluetoothMasAppIf {
 
         String msgNum = uri.getLastPathSegment();
         int msgID = Integer.parseInt(msgNum);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
         int virtualMsgId = (msgID + MMS_HDLR_CONSTANT);
 
         // Build the \mms\part portion
@@ -3162,7 +2496,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/part");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         values.clear();
         values.put("seq", 0);
@@ -3180,7 +2516,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/part");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         values.clear();
         values.put("contact_id", "null");
@@ -3190,7 +2528,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/addr");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         values.clear();
         values.put("contact_id", "null");
@@ -3200,7 +2540,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/addr");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
         String whereClause = "address LIKE '" + Address + "' AND type = 125";
         context.getContentResolver().delete(Uri.parse("content://sms/"), whereClause, null);
         String virtualMsgIdStr = String.valueOf(virtualMsgId);
@@ -3265,7 +2607,9 @@ public class BluetoothMasAppIf {
 
         String msgNum = uri.getLastPathSegment();
         int msgID = Integer.parseInt(msgNum);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
         int virtualMsgId = (msgID + MMS_HDLR_CONSTANT);
 
         // Build the \mms\part portion
@@ -3281,7 +2625,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/part");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         values.clear();
         values.put("seq", 0);
@@ -3299,7 +2645,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/part");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         values.clear();
         values.put("contact_id", "null");
@@ -3309,7 +2657,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/addr");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         values.clear();
         values.put("contact_id", "null");
@@ -3319,7 +2669,9 @@ public class BluetoothMasAppIf {
 
         uri = Uri.parse("content://mms/" + msgID + "/addr");
         uri = cr.insert(uri, values);
-        Log.d(TAG, " NEW URI " + uri.toString());
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " NEW URI " + uri.toString());
+        }
 
         String virtualMsgIdStr = String.valueOf(virtualMsgId);
         String whereClause = "address LIKE '" + Address + "' AND type = 125";
@@ -3382,7 +2734,9 @@ public class BluetoothMasAppIf {
     private int createMMSThread(String address) {
         int returnValue = 0;
         if (address != null) {
-            Log.d(TAG, "Inside adress not null");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "Inside adress not null");
+            }
             ContentValues tempValue = new ContentValues();
             tempValue.put("address", address);
             tempValue.put("type", 125);
@@ -3397,11 +2751,893 @@ public class BluetoothMasAppIf {
                         .getColumnIndex("thread_id"));
                 tempCr.close();
                 returnValue = Integer.valueOf(newThreadIdStr);
-                Log.d(TAG, "Thread ID::"+returnValue);
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, "Thread ID::"+returnValue);
+                }
             }
         }
 
         return returnValue;
+    }
+    private String bldSmsBmsg(String msgHandle, Context context, MapUtils mu, Cursor cr,
+                BluetoothMasAppParams bluetoothMasAppParams) {
+        String str = null;
+        if (cr.getCount() > 0) {
+            cr.moveToFirst();
+            String containingFolder = getContainingFolder(msgHandle);
+            BmessageConsts bmsg = new BmessageConsts();
+
+            // Create a bMessage
+
+            // TODO Get Current type
+            bmsg.setType("SMS_GSM");
+
+            bmsg.setBmsg_version("1.0");
+            if (cr.getString(cr.getColumnIndex("read")).equalsIgnoreCase("1")) {
+                bmsg.setStatus("READ");
+            } else {
+                bmsg.setStatus("UNREAD");
+            }
+
+            bmsg.setFolder(Telecom + "/" + Msg + "/" + containingFolder);
+
+            bmsg.setVcard_version("2.1");
+            VcardContent vcard = getVcardContent(cr.getString(cr
+                    .getColumnIndex("address")));
+
+            String type = cr.getString(cr.getColumnIndex("type"));
+            if (type.equalsIgnoreCase("1")) {
+                // The address in database is of originator
+                bmsg.setOriginatorVcard_name(vcard.name);
+                bmsg.setOriginatorVcard_phone_number(vcard.tel);
+                bmsg.setRecipientVcard_name(getOwnerName());
+                bmsg.setRecipientVcard_phone_number(getOwnerNumber());
+            } else {
+                bmsg.setRecipientVcard_name(vcard.name);
+                bmsg.setRecipientVcard_phone_number(vcard.tel);
+                bmsg.setOriginatorVcard_name(getOwnerName());
+                bmsg.setOriginatorVcard_phone_number(getOwnerNumber());
+            }
+
+            String smsBody = " ";
+
+            if ( (int)bluetoothMasAppParams.Charset == 1){
+                bmsg.setBody_charset("UTF-8");
+                smsBody = cr.getString(cr.getColumnIndex("body"));
+            }
+
+            if ( (int)bluetoothMasAppParams.Charset == 0){
+                bmsg.setBody_encoding("G-7BIT");
+                String smsBodyUnicode = cr.getString(cr.getColumnIndex("body"));
+                smsBody = getSMSDeliverPdu(smsBodyUnicode, cr.getString(cr.getColumnIndex("date")), vcard.tel);
+            }
+
+            bmsg.setBody_length(22 + smsBody.length());
+
+            bmsg.setBody_msg(smsBody);
+            cr.close();
+
+            // Send a bMessage
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "bMessageSMS test\n");
+                Log.v(TAG, "=======================\n\n");
+            }
+            str = mu.toBmessageSMS(bmsg);
+        }
+        return str;
+    }
+    private MsgListingConsts bldSmsMsgLstItem(BluetoothMasAppParams appParams,
+                String subject, String timestamp, String address, String msgId,
+                String readStatus, int msgType){
+        MsgListingConsts ml = new MsgListingConsts();
+        ml.setMsg_handle(Integer.valueOf(msgId));
+
+        Time time = new Time();
+        time.set(Long.valueOf(timestamp));
+
+        String datetimeStr = time.toString().substring(0, 15);
+
+        ml.msgInfo.setDateTime(datetimeStr);
+
+        if ((appParams.ParameterMask & BIT_SUBJECT) != 0) {
+            /* SMS doesn't have subject. Append Body
+             * so that remote client doesn't have to do
+             * GetMessage
+             */
+            ml.setSendSubject(true);
+            if (subject != null && subject.length() > appParams.SubjectLength ) {
+                subject = subject.substring(0,
+                        appParams.SubjectLength);
+            }
+            ml.setSubject(subject);
+        }
+
+        if ((appParams.ParameterMask & BIT_DATETIME) != 0) {
+            ml.setDatetime(datetimeStr);
+        }
+
+        if ((appParams.ParameterMask & BIT_SENDER_NAME) != 0) {
+            // TODO Query the Contacts database
+            String senderName = null;
+            if (isOutgoingSMSMessage(msgType) == true) {
+                senderName = getOwnerName();
+            } else {
+                senderName = getContactName(address);
+            }
+            ml.setSender_name(senderName);
+        }
+
+        if ((appParams.ParameterMask & BIT_SENDER_ADDRESSING) != 0) {
+            // TODO In case of a SMS this is
+            // the sender's phone number in canonical form
+            // (chapter
+            // 2.4.1 of [5]).
+            String senderAddressing = null;
+            if (isOutgoingSMSMessage(msgType) == true) {
+                senderAddressing = getOwnerNumber();
+            } else {
+                senderAddressing = address;
+            }
+            ml.setSender_addressing(senderAddressing);
+        }
+
+        if ((appParams.ParameterMask & BIT_RECIPIENT_NAME) != 0) {
+            // TODO "recipient_name" is the name of the
+            // recipient of
+            // the message, when it is known
+            // by the MSE device.
+            String recipientName = null;
+            if (isOutgoingSMSMessage(msgType) == false) {
+                recipientName = getOwnerName();
+            } else {
+                recipientName = getContactName(address);
+            }
+            ml.setRecepient_name(recipientName);
+        }
+
+        if ((appParams.ParameterMask & BIT_RECIPIENT_ADDRESSING) != 0) {
+            // TODO In case of a SMS this is the recipient's
+            // phone
+            // number in canonical form (chapter 2.4.1 of [5])
+            String recipientAddressing = null;
+            if (isOutgoingSMSMessage(msgType) == false) {
+                recipientAddressing = getOwnerNumber();
+            } else {
+                recipientAddressing = address;
+            }
+            ml.setRecepient_addressing(recipientAddressing);
+            ml.setSendRecipient_addressing(true);
+        }
+
+        if ((appParams.ParameterMask & BIT_TYPE) != 0) {
+            // TODO GSM or CDMA SMS?
+            ml.setType("SMS_GSM");
+        }
+
+        if ((appParams.ParameterMask & BIT_SIZE) != 0) {
+            ml.setSize(subject.length());
+        }
+
+        if ((appParams.ParameterMask & BIT_RECEPTION_STATUS) != 0) {
+            ml.setReception_status("complete");
+        }
+
+        if ((appParams.ParameterMask & BIT_TEXT) != 0) {
+            // TODO Set text to "yes"
+            ml.setContains_text("yes");
+        }
+
+        if ((appParams.ParameterMask & BIT_ATTACHMENT_SIZE) != 0) {
+            ml.setAttachment_size(0);
+        }
+
+        if ((appParams.ParameterMask & BIT_PRIORITY) != 0) {
+            // TODO Get correct priority
+            ml.setPriority("no");
+        }
+
+        if ((appParams.ParameterMask & BIT_READ) != 0) {
+            if (readStatus.equalsIgnoreCase("1")) {
+                ml.setRead("yes");
+            } else {
+                ml.setRead("no");
+            }
+        }
+
+        if ((appParams.ParameterMask & BIT_SENT) != 0) {
+            // TODO Get sent status?
+            if (msgType == 2) {
+                ml.setSent("yes");
+            } else {
+                ml.setSent("no");
+            }
+        }
+
+        if ((appParams.ParameterMask & BIT_PROTECTED) != 0) {
+            ml.setMsg_protected("no");
+        }
+
+        return ml;
+    }
+    private BluetoothMsgListRsp msgListSms(List<MsgListingConsts> msgList,
+                int messageListingSize, int processCount, int writeCount, String folder,
+                BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
+        BluetoothMsgListRsp bmlr = new BluetoothMsgListRsp();
+        String url = "content://sms/";
+        Uri uri = Uri.parse(url);
+        ContentResolver cr = context.getContentResolver();
+        SmsMmsUtils smu = new SmsMmsUtils();
+
+        String whereClause  = smu.getConditionStringSms(folder, appParams);
+
+        Cursor cursor = cr.query(uri, null, whereClause, null,
+                "date desc");
+
+        int idInd = cursor.getColumnIndex("_id");
+        int addressInd = cursor.getColumnIndex("address");
+        int personInd = cursor.getColumnIndex("person");
+        int dateInd = cursor.getColumnIndex("date");
+        int readInd = cursor.getColumnIndex("read");
+        int statusInd = cursor.getColumnIndex("status");
+        int subjectInd = cursor.getColumnIndex("subject");
+        int typeInd = cursor.getColumnIndex("type");
+        int bodyInd = cursor.getColumnIndex("body");
+
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "move to First" + cursor.moveToFirst());
+        }
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "move to Liststartoffset"
+                    + cursor.moveToPosition(appParams.ListStartOffset));
+        }
+        if (cursor.moveToFirst()) {
+            do {
+                /*
+                 * Apply remaining filters
+                 */
+
+                /*
+                 * For incoming message, originator is the remote
+                 * contact For outgoing message, originator is the
+                 * owner.
+                 */
+                String filterString = null;
+                String oname = getOwnerName();
+                String onumber = getOwnerNumber();
+
+                int msgType = cursor.getInt(typeInd);
+                String regExpOrig = null;
+                String regExpRecipient = null;
+                if (appParams.FilterOriginator != null) {
+                    regExpOrig = appParams.FilterOriginator.replace("*", ".*[0-9A-Za-z].*");
+                }
+                if (appParams.FilterRecipient != null) {
+                    regExpRecipient = appParams.FilterRecipient.replace("*", ".*[0-9A-Za-z].*");
+                }
+                if (isOutgoingSMSMessage(msgType) == true) {
+                    if ((appParams.FilterOriginator != null)
+                            && (appParams.FilterOriginator.length() != 0)
+                            && !(oname.matches(".*"+regExpOrig+".*"))
+                            && !(onumber.matches(".*"+regExpOrig+".*"))) {
+                        continue;
+                    }
+                    if ((appParams.FilterRecipient != null)
+                            && (appParams.FilterRecipient.length() != 0)) {
+                        filterString = appParams.FilterRecipient.trim();
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, "appParams.FilterRecipient"
+                                    + appParams.FilterRecipient);
+                        }
+                    }
+                }
+                if (isOutgoingSMSMessage(msgType) == false) {
+                    if ((appParams.FilterRecipient != null)
+                            && (appParams.FilterRecipient.length() != 0)
+                            && !(oname.matches(".*"+regExpRecipient+".*"))
+                            && !(onumber.matches(".*"+regExpRecipient+".*"))) {
+                        continue;
+                    }
+                    if ((appParams.FilterOriginator != null)
+                            && (appParams.FilterOriginator.length() != 0)) {
+                        filterString = appParams.FilterOriginator.trim();
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, "appParams.FilterOriginator"
+                                    + appParams.FilterOriginator);
+                        }
+                    }
+                }
+
+                if (filterString != null) {
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "filterString = " + filterString);
+                    }
+                    if (allowEntry(cursor.getString(addressInd),
+                            filterString) == true) {
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG,
+                                    "+++ ALLOWED +++++++++ "
+                                    + cursor.getString(addressInd)
+                                    + " - " + cursor.getPosition());
+                        }
+                    } else {
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG,
+                                    "+++ DENIED +++++++++ "
+                                    + cursor.getString(addressInd)
+                                    + " - " + cursor.getPosition());
+                        }
+                        continue;
+                    }
+                }
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " msgListSize " + messageListingSize
+                            + "write count " + writeCount);
+                }
+
+                messageListingSize++;
+
+                /*
+                 * Don't want the listing; just send the listing size
+                 * after applying all the filters.
+                 */
+                if (appParams.MaxListCount == 0) {
+                    continue;
+                }
+                processCount++;
+                String msgIdSms = cursor.getString(idInd);
+                String subjectSms = cursor.getString(bodyInd);
+                String timestampSms = cursor.getString(dateInd);
+                String addressSms = cursor.getString(addressInd);
+                String readStatusSms = cursor.getString(readInd);
+
+                MsgListingConsts ml = new MsgListingConsts();
+                ml = bldSmsMsgLstItem(appParams, subjectSms,
+                                timestampSms, addressSms, msgIdSms,
+                                readStatusSms, msgType);
+
+                // New Message?
+                if ((rsp.newMessage == 0)
+                        && (cursor.getInt(readInd) == 0)) {
+                    rsp.newMessage = 1;
+                }
+
+                msgList.add(ml);
+                writeCount++;
+            } while (cursor.moveToNext());
+
+            cursor.close();
+        }
+        rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
+        bmlr.messageListingSize = messageListingSize;
+        bmlr.processCount = processCount;
+        bmlr.writeCount = writeCount;
+        bmlr.rsp = rsp;
+        bmlr.msgList = msgList;
+        return bmlr;
+    }
+    private BluetoothMsgListRsp msgListMms(List<MsgListingConsts> msgList,
+                int messageListingSize, String name, BluetoothMasMessageListingRsp rsp,
+                BluetoothMasAppParams appParams){
+        BluetoothMsgListRsp bmlr = new BluetoothMsgListRsp();
+
+        if (getNumMmsMsgs(name) != 0) {
+            MsgListingConsts mmsl = new MsgListingConsts();
+            List<Integer> list = getMmsMsgMIDs(bldMmsWhereClause(
+                    appParams, getMMSFolderType(name)));
+            for (int msgId : list) {
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "\n MMS Text message ==> "
+                            + getMmsMsgTxt(msgId));
+                }
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "\n MMS message subject ==> "
+                            + getMmsMsgSubject(msgId));
+                }
+
+                String datetime = getMmsMsgDate(msgId);
+                Time time = new Time();
+                Date dt = new Date(Long.valueOf(datetime));
+                time.set((dt.getTime() * 1000));
+
+                String datetimeStr = time.toString().substring(0, 15);
+
+                mmsl = bldMmsMsgLstItem(msgId, appParams, name, datetimeStr);
+                mmsl.msgInfo.setDateTime(datetimeStr);
+
+                if ((rsp.newMessage == 0)
+                        && (getMmsMsgReadStatus(msgId).equalsIgnoreCase("no"))) {
+                    rsp.newMessage = 1;
+                }
+
+                msgList.add(mmsl);
+                messageListingSize++;
+            }
+        }
+        rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
+        bmlr.messageListingSize = messageListingSize;
+        bmlr.rsp = rsp;
+        bmlr.msgList = msgList;
+        return bmlr;
+    }
+    private BluetoothMsgListRsp msgListEmail(List<MsgListingConsts> msgList,
+                int messageListingSize, int processCount, int writeCount, String tempPath, 
+                BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
+        BluetoothMsgListRsp bmlr = new BluetoothMsgListRsp();
+        EmailUtils eu = new EmailUtils();
+        String folderName;
+
+        String splitStringsEmail[] = tempPath.split("/");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "splitStringsEmail[2] = " + splitStringsEmail[2]);
+        }
+        // TODO: Take care of subfolders
+
+        folderName = eu.getFolderName(splitStringsEmail);
+        if(folderName != null && folderName.equalsIgnoreCase("draft")){
+            folderName = "Drafts";
+        }
+
+        String urlEmail = "content://com.android.email.provider/message";
+        Uri uriEmail = Uri.parse(urlEmail);
+        ContentResolver crEmail = context.getContentResolver();
+
+        String whereClauseEmail  = eu.getConditionString(folderName, context, appParams);
+
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "## whereClauseEmail ##:" + whereClauseEmail);
+        }
+        Cursor cursor = crEmail.query(uriEmail, null, whereClauseEmail, null, "timeStamp desc");
+
+        int idInd = cursor.getColumnIndex("_id");
+        int fromIndex = cursor.getColumnIndex("fromList");
+        int toIndex = cursor.getColumnIndex("toList");
+        int dateInd = cursor.getColumnIndex("timeStamp");
+        int readInd = cursor.getColumnIndex("flagRead");
+        int subjectInd = cursor.getColumnIndex("subject");
+        int replyToInd = cursor.getColumnIndex("replyToList");
+
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "move to First" + cursor.moveToFirst());
+        }
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "move to Liststartoffset"
+                    + cursor.moveToPosition(appParams.ListStartOffset));
+        }
+        if (cursor.moveToFirst()) {
+
+            do {
+                /*
+                 * Apply remaining filters
+                 */
+
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " msgListSize " + messageListingSize
+                            + "write count " + writeCount);
+                }
+
+                messageListingSize++;
+
+                String subject = cursor.getString(subjectInd);
+                String timestamp = cursor.getString(dateInd);
+                String senderName = cursor.getString(fromIndex);
+                String senderAddressing = cursor.getString(fromIndex);
+                String recipientName = cursor.getString(toIndex);
+                String recipientAddressing = cursor.getString(toIndex);
+                String msgId = cursor.getString(idInd);
+                String readStatus = cursor.getString(readInd);
+                String replyToStr = cursor.getString(replyToInd);
+
+                /*
+                 * Don't want the listing; just send the listing size after
+                 * applying all the filters.
+                 */
+
+                processCount++;
+                /*
+                 * TODO Skip the first ListStartOffset record(s). Don't write
+                 * more than MaxListCount record(s).
+                 */
+
+                MsgListingConsts emailMsg = new MsgListingConsts();
+                emailMsg = eu.bldEmailMsgLstItem(context, folderName, appParams,
+                        subject, timestamp, senderName, senderAddressing,
+                        recipientName, recipientAddressing,
+                        msgId, readStatus, replyToStr);
+
+                // New Message?
+                if ((rsp.newMessage == 0) && (cursor.getInt(readInd) == 0)) {
+                    rsp.newMessage = 1;
+                }
+                msgList.add(emailMsg);
+                writeCount++;
+            } while (cursor.moveToNext());
+
+            cursor.close();
+        }
+        rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
+        bmlr.messageListingSize = messageListingSize;
+        bmlr.processCount = processCount;
+        bmlr.writeCount = writeCount;
+        bmlr.rsp = rsp;
+        bmlr.msgList = msgList;
+        return bmlr;
+    }
+    private BluetoothMasMessageRsp getMessageSms(String msgHandle, Context context,
+                BluetoothMasMessageRsp rsp, BluetoothMasAppParams bluetoothMasAppParams){
+        Cursor cr = null;
+        Uri uri = Uri.parse("content://sms/");
+        String whereClause = " _id = " + msgHandle;
+        try {
+            cr = context.getContentResolver().query(uri, null, whereClause, null,
+                    null);
+        } catch (Exception e){
+            rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+            return rsp;
+        }
+        String strSms = bldSmsBmsg(msgHandle, context, mu, cr, bluetoothMasAppParams);
+        if(strSms != null){
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, strSms);
+            }
+        }
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "\n\n");
+        }
+        cr.close();
+
+        if (strSms != null && (strSms.length() > 0)) {
+            final String FILENAME = "message";
+            // BufferedOutputStream bos = null;
+            FileOutputStream bos = null;
+            File file = new File(context.getFilesDir() + "/" + FILENAME);
+            file.delete();
+
+            try {
+                bos = context
+                        .openFileOutput(FILENAME, Context.MODE_PRIVATE);
+                bos.write(strSms.getBytes());
+                bos.flush();
+                bos.close();
+            } catch (FileNotFoundException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+            File fileR = new File(context.getFilesDir() + "/" + FILENAME);
+            if (fileR.exists() == true) {
+                rsp.file = fileR;
+                rsp.fractionDeliver = 1;
+            }
+
+        }
+        return rsp;
+    }
+    private BluetoothMasMessageRsp getMessageMms(String msgHandle,
+                BluetoothMasMessageRsp rsp){
+        int mmsMsgID = 0;
+        try {
+            mmsMsgID = getMmsMsgHndToID(Integer.valueOf(msgHandle));
+        } catch (Exception e) {
+            rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+            return rsp;
+        }
+        if (mmsMsgID > 0) {
+            rsp = bldMmsBmsg(mmsMsgID, rsp);
+        }
+        return rsp;
+    }
+    private BluetoothMasMessageRsp getMessageEmail(String msgHandle,
+                BluetoothMasMessageRsp rsp){
+        int emailMsgID = 0;
+        EmailUtils eu = new EmailUtils();
+
+        emailMsgID = (Integer.valueOf(msgHandle) - EMAIL_HDLR_CONSTANT);
+        String str = eu.bldEmailBmsg(emailMsgID, rsp, context, mu);
+
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, str);
+            Log.v(TAG, "\n\n");
+        }
+        if (str != null && (str.length() > 0)) {
+            final String FILENAME = "message";
+            FileOutputStream bos = null;
+            File file = new File(context.getFilesDir() + "/" + FILENAME);
+            file.delete();
+
+            try {
+                bos = context.openFileOutput(FILENAME, Context.MODE_PRIVATE);
+                bos.write(str.getBytes());
+                bos.flush();
+                bos.close();
+            } catch (FileNotFoundException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+            File fileR = new File(context.getFilesDir() + "/" + FILENAME);
+            if (fileR.exists() == true) {
+                rsp.file = fileR;
+                rsp.fractionDeliver = 1;
+            }
+            else {
+                rsp.rsp = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+            }
+
+        }
+        return rsp;
+    }
+    private BluetoothMasPushMsgRsp pushMessageMms(BluetoothMasPushMsgRsp rsp,
+                String tmpPath, String readStr, String name){
+        if (tmpPath.equalsIgnoreCase("telecom/msg/outbox")) {
+            MmsHandle = moveMMStoDrafts(readStr);
+            moveMMSfromDraftstoOutbox();
+
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "\nBroadcasting Intent to MmsSystemEventReceiver\n ");
+            }
+            Intent sendIntent = new Intent("android.intent.action.MMS_PUSH");
+            context.sendBroadcast(sendIntent);
+            rsp.msgHandle = MmsHandle;
+            rsp.response = ResponseCodes.OBEX_HTTP_OK;
+            return rsp;
+        } else {
+            String splitStrings[] = CurrentPath.split("/");
+            mnsClient.addMceInitiatedOperation("+");
+            int tmp = splitStrings.length;
+            String folderName;
+            if (name != null) {
+                if (name.equals("")) {
+                    folderName = splitStrings[tmp - 1];
+                } else {
+                    folderName = name;
+                }
+            } else {
+                folderName = splitStrings[tmp - 1];
+            }
+            MmsHandle = addToMmsFolder(folderName, readStr);
+            rsp.msgHandle = MmsHandle;
+            rsp.response = ResponseCodes.OBEX_HTTP_OK;
+            return rsp;
+        }
+    }
+    private BluetoothMasPushMsgRsp pushMessageSms(BluetoothMasPushMsgRsp rsp,
+                String tmpPath, String name, BluetoothMasAppParams bluetoothMasAppParams){
+        final String SENT = "Sent";
+        final String DELIVERED = "Delivered";
+
+        if(!tmpPath.equalsIgnoreCase("telecom/msg/outbox")) {
+            String splitStrings[] = CurrentPath.split("/");
+            mnsClient.addMceInitiatedOperation("+");
+            int tmp = splitStrings.length;
+            String folderName;
+            if (name != null) {
+                if (name.equals("")){
+                    folderName = splitStrings[tmp - 1];
+                } else {
+                    folderName = name;
+                }
+            } else {
+                folderName = splitStrings[tmp - 1];
+            }
+            SmsHandle = addToSmsFolder(folderName, PhoneAddress, SmsText);
+            rsp.msgHandle = SmsHandle;
+            rsp.response = ResponseCodes.OBEX_HTTP_OK;
+            return rsp;
+        }
+
+        SmsHandle = null;
+        rsp.msgHandle = "";
+
+        if(bluetoothMasAppParams.Transparent == 0) {
+            mnsClient.addMceInitiatedOperation("+");
+            SmsHandle = addToSmsFolder("queued", PhoneAddress, SmsText);
+            rsp.msgHandle = SmsHandle;
+            rsp.response = ResponseCodes.OBEX_HTTP_OK;
+        }
+        else if(bluetoothMasAppParams.Transparent == 1){
+            ArrayList<String> parts = new ArrayList<String>();
+            SmsManager sms = SmsManager.getDefault();
+            parts = sms.divideMessage(SmsText);
+
+            mnsClient.addMceInitiatedOperation("+");
+            sms.sendMultipartTextMessage(PhoneAddress, null, parts, null, null);
+            rsp.msgHandle = "-1";
+            rsp.response = ResponseCodes.OBEX_HTTP_OK;
+            return rsp;
+        }
+
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " Trying to send SMS ");
+        }
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, " Text " + SmsText + " address " + PhoneAddress);
+        }
+
+        try {
+            Intent sendIntentSms = new Intent("com.android.mms.transaction.SEND_MESSAGE");
+            sendIntentSms.putExtra(android.content.Intent.EXTRA_PHONE_NUMBER, PhoneAddress);
+            sendIntentSms.putExtra(android.content.Intent.EXTRA_TEXT, SmsText);
+            context.sendBroadcast(sendIntentSms);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return rsp;
+    }
+
+    private BluetoothMasPushMsgRsp pushMessageEmail(BluetoothMasPushMsgRsp rsp,
+                String readStr, String name){
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " Before fromBmessageemail method:: "+readStr);
+        }
+        BmessageConsts bMsg = mu.fromBmessageEmail(readStr);
+        EmailAddress = bMsg.getRecipientVcard_email();
+        EmailText = bMsg.getBody_msg();
+        EmailSubject = bMsg.getSubject();
+        EmailOriginator = bMsg.getOriginatorVcard_email();
+        EmailOrigName = bMsg.getOriginatorVcard_name();
+
+        String tmpPath = "";
+        tmpPath = (name == null) ? CurrentPath : CurrentPath + "/" + name;
+
+        String splitStrings[] = CurrentPath.split("/");
+        mnsClient.addMceInitiatedOperation("+");
+        int tmp = splitStrings.length;
+        String folderName;
+        if (name != null) {
+            if (name.equals("")) {
+                folderName = splitStrings[tmp - 1];
+            } else {
+                folderName = name;
+            }
+        } else {
+            folderName = splitStrings[tmp - 1];
+        }
+        EmailHandle = addToEmailFolder(folderName, EmailAddress, EmailText, EmailSubject,
+                EmailOriginator, EmailOrigName);
+        rsp.msgHandle = EmailHandle;
+        rsp.response = ResponseCodes.OBEX_HTTP_OK;
+
+        long accountId = getAccountId();
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " Account id before Mail service:: "+accountId);
+        }
+
+        Intent emailIn = new Intent();
+        emailIn.setAction("com.android.email.intent.action.MAIL_SERVICE_WAKEUP");
+        emailIn.putExtra("com.android.email.intent.extra.ACCOUNT", accountId);
+        this.context.startService(emailIn);
+        return rsp;
+    }
+    private int setMsgStatusSms(String name,
+                BluetoothMasAppParams bluetoothMasAppParams){
+        Uri uri = Uri.parse("content://sms/" + name);
+        Cursor cr = context.getContentResolver().query(uri, null, null, null,
+                null);
+        if (cr.moveToFirst()) {
+            if (bluetoothMasAppParams.StatusIndicator == 0) {
+                /* Read Status */
+                ContentValues values = new ContentValues();
+                values.put("read", bluetoothMasAppParams.StatusValue);
+                context.getContentResolver().update(uri, values, null, null);
+            } else {
+                if (bluetoothMasAppParams.StatusValue == 1) {
+                    deleteSMS(name);
+                } else if (bluetoothMasAppParams.StatusValue == 0) {
+                    unDeleteSMS(name);
+                }
+            }
+            return ResponseCodes.OBEX_HTTP_OK;
+        }
+        cr.close();
+        return ResponseCodes.OBEX_HTTP_OK;
+    }
+    private int setMsgStatusMms(String name,
+                BluetoothMasAppParams bluetoothMasAppParams){
+        Cursor cr = null;
+        String whereClause = " _id= " + getMmsMsgHndToID(Integer.valueOf(name));
+        Uri uri = Uri.parse("content://mms/");
+        if(getMmsMsgHndToID(Integer.valueOf(name)) > 0){
+            cr = context.getContentResolver().query(uri, null, null, null, null);
+        }
+        if (cr.getCount() > 0) {
+            cr.moveToFirst();
+            if (bluetoothMasAppParams.StatusIndicator == 0) {
+                /* Read Status */
+                ContentValues values = new ContentValues();
+                values.put("read", bluetoothMasAppParams.StatusValue);
+                int rowUpdate = context.getContentResolver().update(uri,
+                        values, whereClause, null);
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "\nRows updated => " + Integer.toString(rowUpdate));
+                }
+                return ResponseCodes.OBEX_HTTP_OK;
+            } else {
+                if (bluetoothMasAppParams.StatusValue == 1) {
+                    deleteMMS(Integer.toString(getMmsMsgHndToID(Integer.valueOf(name))));
+                } else if (bluetoothMasAppParams.StatusValue == 0) {
+                    unDeleteMMS(Integer.toString(getMmsMsgHndToID(Integer.valueOf(name))));
+                }
+
+                return ResponseCodes.OBEX_HTTP_OK;
+            }
+        }
+        cr.close();
+        return ResponseCodes.OBEX_HTTP_OK;
+    }
+    private int setMsgStatusEmail(String name,
+                BluetoothMasAppParams bluetoothMasAppParams){
+        //Query the mailbox table to get the id values for Inbox and Trash folder
+        Uri uri1 = Uri.parse("content://com.android.email.provider/mailbox");
+
+        Cursor cr1 = context.getContentResolver().query(uri1, null,
+                "(UPPER(displayName) = 'INBOX' OR UPPER(displayName) LIKE '%TRASH%')", null, null);
+        int inboxFolderId = 0;
+        int deletedFolderId = 0;
+        int msgFolderId = 0;
+        String folderName;
+        if (cr1.getCount() > 0) {
+            cr1.moveToFirst();
+            do {
+                folderName = cr1.getString(cr1.getColumnIndex("displayName"));
+                if(folderName.equalsIgnoreCase("INBOX")){
+                    inboxFolderId = cr1.getInt(cr1.getColumnIndex("_id"));
+                }
+                else{
+                    deletedFolderId = cr1.getInt(cr1.getColumnIndex("_id"));
+                }
+            } while ( cr1.moveToNext());
+        }
+        cr1.close();
+
+        //Query the message table for the given message id
+        int emailMsgId = 0;
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "\n name ::=> " + (Integer.valueOf(name)));
+        }
+        emailMsgId = (Integer.valueOf(name) - EMAIL_HDLR_CONSTANT);
+
+        Uri uri2 = Uri.parse("content://com.android.email.provider/message/"+emailMsgId);
+        Cursor crEmail = context.getContentResolver().query(uri2, null, null, null,
+                null);
+        if (crEmail.moveToFirst()) {
+
+            if (bluetoothMasAppParams.StatusIndicator == 0) {
+                /* Read Status */
+                ContentValues values = new ContentValues();
+                values.put("flagRead", bluetoothMasAppParams.StatusValue);
+                context.getContentResolver().update(uri2, values, null, null);
+            }
+            else {
+                if (bluetoothMasAppParams.StatusValue == 1) { //if the email is deleted
+                    msgFolderId = crEmail.getInt(crEmail.getColumnIndex("mailboxKey"));
+                    if(msgFolderId == deletedFolderId){
+                        //TODO need to add notification for deleted email here
+                        mnsClient.addMceInitiatedOperation(name);
+                        context.getContentResolver().delete(
+                                Uri.parse("content://com.android.email.provider/message/"
+                                + emailMsgId), null, null);
+                    }
+                    else{
+                        ContentValues values = new ContentValues();
+                        values.put("mailboxKey", deletedFolderId);
+                        context.getContentResolver().update(uri2, values, null, null);
+                    }
+                }
+                else{ // if the email is undeleted
+                    ContentValues values = new ContentValues();
+                    values.put("mailboxKey", inboxFolderId);
+                    context.getContentResolver().update(uri2, values, null, null);
+                }
+            }
+        }
+        crEmail.close();
+        return ResponseCodes.OBEX_HTTP_OK;
     }
 
 }

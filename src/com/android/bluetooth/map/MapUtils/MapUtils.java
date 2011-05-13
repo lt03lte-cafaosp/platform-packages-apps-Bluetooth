@@ -53,6 +53,7 @@ import android.util.Xml;
 
 public class MapUtils {
 
+    public final String TAG = "MapUtils";
     private final String CRLF = "\r\n";
 
     /**
@@ -978,54 +979,75 @@ public class MapUtils {
     public BmessageConsts fromBmessageEmail(String bmsg) {
 
         BmessageConsts bMsgObj = new BmessageConsts();
-        Log.d("MapUtils", "Inside fromBmessageEmail method::");
         // Extract Telephone number of sender
         String email = null;
         String vCard = null;
         vCard = fetchRecepientVcardEmail(bmsg);
-        Log.d("MapUtils", "vCard Info:: "+vCard);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "vCard Info:: "+vCard);
+        }
         email = fetchRecipientEmail(bmsg);
-        Log.d("MapUtils", "email Info:: "+email);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "email Info:: "+email);
+        }
         bMsgObj.setRecipientVcard_email(email);
 
         String vcardOrig = fetchOriginatorVcardEmail(bmsg);
         String emailOrig = fetchOriginatorEmail(bmsg);
-        Log.d("MapUtils", "Vcard Originator Email:: "+emailOrig);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Vcard Originator Email:: "+emailOrig);
+        }
         bMsgObj.setOriginatorVcard_email(emailOrig);
 
-        Log.d("MapUtils", "Vcard Originatore Name:: "+fetchVcardName(vcardOrig));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Vcard Originatore Name:: "+fetchVcardName(vcardOrig));
+        }
         String nameOrig = fetchVcardName(vcardOrig);
         bMsgObj.setOriginatorVcard_name(nameOrig);
 
-        Log.d("MapUtils", "Vcard version:: "+fetchVcardVersion(vCard));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Vcard version:: "+fetchVcardVersion(vCard));
+        }
         // Extract vCard Version
         bMsgObj.setVcard_version(fetchVcardVersion(vCard));
 
         // Extract vCard Name
 
-        Log.d("MapUtils", "Bmsg version:: "+fetchVersion(bmsg));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Bmsg version:: "+fetchVersion(bmsg));
+        }
         // Extract bMessage Version
         bMsgObj.setBmsg_version(fetchVersion(bmsg));
 
-        Log.d("MapUtils", "Read status:: "+fetchReadStatus(bmsg));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Read status:: "+fetchReadStatus(bmsg));
+        }
         // Extract Message Status
         bMsgObj.setStatus(fetchReadStatus(bmsg));
 
-        Log.d("MapUtils", "Message Type:: "+fetchType(bmsg));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Message Type:: "+fetchType(bmsg));
+        }
         // Extract Message Type
         bMsgObj.setType(fetchType(bmsg));
 
-        Log.d("MapUtils", "Folder:: "+fetchFolder(bmsg));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Folder:: "+fetchFolder(bmsg));
+        }
         // Extract Message Folder
         bMsgObj.setFolder(fetchFolder(bmsg));
 
-        Log.d("MapUtils", "body length:: "+fetchBodyLength(bmsg));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "body length:: "+fetchBodyLength(bmsg));
+        }
         // Fetch Message Length
         bMsgObj.setBody_length(fetchBodyLength(bmsg));
         // Extract Message
         bMsgObj.setBody_msg(fetchBodyEmail(bmsg));
 
-        Log.d("MapUtils", "Message encoding:: "+fetchBodyEncoding(bmsg));
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "Message encoding:: "+fetchBodyEncoding(bmsg));
+        }
         // Extract Message encoding
         bMsgObj.setBody_encoding(fetchBodyEncoding(bmsg));
 
@@ -1049,9 +1071,13 @@ public class MapUtils {
 
         int pos = vCard.indexOf(("EMAIL:"));
         int beginVersionPos = pos + (("EMAIL:").length());
-        Log.d("Map Utils","Begin Version Position Email:: "+beginVersionPos);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG,"Begin Version Position Email:: "+beginVersionPos);
+        }
         int endVersionPos = vCard.indexOf("\n", beginVersionPos);
-        Log.d("Map Utils","End version Pos Email:: "+endVersionPos);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG,"End version Pos Email:: "+endVersionPos);
+        }
         return vCard.substring(beginVersionPos, endVersionPos);
     }
     private String fetchOriginatorEmail(String vCard) {
@@ -1072,9 +1098,13 @@ public class MapUtils {
 
         // Find the position of the first vCard in the string
         int pos = bmsg.indexOf("BEGIN:BENV");
-        Log.d("fetchOriginatorVcard", "vCard start position:: "+pos);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "vCard start position:: "+pos);
+        }
         if (pos > 0) {
-            Log.d("fetchOriginatorVcard", "vCard start position greater than 0::");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            	Log.v(TAG, "vCard start position greater than 0::");
+            }
             int beginVcardPos = pos + ("\r\n".length());
             int endVcardPos = bmsg.indexOf("END:BENV");
 
@@ -1091,9 +1121,13 @@ public class MapUtils {
 
         // Find the position of the first vCard in the string
         int pos = bmsg.indexOf("BEGIN:VCARD");
-        Log.d("fetchOriginatorVcard", "vCard start position:: "+pos);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "vCard start position:: "+pos);
+        }
         if (pos > 0) {
-            Log.d("fetchOriginatorVcard", "vCard start position greater than 0::");
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            	Log.v(TAG, "vCard start position greater than 0::");
+            }
             int beginVcardPos = pos + ("\r\n".length());
             int endVcardPos = bmsg.indexOf("END:VCARD");
 
@@ -1466,7 +1500,9 @@ public class MapUtils {
     }
 
     private String fetchBodyMsgEmail(String body) {
-        Log.d("MapUtils", "bMessageEmail inside fetch body ::"+body);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "bMessageEmail inside fetch body ::"+body);
+        }
         int pos = body.indexOf("Content-Disposition:inline");
         if (pos > 0) {
             int beginVersionPos = pos
@@ -1495,7 +1531,9 @@ public class MapUtils {
     }
 
     public String fetchBodyEmail(String body) {
-        Log.d("MapUtils", "inside fetch body Email ::"+body);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "inside fetch body Email ::"+body);
+        }
         int beginVersionPos = -1;
         int rfc822Flag = 0;
         int mimeFlag = 0;
@@ -1532,33 +1570,32 @@ public class MapUtils {
             int endVersionPos;
             if(rfc822Flag == 0){
                 if(mimeFlag == 0){
-                        endVersionPos = (body.indexOf("END:MSG", beginVersionPos)
-                                        - CRLF.length());
+                    endVersionPos = (body.indexOf("END:MSG", beginVersionPos)
+                            - CRLF.length());
+                }
+                else{
+                    endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos) - CRLF.length());
+                }
+                return body.substring(beginVersionPos, endVersionPos);
+            }
+            else if(rfc822Flag == 1){
+                endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos));
+                body = body.substring(beginVersionPos, endVersionPos);
+                int pos2 = body.indexOf(CRLF) + CRLF.length();
+                while (pos2 > 0) {
+                    if(body.startsWith(CRLF, pos2) == true){
+                        beginVersionPos1 = pos2 + CRLF.length();
+                        break;
                     }
                     else{
-                    endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos) - CRLF
-                                    .length());
-                    }
-                    return body.substring(beginVersionPos, endVersionPos);
-                }
-                else if(rfc822Flag == 1){
-                    endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos));
-                    body = body.substring(beginVersionPos, endVersionPos);
-                    int pos2 = body.indexOf(CRLF) + CRLF.length();
-                    while (pos2 > 0) {
-                        if(body.startsWith(CRLF, pos2) == true){
-                            beginVersionPos1 = pos2 + CRLF.length();
-                            break;
-                        }
-                        else{
-                            pos2 = body.indexOf(CRLF, pos2)+ CRLF.length();
-                        }
-                    }
-                    if(beginVersionPos1 > 0){
-                        int endVersionPos1 = (body.lastIndexOf(CRLF));
-                        return body.substring(beginVersionPos1, endVersionPos1);
+                        pos2 = body.indexOf(CRLF, pos2)+ CRLF.length();
                     }
                 }
+                if(beginVersionPos1 > 0){
+                    int endVersionPos1 = (body.lastIndexOf(CRLF));
+                    return body.substring(beginVersionPos1, endVersionPos1);
+                }
+            }
         }
         return null;
     }

@@ -64,6 +64,7 @@ import android.util.Log;
 
 import com.android.bluetooth.map.MapUtils.MapUtils;
 import com.android.bluetooth.map.MapUtils.EmailUtils;
+import com.android.bluetooth.map.MapUtils.SmsMmsUtils;
 
 import javax.obex.*;
 
@@ -158,8 +159,10 @@ public class BluetoothMns {
 
     public String deletedFolderName = null;
     private EmailFolderContentObserverClass[] arrObj;
+    private SmsMmsFolderContentObserverClass[] arrObjSmsMms;
 
     List<String> folderList;
+    List<String> folderListSmsMms;
     public BluetoothMns(Context context) {
         /* check Bluetooth enable status */
         /*
@@ -186,6 +189,11 @@ public class BluetoothMns {
             mHandlerThread.start();
             mSessionHandler = new EventHandler(mHandlerThread.getLooper());
         }
+        SmsMmsUtils smu = new SmsMmsUtils();
+        folderListSmsMms = new ArrayList<String>();
+        folderListSmsMms = smu.folderListSmsMmsMns(folderListSmsMms);
+        arrObjSmsMms = new SmsMmsFolderContentObserverClass[folderListSmsMms.size()];
+
         EmailUtils eu = new EmailUtils();
         folderList = eu.folderListMns(mContext);
         arrObj = new EmailFolderContentObserverClass[folderList.size()];
@@ -205,15 +213,19 @@ public class BluetoothMns {
 
         @Override
         public void handleMessage(Message msg) {
-            Log.d(TAG, " Handle Message " + msg.what);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " Handle Message " + msg.what);
+            }
             switch (msg.what) {
             case MNS_CONNECT:
                 if (mSession != null) {
-                    Log.d(TAG, "Disconnect previous obex connection");
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, "Disconnect previous obex connection");
+                    }
                     mSession.disconnect();
                     mSession = null;
                 }
-                    start((BluetoothDevice) msg.obj);
+                start((BluetoothDevice) msg.obj);
                 break;
             case MNS_DISCONNECT:
                 deregisterUpdates();
@@ -221,7 +233,7 @@ public class BluetoothMns {
                 break;
             case SDP_RESULT:
                 if (V) Log.v(TAG, "SDP request returned " + msg.arg1
-                    + " (" + (System.currentTimeMillis() - mTimestamp + " ms)"));
+                            + " (" + (System.currentTimeMillis() - mTimestamp + " ms)"));
                 if (!((BluetoothDevice) msg.obj).equals(mDestination)) {
                     return;
                 }
@@ -232,7 +244,7 @@ public class BluetoothMns {
                 }
                 if (msg.arg1 > 0) {
                     mConnectThread = new SocketConnectThread(mDestination,
-                        msg.arg1);
+                            msg.arg1);
                     mConnectThread.start();
                 } else {
                     /* SDP query fail case */
@@ -341,23 +353,23 @@ public class BluetoothMns {
         Time currentTime = new Time();
         currentTime.setToNow();
 
-        for ( BluetoothMnsMsgHndlMceInitOp op: opList) {
+        for (BluetoothMnsMsgHndlMceInitOp op: opList) {
             // Remove stale entries
-            if ( currentTime.toMillis(false) - op.time.toMillis(false) > 10000 ) {
+            if (currentTime.toMillis(false) - op.time.toMillis(false) > 10000) {
                 opList.remove(op);
             }
         }
 
-        for ( BluetoothMnsMsgHndlMceInitOp op: opList) {
-            if ( op.msgHandle.equalsIgnoreCase(msgHandle)){
+        for (BluetoothMnsMsgHndlMceInitOp op: opList) {
+            if (op.msgHandle.equalsIgnoreCase(msgHandle)){
                 location = opList.indexOf(op);
                 break;
             }
         }
 
         if (location == -1) {
-            for ( BluetoothMnsMsgHndlMceInitOp op: opList) {
-                if ( op.msgHandle.equalsIgnoreCase("+")) {
+            for (BluetoothMnsMsgHndlMceInitOp op: opList) {
+                if (op.msgHandle.equalsIgnoreCase("+")) {
                     location = opList.indexOf(op);
                     break;
                 }
@@ -378,7 +390,7 @@ public class BluetoothMns {
          * by MCE. MEMORY_FULL and MEMORY_AVAILABLE cannot be
          * MCE initiated
          */
-        if ( msg.equals(MEMORY_AVAILABLE) || msg.equals(MEMORY_FULL)) {
+        if (msg.equals(MEMORY_AVAILABLE) || msg.equals(MEMORY_FULL)) {
             location = -1;
         } else {
             location = findLocationMceInitiatedOperation(handle);
@@ -400,8 +412,10 @@ public class BluetoothMns {
     private void sendEvent(String str) {
         if (str != null && (str.length() > 0)) {
 
-            Log.d(TAG, "--------------");
-            Log.d(TAG, " CONTENT OF EVENT REPORT FILE: " + str);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "--------------");
+                Log.v(TAG, " CONTENT OF EVENT REPORT FILE: " + str);
+            }
 
             final String FILENAME = "EventReport";
             FileOutputStream fos = null;
@@ -422,10 +436,14 @@ public class BluetoothMns {
 
             File fileR = new File(mContext.getFilesDir() + "/" + FILENAME);
             if (fileR.exists() == true) {
-                Log.d(TAG, " Sending event report file ");
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " Sending event report file ");
+                }
                 mSession.sendEvent(fileR, (byte) 0);
             } else {
-                Log.d(TAG, " ERROR IN CREATING SEND EVENT OBJ FILE");
+                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    Log.v(TAG, " ERROR IN CREATING SEND EVENT OBJ FILE");
+                }
             }
         }
     }
@@ -442,45 +460,9 @@ public class BluetoothMns {
 
         Uri smsUri = Uri.parse("content://sms/");
         crSmsA = mContext.getContentResolver().query(smsUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
+                new String[] { "_id", "body", "type"}, null, null, "_id asc");
         crSmsB = mContext.getContentResolver().query(smsUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-
-        Uri smsInboxUri = Uri.parse("content://sms/inbox/");
-        crSmsInboxA = mContext.getContentResolver().query(smsInboxUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-        crSmsInboxB = mContext.getContentResolver().query(smsInboxUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-
-        Uri smsSentUri = Uri.parse("content://sms/sent/");
-        crSmsSentA = mContext.getContentResolver().query(smsSentUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-        crSmsSentB = mContext.getContentResolver().query(smsSentUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-
-        Uri smsDraftUri = Uri.parse("content://sms/draft/");
-        crSmsDraftA = mContext.getContentResolver().query(smsDraftUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-        crSmsDraftB = mContext.getContentResolver().query(smsDraftUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-
-        Uri smsOutboxUri = Uri.parse("content://sms/outbox/");
-        crSmsOutboxA = mContext.getContentResolver().query(smsOutboxUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-        crSmsOutboxB = mContext.getContentResolver().query(smsOutboxUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-
-        Uri smsFailedUri = Uri.parse("content://sms/failed/");
-        crSmsFailedA = mContext.getContentResolver().query(smsFailedUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-        crSmsFailedB = mContext.getContentResolver().query(smsFailedUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-
-        Uri smsQueuedUri = Uri.parse("content://sms/queued/");
-        crSmsQueuedA = mContext.getContentResolver().query(smsQueuedUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
-        crSmsQueuedB = mContext.getContentResolver().query(smsQueuedUri,
-                new String[] { "_id", "body", "type" }, null, null, "_id asc");
+                new String[] { "_id", "body", "type"}, null, null, "_id asc");
 
         Uri smsObserverUri = Uri.parse("content://mms-sms/");
         mContext.getContentResolver().registerContentObserver(smsObserverUri,
@@ -494,44 +476,46 @@ public class BluetoothMns {
                 .query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
                         null, "_id asc");
 
-        Uri mmsOutboxUri = Uri.parse("content://mms/outbox/");
-        crMmsOutboxA = mContext.getContentResolver()
-                .query(mmsOutboxUri, new String[] { "_id", "read", "m_type" },
+        if (folderListSmsMms != null && folderListSmsMms.size() > 0){
+            for (int i=0; i < folderListSmsMms.size(); i++){
+                folderNameSmsMms = folderListSmsMms.get(i);
+                Uri smsFolderUri =  Uri.parse("content://sms/"+folderNameSmsMms.trim()+"/");
+                crSmsFolderA = mContext.getContentResolver().query(smsFolderUri,
+                        new String[] { "_id", "body", "type"}, null, null, "_id asc");
+                crSmsFolderB = mContext.getContentResolver().query(smsFolderUri,
+                        new String[] { "_id", "body", "type"}, null, null, "_id asc");
+                Uri mmsFolderUri;
+                if (folderNameSmsMms != null
+                        && folderNameSmsMms.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
+                    mmsFolderUri = Uri.parse("content://mms/"+BluetoothMasAppIf.Drafts+"/");
+                } else{
+                    mmsFolderUri = Uri.parse("content://mms/"+folderNameSmsMms.trim()+"/");
+                }
+                crMmsFolderA = mContext.getContentResolver()
+                .query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
                         null, null, "_id asc");
-        crMmsOutboxB = mContext.getContentResolver()
-                .query(mmsOutboxUri, new String[] { "_id", "read", "m_type" },
-                        null, null, "_id asc");
-        Uri mmsDraftUri = Uri.parse("content://mms/drafts/");
-        crMmsDraftA = mContext.getContentResolver()
-                .query(mmsDraftUri, new String[] { "_id", "read", "m_type" },
-                        null, null, "_id asc");
-        crMmsDraftB = mContext.getContentResolver()
-                .query(mmsDraftUri, new String[] { "_id", "read", "m_type" },
-                        null, null, "_id asc");
-        Uri mmsInboxUri = Uri.parse("content://mms/inbox/");
-        crMmsInboxA = mContext.getContentResolver()
-                .query(mmsInboxUri, new String[] { "_id", "read", "m_type", "m_id" },
-                        null, null, "_id asc");
-        crMmsInboxB = mContext.getContentResolver()
-                .query(mmsInboxUri, new String[] { "_id", "read", "m_type", "m_id" },
-                        null, null, "_id asc");
-
-        Uri mmsSentUri = Uri.parse("content://mms/sent/");
-        crMmsSentA = mContext.getContentResolver()
-                .query(mmsSentUri, new String[] { "_id", "read", "m_type" },
-                        null, null, "_id asc");
-        crMmsSentB = mContext.getContentResolver()
-                .query(mmsSentUri, new String[] { "_id", "read", "m_type" },
+                crMmsFolderB = mContext.getContentResolver()
+                .query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
                         null, null, "_id asc");
 
-        //email start
+                arrObjSmsMms[i] = new SmsMmsFolderContentObserverClass(folderNameSmsMms,
+                        crSmsFolderA, crSmsFolderB, crMmsFolderA, crMmsFolderB,
+                        CR_SMS_FOLDER_A, CR_MMS_FOLDER_A);
+
+                Uri smsFolderObserverUri = Uri.parse("content://mms-sms/"+folderNameSmsMms.trim());
+                mContext.getContentResolver().registerContentObserver(
+                        smsFolderObserverUri, true, arrObjSmsMms[i]);
+            }
+        }
+
         Uri emailUri = Uri.parse("content://com.android.email.provider/message");
         crEmailA = mContext.getContentResolver().query(emailUri,
-                new String[] { "_id", "mailboxkey" }, null, null, "_id asc");
+                new String[] { "_id", "mailboxkey"}, null, null, "_id asc");
         crEmailB = mContext.getContentResolver().query(emailUri,
-                new String[] { "_id", "mailboxkey" }, null, null, "_id asc");
+                new String[] { "_id", "mailboxkey"}, null, null, "_id asc");
 
         EmailUtils eu = new EmailUtils();
+
         Uri emailObserverUri = Uri.parse("content://com.android.email.provider/message");
         mContext.getContentResolver().registerContentObserver(emailObserverUri,
                 true, emailContentObserver);
@@ -540,41 +524,17 @@ public class BluetoothMns {
             for(int i=0; i < folderList.size(); i++){
                 folderName = folderList.get(i);
                 String emailFolderCondition = eu.getWhereIsQueryForTypeEmail(folderName, mContext);
-                Cursor crEmailFolderA = mContext.getContentResolver().query(emailUri,
-                        new String[] {  "_id", "mailboxkey"  }, emailFolderCondition, null, "_id asc");
-                Cursor crEmailFolderB = mContext.getContentResolver().query(emailUri,
-                        new String[] {"_id", "mailboxkey" }, emailFolderCondition, null, "_id asc");
+                crEmailFolderA = mContext.getContentResolver().query(emailUri,
+                        new String[] {  "_id", "mailboxkey"}, emailFolderCondition, null, "_id asc");
+                crEmailFolderB = mContext.getContentResolver().query(emailUri,
+                        new String[] {"_id", "mailboxkey"}, emailFolderCondition, null, "_id asc");
                 arrObj[i] = new EmailFolderContentObserverClass(folderName,
-                            crEmailFolderA, crEmailFolderB, CR_EMAIL_FOLDER_A);
+                        crEmailFolderA, crEmailFolderB, CR_EMAIL_FOLDER_A);
                 Uri emailFolderObserverUri = Uri.parse("content://com.android.email.provider/message");
                 mContext.getContentResolver().registerContentObserver(
                         emailFolderObserverUri, true, arrObj[i]);
             }
         }
-        Uri smsInboxObserverUri = Uri.parse("content://mms-sms/inbox");
-        mContext.getContentResolver().registerContentObserver(
-                smsInboxObserverUri, true, inboxContentObserver);
-
-        Uri smsSentObserverUri = Uri.parse("content://mms-sms/sent");
-        mContext.getContentResolver().registerContentObserver(
-                smsSentObserverUri, true, sentContentObserver);
-
-        Uri smsDraftObserverUri = Uri.parse("content://mms-sms/draft");
-        mContext.getContentResolver().registerContentObserver(
-                smsDraftObserverUri, true, draftContentObserver);
-
-        Uri smsOutboxObserverUri = Uri.parse("content://mms-sms/outbox");
-        mContext.getContentResolver().registerContentObserver(
-                smsOutboxObserverUri, true, outboxContentObserver);
-
-        Uri smsFailedObserverUri = Uri.parse("content://mms-sms/failed");
-        mContext.getContentResolver().registerContentObserver(
-                smsFailedObserverUri, true, failedContentObserver);
-
-        Uri smsQueuedObserverUri = Uri.parse("content://mms-sms/queued");
-        mContext.getContentResolver().registerContentObserver(
-                smsQueuedObserverUri, true, queuedContentObserver);
-
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_DEVICE_STORAGE_LOW);
@@ -592,170 +552,92 @@ public class BluetoothMns {
      */
     private void deregisterUpdates() {
 
-        if ( updatesRegistered == true ){
-                updatesRegistered = false;
+        if (updatesRegistered == true){
+            updatesRegistered = false;
             Log.d(TAG, "DEREGISTER MNS SMS UPDATES");
+
             mContext.getContentResolver().unregisterContentObserver(
                     smsContentObserver);
-            mContext.getContentResolver().unregisterContentObserver(
-                    inboxContentObserver);
-            mContext.getContentResolver().unregisterContentObserver(
-                    sentContentObserver);
-            mContext.getContentResolver().unregisterContentObserver(
-                    draftContentObserver);
-            mContext.getContentResolver().unregisterContentObserver(
-                    outboxContentObserver);
-            mContext.getContentResolver().unregisterContentObserver(
-                    failedContentObserver);
-            mContext.getContentResolver().unregisterContentObserver(
-                    queuedContentObserver);
 
-            //email start
             mContext.getContentResolver().unregisterContentObserver(
                     emailContentObserver);
-            //email end
 
             mContext.unregisterReceiver(mStorageStatusReceiver);
 
             crSmsA.close();
             crSmsB.close();
             currentCRSms = CR_SMS_A;
-            crSmsInboxA.close();
-            crSmsInboxB.close();
-            currentCRSmsInbox = CR_SMS_INBOX_A;
-            crSmsSentA.close();
-            crSmsSentB.close();
-            currentCRSmsSent = CR_SMS_SENT_A;
-            crSmsDraftA.close();
-            crSmsDraftB.close();
-            currentCRSmsDraft = CR_SMS_DRAFT_A;
-            crSmsOutboxA.close();
-            crSmsOutboxB.close();
-            currentCRSmsOutbox = CR_SMS_OUTBOX_A;
-            crSmsFailedA.close();
-            crSmsFailedB.close();
-            currentCRSmsFailed = CR_SMS_FAILED_A;
-            crSmsQueuedA.close();
-            crSmsQueuedB.close();
-            currentCRSmsQueued = CR_SMS_QUEUED_A;
 
             crMmsA.close();
             crMmsB.close();
             currentCRMms = CR_MMS_A;
-            crMmsOutboxA.close();
-            crMmsOutboxB.close();
-            currentCRMmsOutbox = CR_MMS_OUTBOX_A;
-            crMmsDraftA.close();
-            crMmsDraftB.close();
-            currentCRMmsDraft = CR_MMS_DRAFT_A;
-            crMmsInboxA.close();
-            crMmsInboxB.close();
-            currentCRMmsInbox = CR_MMS_INBOX_A;
-            crMmsSentA.close();
-            crMmsSentB.close();
-            currentCRMmsSent = CR_MMS_SENT_A;
 
-            //email start
             crEmailA.close();
             crEmailB.close();
             currentCREmail = CR_EMAIL_A;
-            if(arrObj != null && arrObj.length > 0){
-                for(int i=0; i < arrObj.length; i++){
-                        arrObj[i].crEmailFolderA.close();
-                        arrObj[i].crEmailFolderB.close();
-                        arrObj[i].currentCREmailFolder = CR_EMAIL_FOLDER_A;
+
+            if (arrObj != null && arrObj.length > 0){
+                for (int i=0; i < arrObj.length; i++){
+                    arrObj[i].crEmailFolderA.close();
+                    arrObj[i].crEmailFolderB.close();
+                    arrObj[i].currentCREmailFolder = CR_EMAIL_FOLDER_A;
                 }
             }
-            //email end
+
+            if (arrObjSmsMms != null && arrObj.length > 0){
+                for (int i=0; i < arrObj.length; i++){
+                    arrObjSmsMms[i].crSmsFolderA.close();
+                    arrObjSmsMms[i].crSmsFolderB.close();
+                    arrObjSmsMms[i].currentCRSmsFolder = CR_SMS_FOLDER_A;
+                    arrObjSmsMms[i].crMmsFolderA.close();
+                    arrObjSmsMms[i].crMmsFolderB.close();
+                    arrObjSmsMms[i].currentCRMmsFolder = CR_MMS_FOLDER_A;
+                }
+            }
 
         }
 
     }
 
     private SmsContentObserverClass smsContentObserver = new SmsContentObserverClass();
-    private InboxContentObserverClass inboxContentObserver = new InboxContentObserverClass();
-    private SentContentObserverClass sentContentObserver = new SentContentObserverClass();
-    private DraftContentObserverClass draftContentObserver = new DraftContentObserverClass();
-    private OutboxContentObserverClass outboxContentObserver = new OutboxContentObserverClass();
-    private FailedContentObserverClass failedContentObserver = new FailedContentObserverClass();
-    private QueuedContentObserverClass queuedContentObserver = new QueuedContentObserverClass();
-
     private EmailContentObserverClass emailContentObserver = new EmailContentObserverClass();
+
     private Cursor crSmsA = null;
     private Cursor crSmsB = null;
-    private Cursor crSmsInboxA = null;
-    private Cursor crSmsInboxB = null;
-    private Cursor crSmsSentA = null;
-    private Cursor crSmsSentB = null;
-    private Cursor crSmsDraftA = null;
-    private Cursor crSmsDraftB = null;
-    private Cursor crSmsOutboxA = null;
-    private Cursor crSmsOutboxB = null;
-    private Cursor crSmsFailedA = null;
-    private Cursor crSmsFailedB = null;
-    private Cursor crSmsQueuedA = null;
-    private Cursor crSmsQueuedB = null;
+    private Cursor crSmsFolderA = null;
+    private Cursor crSmsFolderB = null;
 
     private Cursor crMmsA = null;
     private Cursor crMmsB = null;
-    private Cursor crMmsOutboxA = null;
-    private Cursor crMmsOutboxB = null;
-    private Cursor crMmsDraftA = null;
-    private Cursor crMmsDraftB = null;
-    private Cursor crMmsInboxA = null;
-    private Cursor crMmsInboxB = null;
-    private Cursor crMmsSentA = null;
-    private Cursor crMmsSentB = null;
-
+    private Cursor crMmsFolderA = null;
+    private Cursor crMmsFolderB = null;
 
     private Cursor crEmailA = null;
     private Cursor crEmailB = null;
+    private Cursor crEmailFolderA = null;
+    private Cursor crEmailFolderB = null;
 
     private final int CR_SMS_A = 1;
     private final int CR_SMS_B = 2;
     private int currentCRSms = CR_SMS_A;
-    private final int CR_SMS_INBOX_A = 1;
-    private final int CR_SMS_INBOX_B = 2;
-    private int currentCRSmsInbox = CR_SMS_INBOX_A;
-    private final int CR_SMS_SENT_A = 1;
-    private final int CR_SMS_SENT_B = 2;
-    private int currentCRSmsSent = CR_SMS_SENT_A;
-    private final int CR_SMS_DRAFT_A = 1;
-    private final int CR_SMS_DRAFT_B = 2;
-    private int currentCRSmsDraft = CR_SMS_DRAFT_A;
-    private final int CR_SMS_OUTBOX_A = 1;
-    private final int CR_SMS_OUTBOX_B = 2;
-    private int currentCRSmsOutbox = CR_SMS_OUTBOX_A;
-    private final int CR_SMS_FAILED_A = 1;
-    private final int CR_SMS_FAILED_B = 2;
-    private int currentCRSmsFailed = CR_SMS_FAILED_A;
-    private final int CR_SMS_QUEUED_A = 1;
-    private final int CR_SMS_QUEUED_B = 2;
-    private int currentCRSmsQueued = CR_SMS_QUEUED_A;
+    private final int CR_SMS_FOLDER_A = 1;
+    private final int CR_SMS_FOLDER_B = 2;
 
     private final int CR_MMS_A = 1;
     private final int CR_MMS_B = 2;
     private int currentCRMms = CR_MMS_A;
-    private final int CR_MMS_OUTBOX_A = 1;
-    private final int CR_MMS_OUTBOX_B = 2;
-    private int currentCRMmsOutbox = CR_MMS_OUTBOX_A;
-    private final int CR_MMS_DRAFT_A = 1;
-    private final int CR_MMS_DRAFT_B = 2;
-    private int currentCRMmsDraft = CR_MMS_DRAFT_A;
-    private final int CR_MMS_INBOX_A = 1;
-    private final int CR_MMS_INBOX_B = 2;
-    private int currentCRMmsInbox = CR_MMS_INBOX_A;
-    private final int CR_MMS_SENT_A = 1;
-    private final int CR_MMS_SENT_B = 2;
-    private int currentCRMmsSent = CR_MMS_SENT_A;
+    private final int CR_MMS_FOLDER_A = 1;
+    private final int CR_MMS_FOLDER_B = 2;
 
     private final int CR_EMAIL_A = 1;
     private final int CR_EMAIL_B = 2;
     private int currentCREmail = CR_EMAIL_A;
+
     private final int CR_EMAIL_FOLDER_A = 1;
     private final int CR_EMAIL_FOLDER_B = 2;
     private int currentCREmailFolder = CR_EMAIL_FOLDER_A;
     public String folderName = "";
+    public String folderNameSmsMms = "";
 
 
     /**
@@ -822,7 +704,7 @@ public class BluetoothMns {
     private int getMessageType(String id) {
         Cursor cr = mContext.getContentResolver().query(
                 Uri.parse("content://sms/" + id),
-                new String[] { "_id", "type" }, null, null, null);
+                new String[] { "_id", "type"}, null, null, null);
         if (cr.moveToFirst()) {
             return cr.getInt(cr.getColumnIndex("type"));
         }
@@ -837,7 +719,7 @@ public class BluetoothMns {
         int deletedFlag =0;
         Cursor cr = mContext.getContentResolver().query(
                 Uri.parse("content://com.android.email.provider/message/" + id),
-                new String[] { "_id", "mailboxKey" }, null, null, null);
+                new String[] { "_id", "mailboxKey"}, null, null, null);
         int folderId = -1;
         if (cr.moveToFirst()) {
             folderId = cr.getInt(cr.getColumnIndex("mailboxKey"));
@@ -845,12 +727,12 @@ public class BluetoothMns {
 
         Cursor cr1 = mContext.getContentResolver().query(
                 Uri.parse("content://com.android.email.provider/mailbox"),
-                new String[] { "_id", "displayName" }, "_id ="+ folderId, null, null);
+                new String[] { "_id", "displayName"}, "_id ="+ folderId, null, null);
         String folderName = null;
         if (cr1.moveToFirst()) {
             folderName = cr1.getString(cr1.getColumnIndex("displayName"));
         }
-        if(folderName !=null && (folderName.equalsIgnoreCase("Trash") ||
+        if (folderName !=null && (folderName.equalsIgnoreCase("Trash") ||
                 folderName.toUpperCase().contains("TRASH"))){
             deletedFlag = 1;
         }
@@ -867,7 +749,7 @@ public class BluetoothMns {
         String newFolder = null;
         Cursor cr = mContext.getContentResolver().query(
                 Uri.parse("content://sms/"),
-                new String[] { "_id", "date", "type" }, " _id = " + id, null,
+                new String[] { "_id", "date", "type"}, " _id = " + id, null,
                 null);
         if (cr.moveToFirst()) {
             return getFolder(cr.getInt(cr.getColumnIndex("type")));
@@ -890,8 +772,8 @@ public class BluetoothMns {
         }
     };
     /**
-     * This class listens for changes in Email Content Provider's inbox table
-     * It acts, only when a entry gets removed from the table
+     * This class listens for changes in Email Content Provider tables
+     * It acts, only when an entry gets removed from the table
      */
     private class EmailFolderContentObserverClass extends ContentObserver {
         private String folder;
@@ -900,7 +782,7 @@ public class BluetoothMns {
         private int currentCREmailFolder;
 
         public EmailFolderContentObserverClass(String folderName, Cursor crEmailFolderA,
-                        Cursor crEmailFolderB, int currentCREmailFolder) {
+                Cursor crEmailFolderB, int currentCREmailFolder) {
             super(null);
             this.folder = folderName;
             this.crEmailFolderA = crEmailFolderA;
@@ -914,8 +796,10 @@ public class BluetoothMns {
 
             int currentItemCount = 0;
             int newItemCount = 0;
-            Log.d(TAG,"Folder name in Observer class ::"+folderName);
-            Log.d(TAG,"Flag value name in Obsrever class ::"+currentCREmailFolder);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG,"Folder name in Observer class ::"+folderName);
+                Log.v(TAG,"Flag value name in Observer class ::"+currentCREmailFolder);
+            }
 
             if (currentCREmailFolder == CR_EMAIL_FOLDER_A) {
                 currentItemCount = crEmailFolderA.getCount();
@@ -927,15 +811,17 @@ public class BluetoothMns {
                 newItemCount = crEmailFolderA.getCount();
             }
 
-            Log.d(TAG, "EMAIL Deleted folder current " + currentItemCount + " new "
-                    + newItemCount);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "EMAIL Deleted folder current " + currentItemCount + " new "
+                        + newItemCount);
+            }
             if (currentItemCount > newItemCount) {
                 crEmailFolderA.moveToFirst();
                 crEmailFolderB.moveToFirst();
 
                 CursorJoiner joiner = new CursorJoiner(crEmailFolderA,
-                        new String[] { "_id" }, crEmailFolderB,
-                        new String[] { "_id" });
+                        new String[] { "_id"}, crEmailFolderB,
+                        new String[] { "_id"});
 
                 CursorJoiner.Result joinerResult;
                 while (joiner.hasNext()) {
@@ -946,27 +832,34 @@ public class BluetoothMns {
                         if (currentCREmailFolder == CR_EMAIL_FOLDER_A) {
                             // The new query doesn't have this row; implies it
                             // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM FOLDER ");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " EMAIL DELETED FROM FOLDER ");
+                            }
                             String id = crEmailFolderA.getString(crEmailFolderA
                                     .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-                            int deletedFlag = getDeletedFlagEmail(id); //TODO
-                            if(deletedFlag == 1){
-                                    id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                    sendMnsEvent(MESSAGE_DELETED, id,
-                                            "TELECOM/MSG/"+folder, null, "EMAIL");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " DELETED EMAIL ID " + id);
                             }
-                            else {
-                                Log.d(TAG, "Shouldn't reach here as you cannot "
-                                        + "move msg from Inbox to any other folder");
-                                if(folder != null && folder.equalsIgnoreCase("outbox")){
+                            int deletedFlag = getDeletedFlagEmail(id);
+                            if (deletedFlag == 1){
+                                id = Integer.toString(Integer.valueOf(id)
+                                        + EMAIL_HDLR_CONSTANT);
+                                sendMnsEvent(MESSAGE_DELETED, id,
+                                        BluetoothMasAppIf.Telecom+"/"+
+                                        BluetoothMasAppIf.Msg+"/"+
+                                        folder, null, "EMAIL");
+                            } else {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, "Shouldn't reach here as you cannot "
+                                            + "move msg from Inbox to any other folder");
+                                }
+                                if (folder != null && folder.equalsIgnoreCase("outbox")){
                                     Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
                                     EmailUtils eu = new EmailUtils();
                                     Uri uri1 = Uri.parse("content://com.android.email.provider/message");
-                                    if(Integer.valueOf(id) > 200000){
+                                    if (Integer.valueOf(id) > 200000){
                                         id = Integer.toString(Integer.valueOf(id)
                                                 - EMAIL_HDLR_CONSTANT);
                                     }
@@ -985,20 +878,22 @@ public class BluetoothMns {
                                             + EMAIL_HDLR_CONSTANT);
                                     if ((newFolder != null)
                                             && (!newFolder
-                                                    .equalsIgnoreCase("outbox"))) {
+                                            .equalsIgnoreCase("outbox"))) {
                                         // The message has moved on MAP virtual
                                         // folder representation.
                                         sendMnsEvent(MESSAGE_SHIFT, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                "TELECOM/MSG/OUTBOX", "EMAIL");
-                                        if ( newFolder.equalsIgnoreCase("sent")) {
+                                                BluetoothMasAppIf.Telecom+"/"+
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/"+ BluetoothMasAppIf.Outbox, "EMAIL");
+                                        if (newFolder.equalsIgnoreCase("sent")) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
-                                                    "TELECOM/MSG/" + newFolder,
+                                                    BluetoothMasAppIf.Telecom + "/"+
+                                                    BluetoothMasAppIf.Msg + "/" + newFolder,
                                                     null, "EMAIL");
                                         }
                                     }
-                                }
-                                else if(folder !=null){
+                                } else if (folder !=null){
                                     Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
@@ -1017,11 +912,15 @@ public class BluetoothMns {
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
-                                    sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                            + newFolder, "TELECOM/MSG/"+folder,
+                                    sendMnsEvent(MESSAGE_SHIFT, id, 
+                                            BluetoothMasAppIf.Telecom + "/"+
+                                            BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom +
+                                            "/"+BluetoothMasAppIf.Msg + "/"
+                                            +folder,
                                             "EMAIL");
-                                 }
-                              }
+                                }
+                            }
                         } else {
                             // TODO - The current(old) query doesn't have this row;
                             // implies it was added
@@ -1032,27 +931,33 @@ public class BluetoothMns {
                         if (currentCREmailFolder == CR_EMAIL_FOLDER_B) {
                             // The new query doesn't have this row; implies it
                             // was deleted
-                            Log.d(TAG, " EMAIL DELETED FROM FOLDER ");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " EMAIL DELETED FROM FOLDER ");
+                            }
                             String id = crEmailFolderB.getString(crEmailFolderB
                                     .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED EMAIL ID " + id);
-                            int deletedFlag = getDeletedFlagEmail(id); //TODO
-                            if(deletedFlag == 1){
-                                    id = Integer.toString(Integer.valueOf(id)
-                                            + EMAIL_HDLR_CONSTANT);
-                                    sendMnsEvent(MESSAGE_DELETED, id,
-                                                "TELECOM/MSG/"+folder, null, "EMAIL");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " DELETED EMAIL ID " + id);
                             }
-                            else {
-                                Log.d(TAG, "Shouldn't reach here as you cannot "
-                                        + "move msg from Inbox to any other folder");
-                                if(folder != null && folder.equalsIgnoreCase("outbox")){
+                            int deletedFlag = getDeletedFlagEmail(id); //TODO
+                            if (deletedFlag == 1){
+                                id = Integer.toString(Integer.valueOf(id)
+                                        + EMAIL_HDLR_CONSTANT);
+                                sendMnsEvent(MESSAGE_DELETED, id,
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/" +folder, null, "EMAIL");
+                            } else {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, "Shouldn't reach here as you cannot "
+                                            + "move msg from Inbox to any other folder");
+                                }
+                                if (folder != null && folder.equalsIgnoreCase("outbox")){
                                     Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
                                     EmailUtils eu = new EmailUtils();
                                     Uri uri1 = Uri.parse("content://com.android.email.provider/message");
-                                    if(Integer.valueOf(id) > 200000){
+                                    if (Integer.valueOf(id) > 200000){
                                         id = Integer.toString(Integer.valueOf(id)
                                                 - EMAIL_HDLR_CONSTANT);
                                     }
@@ -1071,20 +976,23 @@ public class BluetoothMns {
                                             + EMAIL_HDLR_CONSTANT);
                                     if ((newFolder != null)
                                             && (!newFolder
-                                                    .equalsIgnoreCase("outbox"))) {
+                                            .equalsIgnoreCase("outbox"))) {
                                         // The message has moved on MAP virtual
                                         // folder representation.
                                         sendMnsEvent(MESSAGE_SHIFT, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                "TELECOM/MSG/OUTBOX", "EMAIL");
-                                        if ( newFolder.equalsIgnoreCase("sent")) {
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/"+
+                                                BluetoothMasAppIf.Outbox, "EMAIL");
+                                        if (newFolder.equalsIgnoreCase("sent")) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
-                                                    "TELECOM/MSG/" + newFolder,
+                                                    BluetoothMasAppIf.Telecom + "/"+
+                                                    BluetoothMasAppIf.Msg + "/" + newFolder,
                                                     null, "EMAIL");
                                         }
                                     }
-                                }
-                                else if(folder !=null){
+                                } else if (folder !=null){
                                     Cursor cr1 = null;
                                     int folderId;
                                     String containingFolder = null;
@@ -1103,13 +1011,15 @@ public class BluetoothMns {
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
-                                    sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                            + newFolder, "TELECOM/MSG/"+folder,
+                                    sendMnsEvent(MESSAGE_SHIFT, id, 
+                                            BluetoothMasAppIf.Telecom + "/"+
+                                            BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom + "/"+
+                                            BluetoothMasAppIf.Msg + "/"+ folder,
                                             "EMAIL");
                                 }
-                           }
-                        }
-                        else {
+                            }
+                        } else {
                             // The current(old) query doesn't have this row;
                             // implies it was added
                         }
@@ -1128,6 +1038,329 @@ public class BluetoothMns {
             }
         }
     }
+
+    /**
+     * This class listens for changes in Sms MMs Content Provider's folders
+     * It acts, only when an entry gets removed from the table
+     */
+    private class SmsMmsFolderContentObserverClass extends ContentObserver {
+        private String folder;
+        private Cursor crSmsFolderA;
+        private Cursor crSmsFolderB;
+        private int currentCRSmsFolder;
+        private Cursor crMmsFolderA;
+        private Cursor crMmsFolderB;
+        private int currentCRMmsFolder;
+
+        public SmsMmsFolderContentObserverClass(String folderNameSmsMms,
+                Cursor crSmsFolderA, Cursor crSmsFolderB, Cursor crMmsFolderA,
+                Cursor crMmsFolderB, int currentCRSmsFolder, int currentCRMmsFolder) {
+            super(null);
+            this.folder = folderNameSmsMms;
+            this.crSmsFolderA = crSmsFolderA;
+            this.crSmsFolderB = crSmsFolderB;
+            this.currentCRSmsFolder = currentCRSmsFolder;
+            this.crMmsFolderA = crMmsFolderA;
+            this.crMmsFolderB = crMmsFolderB;
+            this.currentCRMmsFolder = currentCRMmsFolder;
+        }
+
+        @Override
+                public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+
+            int currentItemCount = 0;
+            int newItemCount = 0;
+
+            if (folder != null
+                    && !folder.equalsIgnoreCase(BluetoothMasAppIf.Failed)
+                    && !folder.equalsIgnoreCase(BluetoothMasAppIf.Queued)){
+                currentCRMmsFolder = checkMmsFolder(folder, crMmsFolderA, crMmsFolderB, currentCRMmsFolder);
+            }
+
+            if (currentCRSmsFolder == CR_SMS_FOLDER_A) {
+                currentItemCount = crSmsFolderA.getCount();
+                crSmsFolderB.requery();
+                newItemCount = crSmsFolderB.getCount();
+            } else {
+                currentItemCount = crSmsFolderB.getCount();
+                crSmsFolderA.requery();
+                newItemCount = crSmsFolderA.getCount();
+            }
+
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "SMS FOLDER current " + currentItemCount + " new "
+                        + newItemCount);
+            }
+
+            if (currentItemCount > newItemCount) {
+                crSmsFolderA.moveToFirst();
+                crSmsFolderB.moveToFirst();
+
+                CursorJoiner joiner = new CursorJoiner(crSmsFolderA,
+                        new String[] { "_id"}, crSmsFolderB,
+                        new String[] { "_id"});
+
+                CursorJoiner.Result joinerResult;
+                while (joiner.hasNext()) {
+                    joinerResult = joiner.next();
+                    switch (joinerResult) {
+                    case LEFT:
+                        // handle case where a row in cursor1 is unique
+                        if (currentCRSmsFolder == CR_SMS_FOLDER_A) {
+                            // The new query doesn't have this row; implies it
+                            // was deleted
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " SMS DELETED FROM FOLDER ");
+                            }
+                            String body = crSmsFolderA.getString(crSmsFolderA
+                                    .getColumnIndex("body"));
+                            String id = crSmsFolderA.getString(crSmsFolderA
+                                    .getColumnIndex("_id"));
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " DELETED SMS ID " + id + " BODY "
+                                        + body);
+                            }
+                            int msgType = getMessageType(id);
+                            if (msgType == -1) {
+                                sendMnsEvent(MESSAGE_DELETED, id,
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/" +
+                                        folder, null, "SMS_GSM");
+                            } else {
+                                /*if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                        Log.v(TAG, "Shouldn't reach here as you cannot " +
+                                            "move msg from this folder to any other folder");
+                                }*/
+                                if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    sendMnsEvent(MESSAGE_SHIFT, id, BluetoothMasAppIf.Telecom
+                                            + "/" + BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom + "/" +
+                                            BluetoothMasAppIf.Msg + "/" +
+                                            BluetoothMasAppIf.Draft, "SMS_GSM");
+                                    if (newFolder.equalsIgnoreCase("sent")) {
+                                        sendMnsEvent(SENDING_SUCCESS, id,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                null, "SMS_GSM");
+                                    }
+                                } else if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Outbox)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                            .equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" +
+                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                        if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    BluetoothMasAppIf.Telecom + "/"+
+                                                    BluetoothMasAppIf.Msg +"/" + newFolder,
+                                                    null, "SMS_GSM");
+                                        }
+                                    }
+                                    if ((msgType == MSG_CP_QUEUED_TYPE) ||
+                                            (msgType == MSG_CP_FAILED_TYPE)) {
+                                        // Message moved from outbox to queue or
+                                        // failed folder
+                                        sendMnsEvent(SENDING_FAILURE, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" +
+                                                BluetoothMasAppIf.Outbox, null, "SMS_GSM");
+                                    }
+                                } else if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Failed)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                            .equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/"+
+                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                        if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    BluetoothMasAppIf.Telecom + "/" +
+                                                    BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                    null, "SMS_GSM");
+                                        }
+                                    }
+                                } else if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Queued)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                            .equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" +
+                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                        if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    BluetoothMasAppIf.Telecom + "/" +
+                                                    BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                    null, "SMS_GSM");
+                                        }
+                                    }
+                                }
+
+                            }
+                        } else {
+                            // TODO - The current(old) query doesn't have this row;
+                            // implies it was added
+                        }
+                        break;
+                    case RIGHT:
+                        // handle case where a row in cursor2 is unique
+                        if (currentCRSmsFolder == CR_SMS_FOLDER_B) {
+                            // The new query doesn't have this row; implies it
+                            // was deleted
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " SMS DELETED FROM FOLDER");
+                            }
+                            String body = crSmsFolderB.getString(crSmsFolderB
+                                    .getColumnIndex("body"));
+                            String id = crSmsFolderB.getString(crSmsFolderB
+                                    .getColumnIndex("_id"));
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " DELETED SMS ID " + id + " BODY "
+                                        + body);
+                            }
+                            int msgType = getMessageType(id);
+                            if (msgType == -1) {
+                                sendMnsEvent(MESSAGE_DELETED, id,
+                                        BluetoothMasAppIf.Telecom + "/"+
+                                        BluetoothMasAppIf.Msg + "/"+
+                                        folder, null, "SMS_GSM");
+                            } else {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG,"Shouldn't reach here as you cannot " +
+                                            "move msg from this folder to any other folder");
+                                }
+                                if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    sendMnsEvent(MESSAGE_SHIFT, id, BluetoothMasAppIf.Telecom
+                                            + "/" + BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom + "/" +
+                                            BluetoothMasAppIf.Msg + "/" +
+                                            BluetoothMasAppIf.Draft, "SMS_GSM");
+                                    if (newFolder.equalsIgnoreCase("sent")) {
+                                        sendMnsEvent(SENDING_SUCCESS, id,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                null, "SMS_GSM");
+                                    }
+                                } else if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Outbox)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                            .equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" +
+                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                        if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    BluetoothMasAppIf.Telecom + "/"+
+                                                    BluetoothMasAppIf.Msg +"/" + newFolder,
+                                                    null, "SMS_GSM");
+                                        }
+                                    }
+                                    if ((msgType == MSG_CP_QUEUED_TYPE) ||
+                                            (msgType == MSG_CP_FAILED_TYPE)) {
+                                        // Message moved from outbox to queue or
+                                        // failed folder
+                                        sendMnsEvent(SENDING_FAILURE, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" +
+                                                BluetoothMasAppIf.Outbox, null, "SMS_GSM");
+                                    }
+                                } else if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Failed)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                            .equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" +
+                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                        if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    BluetoothMasAppIf.Telecom + "/" +
+                                                    BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                    null, "SMS_GSM");
+                                        }
+                                    }
+                                } else if (folder != null &&
+                                        folder.equalsIgnoreCase(BluetoothMasAppIf.Queued)){
+                                    String newFolder = getMAPFolder(msgType);
+                                    if ((newFolder != null)
+                                            && (!newFolder
+                                            .equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                        // The message has moved on MAP virtual
+                                        // folder representation.
+                                        sendMnsEvent(MESSAGE_SHIFT, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/"+
+                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                        if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                            sendMnsEvent(SENDING_SUCCESS, id,
+                                                    BluetoothMasAppIf.Telecom + "/" +
+                                                    BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                    null, "SMS_GSM");
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // The current(old) query doesn't have this row;
+                            // implies it was added
+                        }
+                        break;
+                    case BOTH:
+                        // handle case where a row with the same key is in both
+                        // cursors
+                        break;
+                    }
+                }
+            }
+            if (currentCRSmsFolder == CR_SMS_FOLDER_A) {
+                currentCRSmsFolder = CR_SMS_FOLDER_B;
+            } else {
+                currentCRSmsFolder = CR_SMS_FOLDER_A;
+            }
+        }
+    }
+
     /**
      * This class listens for changes in Sms Content Provider
      * It acts, only when a new entry gets added to database
@@ -1158,15 +1391,16 @@ public class BluetoothMns {
                 newItemCount = crSmsA.getCount();
             }
 
-            Log.d(TAG, "SMS current " + currentItemCount + " new "
-                    + newItemCount);
-
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "SMS current " + currentItemCount + " new "
+                        + newItemCount);
+            }
             if (newItemCount > currentItemCount) {
                 crSmsA.moveToFirst();
                 crSmsB.moveToFirst();
 
                 CursorJoiner joiner = new CursorJoiner(crSmsA,
-                        new String[] { "_id" }, crSmsB, new String[] { "_id" });
+                        new String[] { "_id"}, crSmsB, new String[] { "_id"});
 
                 CursorJoiner.Result joinerResult;
                 while (joiner.hasNext()) {
@@ -1180,20 +1414,33 @@ public class BluetoothMns {
                         } else {
                             // The current(old) query doesn't have this row;
                             // implies it was added
-                            Log.d(TAG, " SMS ADDED TO INBOX ");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " SMS ADDED TO INBOX ");
+                            }
                             String body1 = crSmsA.getString(crSmsA
                                     .getColumnIndex("body"));
                             String id1 = crSmsA.getString(crSmsA
                                     .getColumnIndex("_id"));
-                            Log.d(TAG, " ADDED SMS ID " + id1 + " BODY "
-                                    + body1);
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED SMS ID " + id1 + " BODY "
+                                        + body1);
+                            }
                             String folder = getMAPFolder(crSmsA.getInt(crSmsA
                                     .getColumnIndex("type")));
-                            if ( folder != null ) {
-                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                            if (folder != null &&
+                                    folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                                sendMnsEvent(NEW_MESSAGE, id1, BluetoothMasAppIf.Telecom +
+                                        "/" + BluetoothMasAppIf.Msg + "/"
+                                        + folder, null, "SMS_GSM");
+                            } else if (folder != null &&
+                                    !folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)){
+                                sendMnsEvent(MESSAGE_SHIFT, id1, BluetoothMasAppIf.Telecom +
+                                        "/" + BluetoothMasAppIf.Msg + "/"
                                         + folder, null, "SMS_GSM");
                             } else {
-                                Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
+                                }
                             }
                         }
                         break;
@@ -1205,20 +1452,33 @@ public class BluetoothMns {
                         } else {
                             // The current(old) query doesn't have this row;
                             // implies it was added
-                            Log.d(TAG, " SMS ADDED ");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " SMS ADDED ");
+                            }
                             String body1 = crSmsB.getString(crSmsB
                                     .getColumnIndex("body"));
                             String id1 = crSmsB.getString(crSmsB
                                     .getColumnIndex("_id"));
-                            Log.d(TAG, " ADDED SMS ID " + id1 + " BODY "
-                                    + body1);
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED SMS ID " + id1 + " BODY "
+                                        + body1);
+                            }
                             String folder = getMAPFolder(crSmsB.getInt(crSmsB
                                     .getColumnIndex("type")));
-                            if ( folder != null ) {
-                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                            if (folder != null &&
+                                    folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                                sendMnsEvent(NEW_MESSAGE, id1, BluetoothMasAppIf.Telecom + "/"+
+                                        BluetoothMasAppIf.Msg + "/"
+                                        + folder, null, "SMS_GSM");
+                            } else if (folder != null &&
+                                    !folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)){
+                                sendMnsEvent(MESSAGE_SHIFT, id1, BluetoothMasAppIf.Telecom +
+                                        "/" + BluetoothMasAppIf.Msg + "/"
                                         + folder, null, "SMS_GSM");
                             } else {
-                                Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
+                                }
                             }
                         }
                         break;
@@ -1256,7 +1516,7 @@ public class BluetoothMns {
             EmailUtils eu = new EmailUtils();
             String containingFolder = null;
 
-            // Synchronize this?
+            // Synchronize this
             if (currentCREmail == CR_EMAIL_A) {
                 currentItemCount = crEmailA.getCount();
                 crEmailB.requery();
@@ -1267,15 +1527,17 @@ public class BluetoothMns {
                 newItemCount = crEmailA.getCount();
             }
 
-            Log.d(TAG, "Email current " + currentItemCount + " new "
-                    + newItemCount);
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, "Email current " + currentItemCount + " new "
+                        + newItemCount);
+            }
 
             if (newItemCount > currentItemCount) {
                 crEmailA.moveToFirst();
                 crEmailB.moveToFirst();
 
                 CursorJoiner joiner = new CursorJoiner(crEmailA,
-                        new String[] { "_id" }, crEmailB, new String[] { "_id" });
+                        new String[] { "_id"}, crEmailB, new String[] { "_id"});
 
                 CursorJoiner.Result joinerResult;
                 while (joiner.hasNext()) {
@@ -1289,22 +1551,28 @@ public class BluetoothMns {
                         } else {
                             // The current(old) query doesn't have this row;
                             // implies it was added
-                            Log.d(TAG, " EMAIL ADDED TO INBOX ");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " EMAIL ADDED TO INBOX ");
+                            }
                             String id1 = crEmailA.getString(crEmailA
                                     .getColumnIndex("_id"));
-                            Log.d(TAG, " ADDED EMAIL ID " + id1);
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED EMAIL ID " + id1);
+                            }
                             Cursor cr1 = null;
                             int folderId;
                             Uri uri1 = Uri.parse("content://com.android.email.provider/message");
                             String whereClause = " _id = " + id1;
                             cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                     null);
-                            if ( cr1.moveToFirst()) {
+                            if (cr1.moveToFirst()) {
                                 do {
-                                    for(int i=0;i<cr1.getColumnCount();i++){
-                                        Log.d(TAG, " Column Name: "+ cr1.getColumnName(i) + " Value: " + cr1.getString(i));
+                                    for (int i=0;i<cr1.getColumnCount();i++){
+                                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                            Log.v(TAG, " Column Name: "+ cr1.getColumnName(i) + " Value: " + cr1.getString(i));
+                                        }
                                     }
-                                } while ( cr1.moveToNext());
+                                } while (cr1.moveToNext());
                             }
 
                             if (cr1.getCount() > 0) {
@@ -1313,14 +1581,30 @@ public class BluetoothMns {
                                 containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                             }
                             cr1.close();
-                            if ( containingFolder != null ) {
-                                Log.d(TAG, " containingFolder:: "+containingFolder);
+                            if (containingFolder != null
+                                    && containingFolder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " containingFolder:: "+containingFolder);
+                                }
                                 id1 = Integer.toString(Integer.valueOf(id1)
                                         + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                                sendMnsEvent(NEW_MESSAGE, id1, BluetoothMasAppIf.Telecom
+                                        + "/"+ BluetoothMasAppIf.Msg + "/"
+                                        + containingFolder, null, "EMAIL");
+                            } else if (containingFolder != null
+                                    && !containingFolder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " containingFolder:: "+containingFolder);
+                                }
+                                id1 = Integer.toString(Integer.valueOf(id1)
+                                        + EMAIL_HDLR_CONSTANT);
+                                sendMnsEvent(MESSAGE_SHIFT, id1, BluetoothMasAppIf.Telecom
+                                        + "/"+ BluetoothMasAppIf.Msg + "/"
                                         + containingFolder, null, "EMAIL");
                             } else {
-                                Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
+                                }
                             }
                         }
                         break;
@@ -1332,10 +1616,14 @@ public class BluetoothMns {
                         } else {
                             // The current(old) query doesn't have this row;
                             // implies it was added
-                            Log.d(TAG, " EMAIL ADDED ");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " EMAIL ADDED ");
+                            }
                             String id1 = crEmailB.getString(crEmailB
                                     .getColumnIndex("_id"));
-                            Log.d(TAG, " ADDED EMAIL ID " + id1);
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED EMAIL ID " + id1);
+                            }
                             Cursor cr1 = null;
                             int folderId;
                             Uri uri1 = Uri.parse("content://com.android.email.provider/message");
@@ -1343,13 +1631,15 @@ public class BluetoothMns {
                             cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                     null);
 
-                            if ( cr1.moveToFirst()) {
+                            if (cr1.moveToFirst()) {
                                 do {
-                                    for(int i=0;i<cr1.getColumnCount();i++){
-                                        Log.d(TAG, " Column Name: "+ cr1.getColumnName(i) +
-                                                " Value: " + cr1.getString(i));
+                                    for (int i=0;i<cr1.getColumnCount();i++){
+                                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                            Log.v(TAG, " Column Name: "+ cr1.getColumnName(i) +
+                                                    " Value: " + cr1.getString(i));
+                                        }
                                     }
-                                } while ( cr1.moveToNext());
+                                } while (cr1.moveToNext());
                             }
 
                             if (cr1.getCount() > 0) {
@@ -1358,14 +1648,30 @@ public class BluetoothMns {
                                 containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                             }
                             cr1.close();
-                            if ( containingFolder != null ) {
-                                Log.d(TAG, " containingFolder:: "+containingFolder);
+                            if (containingFolder != null
+                                    && containingFolder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " containingFolder:: "+containingFolder);
+                                }
                                 id1 = Integer.toString(Integer.valueOf(id1)
                                         + EMAIL_HDLR_CONSTANT);
-                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                                sendMnsEvent(NEW_MESSAGE, id1, BluetoothMasAppIf.Telecom
+                                        + "/" + BluetoothMasAppIf.Msg + "/"
+                                        + containingFolder, null, "EMAIL");
+                            } else if (containingFolder != null
+                                    && !containingFolder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " containingFolder:: "+containingFolder);
+                                }
+                                id1 = Integer.toString(Integer.valueOf(id1)
+                                        + EMAIL_HDLR_CONSTANT);
+                                sendMnsEvent(MESSAGE_SHIFT, id1, BluetoothMasAppIf.Telecom
+                                        + "/" + BluetoothMasAppIf.Msg + "/"
                                         + containingFolder, null, "EMAIL");
                             } else {
-                                Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
+                                }
                             }
                         }
                         break;
@@ -1380,770 +1686,6 @@ public class BluetoothMns {
                 currentCREmail = CR_EMAIL_B;
             } else {
                 currentCREmail = CR_EMAIL_A;
-            }
-        }
-    }
-
-
-    /**
-     * This class listens for changes in Sms Content Provider's inbox table
-     * It acts, only when a entry gets removed from the table
-     */
-    private class InboxContentObserverClass extends ContentObserver {
-
-        public InboxContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            checkMmsInbox();
-
-            if (currentCRSmsInbox == CR_SMS_INBOX_A) {
-                currentItemCount = crSmsInboxA.getCount();
-                crSmsInboxB.requery();
-                newItemCount = crSmsInboxB.getCount();
-            } else {
-                currentItemCount = crSmsInboxB.getCount();
-                crSmsInboxA.requery();
-                newItemCount = crSmsInboxA.getCount();
-            }
-
-            Log.d(TAG, "SMS INBOX current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crSmsInboxA.moveToFirst();
-                crSmsInboxB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crSmsInboxA,
-                        new String[] { "_id" }, crSmsInboxB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCRSmsInbox == CR_SMS_INBOX_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM INBOX ");
-                            String body = crSmsInboxA.getString(crSmsInboxA
-                                    .getColumnIndex("body"));
-                            String id = crSmsInboxA.getString(crSmsInboxA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/INBOX", null, "SMS_GSM");
-                            } else {
-                                Log.d(TAG, "Shouldn't reach here as you cannot " +
-                                                "move msg from Inbox to any other folder");
-                            }
-                        } else {
-                            // TODO - The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCRSmsInbox == CR_SMS_INBOX_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM INBOX ");
-                            String body = crSmsInboxB.getString(crSmsInboxB
-                                    .getColumnIndex("body"));
-                            String id = crSmsInboxB.getString(crSmsInboxB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/INBOX", null, "SMS_GSM");
-                            } else {
-                                Log.d(TAG,"Shouldn't reach here as you cannot " +
-                                                "move msg from Inbox to any other folder");
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCRSmsInbox == CR_SMS_INBOX_A) {
-                currentCRSmsInbox = CR_SMS_INBOX_B;
-            } else {
-                currentCRSmsInbox = CR_SMS_INBOX_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Sms Content Provider's Sent table
-     * It acts, only when a entry gets removed from the table
-     */
-    private class SentContentObserverClass extends ContentObserver {
-
-        public SentContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            checkMmsSent();
-
-            if (currentCRSmsSent == CR_SMS_SENT_A) {
-                currentItemCount = crSmsSentA.getCount();
-                crSmsSentB.requery();
-                newItemCount = crSmsSentB.getCount();
-            } else {
-                currentItemCount = crSmsSentB.getCount();
-                crSmsSentA.requery();
-                newItemCount = crSmsSentA.getCount();
-            }
-
-            Log.d(TAG, "SMS SENT current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crSmsSentA.moveToFirst();
-                crSmsSentB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crSmsSentA,
-                        new String[] { "_id" }, crSmsSentB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                // while((CursorJointer.Result joinerResult = joiner.next()) !=
-                // null)
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCRSmsSent == CR_SMS_SENT_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM SENT ");
-                            String body = crSmsSentA.getString(crSmsSentA
-                                    .getColumnIndex("body"));
-                            String id = crSmsSentA.getString(crSmsSentA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/SENT", null, "SMS_GSM");
-                            } else {
-                                Log.d(TAG,"Shouldn't reach here as you cannot " +
-                                          "move msg from Sent to any other folder");
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCRSmsSent == CR_SMS_SENT_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM SENT ");
-                            String body = crSmsSentB.getString(crSmsSentB
-                                    .getColumnIndex("body"));
-                            String id = crSmsSentB.getString(crSmsSentB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/SENT", null, "SMS_GSM");
-                            } else {
-                                Log.d(TAG, "Shouldn't reach here as " +
-                                                "you cannot move msg from Sent to " +
-                                                "any other folder");
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCRSmsSent == CR_SMS_SENT_A) {
-                currentCRSmsSent = CR_SMS_SENT_B;
-            } else {
-                currentCRSmsSent = CR_SMS_SENT_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Sms Content Provider's Draft table
-     * It acts, only when a entry gets removed from the table
-     */
-    private class DraftContentObserverClass extends ContentObserver {
-
-        public DraftContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            checkMmsDrafts();
-
-            if (currentCRSmsDraft == CR_SMS_DRAFT_A) {
-                currentItemCount = crSmsDraftA.getCount();
-                crSmsDraftB.requery();
-                newItemCount = crSmsDraftB.getCount();
-            } else {
-                currentItemCount = crSmsDraftB.getCount();
-                crSmsDraftA.requery();
-                newItemCount = crSmsDraftA.getCount();
-            }
-
-            Log.d(TAG, "SMS DRAFT current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crSmsDraftA.moveToFirst();
-                crSmsDraftB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crSmsDraftA,
-                        new String[] { "_id" }, crSmsDraftB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCRSmsDraft == CR_SMS_DRAFT_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM DRAFT ");
-                            String body = crSmsDraftA.getString(crSmsDraftA
-                                    .getColumnIndex("body"));
-                            String id = crSmsDraftA.getString(crSmsDraftA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/DRAFT", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/DRAFT",
-                                        "SMS_GSM");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "SMS_GSM");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCRSmsDraft == CR_SMS_DRAFT_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM DRAFT ");
-                            String body = crSmsDraftB.getString(crSmsDraftB
-                                    .getColumnIndex("body"));
-                            String id = crSmsDraftB.getString(crSmsDraftB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/DRAFT", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/DRAFT",
-                                        "SMS_GSM");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "SMS_GSM");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCRSmsDraft == CR_SMS_DRAFT_A) {
-                currentCRSmsDraft = CR_SMS_DRAFT_B;
-            } else {
-                currentCRSmsDraft = CR_SMS_DRAFT_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Sms Content Provider's Outbox table
-     * It acts only when a entry gets removed from the table
-     */
-    private class OutboxContentObserverClass extends ContentObserver {
-
-        public OutboxContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            // Check MMS Outbox for changes
-
-            checkMmsOutbox();
-
-            // Check SMS Outbox for changes
-
-            if (currentCRSmsOutbox == CR_SMS_OUTBOX_A) {
-                currentItemCount = crSmsOutboxA.getCount();
-                crSmsOutboxB.requery();
-                newItemCount = crSmsOutboxB.getCount();
-            } else {
-                currentItemCount = crSmsOutboxB.getCount();
-                crSmsOutboxA.requery();
-                newItemCount = crSmsOutboxA.getCount();
-            }
-
-            Log.d(TAG, "SMS OUTBOX current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crSmsOutboxA.moveToFirst();
-                crSmsOutboxB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crSmsOutboxA,
-                        new String[] { "_id" }, crSmsOutboxB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCRSmsOutbox == CR_SMS_OUTBOX_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM OUTBOX ");
-                            String body = crSmsOutboxA.getString(crSmsOutboxA
-                                    .getColumnIndex("body"));
-                            String id = crSmsOutboxA.getString(crSmsOutboxA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "SMS_GSM");
-                                    if ( newFolder.equalsIgnoreCase("sent")) {
-                                        sendMnsEvent(SENDING_SUCCESS, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                null, "SMS_GSM");
-                                    }
-                                }
-                                if ( (msgType == MSG_CP_QUEUED_TYPE) ||
-                                        (msgType == MSG_CP_FAILED_TYPE)) {
-                                    // Message moved from outbox to queue or
-                                    // failed folder
-                                    sendMnsEvent(SENDING_FAILURE, id,
-                                            "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCRSmsOutbox == CR_SMS_OUTBOX_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM OUTBOX ");
-                            String body = crSmsOutboxB.getString(crSmsOutboxB
-                                    .getColumnIndex("body"));
-                            String id = crSmsOutboxB.getString(crSmsOutboxB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "SMS_GSM");
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCRSmsOutbox == CR_SMS_OUTBOX_A) {
-                currentCRSmsOutbox = CR_SMS_OUTBOX_B;
-            } else {
-                currentCRSmsOutbox = CR_SMS_OUTBOX_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Sms Content Provider's Failed table
-     * It acts only when a entry gets removed from the table
-     */
-    private class FailedContentObserverClass extends ContentObserver {
-
-        public FailedContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            // Mms doesn't have Failed type
-
-            if (currentCRSmsFailed == CR_SMS_FAILED_A) {
-                currentItemCount = crSmsFailedA.getCount();
-                crSmsFailedB.requery();
-                newItemCount = crSmsFailedB.getCount();
-            } else {
-                currentItemCount = crSmsFailedB.getCount();
-                crSmsFailedA.requery();
-                newItemCount = crSmsFailedA.getCount();
-            }
-
-            Log.d(TAG, "SMS FAILED current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crSmsFailedA.moveToFirst();
-                crSmsFailedB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crSmsFailedA,
-                        new String[] { "_id" }, crSmsFailedB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCRSmsFailed == CR_SMS_FAILED_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM FAILED ");
-                            String body = crSmsFailedA.getString(crSmsFailedA
-                                    .getColumnIndex("body"));
-                            String id = crSmsFailedA.getString(crSmsFailedA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "SMS_GSM");
-                                    if ( newFolder.equalsIgnoreCase("sent")) {
-                                        sendMnsEvent(SENDING_SUCCESS, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                null, "SMS_GSM");
-                                    }
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCRSmsFailed == CR_SMS_FAILED_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM FAILED ");
-                            String body = crSmsFailedB.getString(crSmsFailedB
-                                    .getColumnIndex("body"));
-                            String id = crSmsFailedB.getString(crSmsFailedB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "SMS_GSM");
-                                    if ( newFolder.equalsIgnoreCase("sent")) {
-                                        sendMnsEvent(SENDING_SUCCESS, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                null, "SMS_GSM");
-                                    }
-                                }
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCRSmsFailed == CR_SMS_FAILED_A) {
-                currentCRSmsFailed = CR_SMS_FAILED_B;
-            } else {
-                currentCRSmsFailed = CR_SMS_FAILED_A;
-            }
-        }
-    }
-
-    /**
-     * This class listens for changes in Sms Content Provider's Queued table
-     * It acts only when a entry gets removed from the table
-     */
-    private class QueuedContentObserverClass extends ContentObserver {
-
-        public QueuedContentObserverClass() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-
-            int currentItemCount = 0;
-            int newItemCount = 0;
-
-            // Mms doesn't have Queued type
-
-            if (currentCRSmsQueued == CR_SMS_QUEUED_A) {
-                currentItemCount = crSmsQueuedA.getCount();
-                crSmsQueuedB.requery();
-                newItemCount = crSmsQueuedB.getCount();
-            } else {
-                currentItemCount = crSmsQueuedB.getCount();
-                crSmsQueuedA.requery();
-                newItemCount = crSmsQueuedA.getCount();
-            }
-
-            Log.d(TAG, "SMS QUEUED current " + currentItemCount + " new "
-                    + newItemCount);
-
-            if (currentItemCount > newItemCount) {
-                crSmsQueuedA.moveToFirst();
-                crSmsQueuedB.moveToFirst();
-
-                CursorJoiner joiner = new CursorJoiner(crSmsQueuedA,
-                        new String[] { "_id" }, crSmsQueuedB,
-                        new String[] { "_id" });
-
-                CursorJoiner.Result joinerResult;
-                while (joiner.hasNext()) {
-                    joinerResult = joiner.next();
-                    switch (joinerResult) {
-                    case LEFT:
-                        // handle case where a row in cursor1 is unique
-                        if (currentCRSmsQueued == CR_SMS_QUEUED_A) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM QUEUED ");
-                            String body = crSmsQueuedA.getString(crSmsQueuedA
-                                    .getColumnIndex("body"));
-                            String id = crSmsQueuedA.getString(crSmsQueuedA
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "SMS_GSM");
-                                    if ( newFolder.equalsIgnoreCase("sent")) {
-                                        sendMnsEvent(SENDING_SUCCESS, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                null, "SMS_GSM");
-                                    }
-                                }
-                            }
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case RIGHT:
-                        // handle case where a row in cursor2 is unique
-                        if (currentCRSmsQueued == CR_SMS_QUEUED_B) {
-                            // The new query doesn't have this row; implies it
-                            // was deleted
-                            Log.d(TAG, " SMS DELETED FROM QUEUED ");
-                            String body = crSmsQueuedB.getString(crSmsQueuedB
-                                    .getColumnIndex("body"));
-                            String id = crSmsQueuedB.getString(crSmsQueuedB
-                                    .getColumnIndex("_id"));
-                            Log.d(TAG, " DELETED SMS ID " + id + " BODY "
-                                    + body);
-                            int msgType = getMessageType(id);
-                            if (msgType == -1) {
-                                sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/OUTBOX", null, "SMS_GSM");
-                            } else {
-                                String newFolder = getMAPFolder(msgType);
-                                if ((newFolder != null)
-                                        && (!newFolder
-                                                .equalsIgnoreCase("outbox"))) {
-                                    // The message has moved on MAP virtual
-                                    // folder representation.
-                                    sendMnsEvent(MESSAGE_SHIFT, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            "TELECOM/MSG/OUTBOX", "SMS_GSM");
-                                    if ( newFolder.equalsIgnoreCase("sent")) {
-                                        sendMnsEvent(SENDING_SUCCESS, id,
-                                                "TELECOM/MSG/" + newFolder,
-                                                null, "SMS_GSM");
-                                    }
-                                }
-                            }
-
-                        } else {
-                            // The current(old) query doesn't have this row;
-                            // implies it was added
-                        }
-                        break;
-                    case BOTH:
-                        // handle case where a row with the same key is in both
-                        // cursors
-                        break;
-                    }
-                }
-            }
-            if (currentCRSmsQueued == CR_SMS_QUEUED_A) {
-                currentCRSmsQueued = CR_SMS_QUEUED_B;
-            } else {
-                currentCRSmsQueued = CR_SMS_QUEUED_A;
             }
         }
     }
@@ -2167,8 +1709,10 @@ public class BluetoothMns {
         // TODO Fix this below
 
         if (channel != -1) {
-            if (D) Log.d(TAG, "Get MNS channel " + channel + " from cache for "
-                    + mDestination);
+            if (D) {
+                Log.d(TAG, "Get MNS channel " + channel + " from cache for "
+                        + mDestination);
+            }
             mTimestamp = System.currentTimeMillis();
             mSessionHandler.obtainMessage(SDP_RESULT, channel, -1, mDestination)
                     .sendToTarget();
@@ -2190,7 +1734,7 @@ public class BluetoothMns {
                 mConnectThread.join();
             } catch (InterruptedException e) {
                 if (V) Log.v(TAG,
-                        "Interrupted waiting for connect thread to join");
+                            "Interrupted waiting for connect thread to join");
             }
             mConnectThread = null;
         }
@@ -2230,7 +1774,7 @@ public class BluetoothMns {
         Method m;
         try {
             m = mDestination.getClass().getMethod("getServiceChannel",
-                    new Class[] { ParcelUuid.class });
+                    new Class[] { ParcelUuid.class});
             channel = (Integer) m.invoke(mDestination, BluetoothUuid_ObexMns);
         } catch (SecurityException e2) {
             // TODO Auto-generated catch block
@@ -2343,7 +1887,7 @@ public class BluetoothMns {
                                     .forName("android.bluetooth.BluetoothUuid");
                             Method m = c.getMethod("isUuidPresent",
                                     new Class[] { ParcelUuid[].class,
-                                            ParcelUuid.class });
+                                        ParcelUuid.class});
 
                             Boolean bool = false;
                             bool = (Boolean) m.invoke(c, uuids,
@@ -2383,7 +1927,7 @@ public class BluetoothMns {
 
                                 m1 = device.getClass().getMethod(
                                         "getServiceChannel",
-                                        new Class[] { ParcelUuid.class });
+                                        new Class[] { ParcelUuid.class});
                                 Integer chan = (Integer) m1.invoke(device,
                                         BluetoothUuid_ObexMns);
 
@@ -2538,181 +2082,37 @@ public class BluetoothMns {
     }
 
     /**
-     * Check for change in MMS outbox and send a notification if there is a
-     * change
-     */
-    private void checkMmsOutbox() {
-
-        int currentItemCount = 0;
-        int newItemCount = 0;
-
-        if (currentCRMmsOutbox == CR_MMS_OUTBOX_A) {
-            currentItemCount = crMmsOutboxA.getCount();
-            crMmsOutboxB.requery();
-            newItemCount = crMmsOutboxB.getCount();
-        } else {
-            currentItemCount = crMmsOutboxB.getCount();
-            crMmsOutboxA.requery();
-            newItemCount = crMmsOutboxA.getCount();
-        }
-
-        Log.d(TAG, "MMS OUTBOX current " + currentItemCount + " new "
-                + newItemCount);
-
-        if (currentItemCount > newItemCount) {
-            crMmsOutboxA.moveToFirst();
-            crMmsOutboxB.moveToFirst();
-
-            CursorJoiner joiner = new CursorJoiner(crMmsOutboxA,
-                    new String[] { "_id" }, crMmsOutboxB,
-                    new String[] { "_id" });
-
-            CursorJoiner.Result joinerResult;
-            while (joiner.hasNext()) {
-                joinerResult = joiner.next();
-                switch (joinerResult) {
-                case LEFT:
-                    // handle case where a row in cursor1 is unique
-                    if (currentCRMmsOutbox == CR_MMS_OUTBOX_A) {
-                        // The new query doesn't have this row; implies it
-                        // was deleted
-                        Log.d(TAG, " MMS DELETED FROM OUTBOX ");
-                        String id = crMmsOutboxA.getString(crMmsOutboxA
-                                .getColumnIndex("_id"));
-                        int msgType = getMmsContainingFolder(Integer
-                                .parseInt(id));
-                        if (msgType == -1) {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/OUTBOX", null, "MMS");
-                        } else {
-                            String newFolder = getMAPFolder(msgType);
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-
-                            Log.d(TAG, " MESSAGE_SHIFT MMS ID " + id);
-                            if ((newFolder != null)
-                                    && (!newFolder.equalsIgnoreCase("outbox"))) {
-                                // The message has moved on MAP virtual
-                                // folder representation.
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/OUTBOX",
-                                        "MMS");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "MMS");
-                                }
-                            }
-                            /* Mms doesn't have failed or queued type
-                             * Cannot send SENDING_FAILURE as there
-                             * is no indication if Sending failed
-                             */
-                        }
-
-                    } else {
-                        // The current(old) query doesn't have this row;
-                        // implies it was added
-                    }
-                    break;
-                case RIGHT:
-                    // handle case where a row in cursor2 is unique
-                    if (currentCRMmsOutbox == CR_MMS_OUTBOX_B) {
-                        // The new query doesn't have this row; implies it
-                        // was deleted
-                        Log.d(TAG, " MMS DELETED FROM OUTBOX ");
-                        String id = crMmsOutboxB.getString(crMmsOutboxB
-                                .getColumnIndex("_id"));
-                        int msgType = getMmsContainingFolder(Integer
-                                .parseInt(id));
-                        if (msgType == -1) {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/OUTBOX", null, "MMS");
-                        } else {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            String newFolder = getMAPFolder(msgType);
-                            if ((newFolder != null)
-                                    && (!newFolder.equalsIgnoreCase("outbox"))) {
-                                // The message has moved on MAP virtual
-                                // folder representation.
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/OUTBOX",
-                                        "MMS");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "MMS");
-                                }
-                            }
-                            /* Mms doesn't have failed or queued type
-                             * Cannot send SENDING_FAILURE as there
-                             * is no indication if Sending failed
-                             */
-                        }
-
-                    } else {
-                        // The current(old) query doesn't have this row;
-                        // implies it was added
-                    }
-                    break;
-                case BOTH:
-                    // handle case where a row with the same key is in both
-                    // cursors
-                    break;
-                }
-            }
-        }
-        if (currentCRMmsOutbox == CR_MMS_OUTBOX_A) {
-            currentCRMmsOutbox = CR_MMS_OUTBOX_B;
-        } else {
-            currentCRMmsOutbox = CR_MMS_OUTBOX_A;
-        }
-    }
-
-    /**
-     * Check for change in MMS Drafts folder and send a notification if there is
+     * Check for change in MMS folder and send a notification if there is
      * a change
      */
-    private void checkMmsDrafts() {
+    private int checkMmsFolder(String folderMms, Cursor crMmsFolderA,
+            Cursor crMmsFolderB, int currentCRMmsFolder) {
 
         int currentItemCount = 0;
         int newItemCount = 0;
 
-        if (currentCRMmsDraft == CR_MMS_OUTBOX_A) {
-            currentItemCount = crMmsDraftA.getCount();
-            crMmsDraftA.requery();
-            newItemCount = crMmsDraftB.getCount();
+        if (currentCRMmsFolder == CR_MMS_FOLDER_A) {
+            currentItemCount = crMmsFolderA.getCount();
+            crMmsFolderB.requery();
+            newItemCount = crMmsFolderB.getCount();
         } else {
-            currentItemCount = crMmsDraftB.getCount();
-            crMmsDraftA.requery();
-            newItemCount = crMmsDraftA.getCount();
+            currentItemCount = crMmsFolderB.getCount();
+            crMmsFolderA.requery();
+            newItemCount = crMmsFolderA.getCount();
         }
 
-        if (newItemCount != 0) {
-            Log.d(TAG, "MMS DRAFT breakpoint placeholder");
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "FOLDER Name::" + folderMms);
+            Log.v(TAG, "MMS FOLDER current " + currentItemCount + " new "
+                    + newItemCount);
         }
-
-        Log.d(TAG, "MMS DRAFT current " + currentItemCount + " new "
-                + newItemCount);
 
         if (currentItemCount > newItemCount) {
-            crMmsDraftA.moveToFirst();
-            crMmsDraftB.moveToFirst();
+            crMmsFolderA.moveToFirst();
+            crMmsFolderB.moveToFirst();
 
-            CursorJoiner joiner = new CursorJoiner(crMmsDraftA,
-                    new String[] { "_id" }, crMmsDraftB, new String[] { "_id" });
+            CursorJoiner joiner = new CursorJoiner(crMmsFolderA,
+                    new String[] { "_id"}, crMmsFolderB, new String[] { "_id"});
 
             CursorJoiner.Result joinerResult;
             while (joiner.hasNext()) {
@@ -2720,162 +2120,93 @@ public class BluetoothMns {
                 switch (joinerResult) {
                 case LEFT:
                     // handle case where a row in cursor1 is unique
-                    if (currentCRMmsDraft == CR_MMS_DRAFT_A) {
+                    if (currentCRMmsFolder == CR_MMS_FOLDER_A) {
                         // The new query doesn't have this row; implies it
                         // was deleted
-                        Log.d(TAG, " MMS DELETED FROM DRAFT ");
-                        String id = crMmsDraftA.getString(crMmsDraftA
-                                .getColumnIndex("_id"));
-                        int msgType = getMmsContainingFolder(Integer
-                                .parseInt(id));
-                        if (msgType == -1) {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/DRAFT", null, "MMS");
-                        } else {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            String newFolder = getMAPFolder(msgType);
-                            if ((newFolder != null)
-                                    && (!newFolder.equalsIgnoreCase("draft"))) {
-                                // The message has moved on MAP virtual
-                                // folder representation.
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/DRAFT", "MMS");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "MMS");
-                                }
-                            }
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                            Log.v(TAG, " MMS DELETED FROM FOLDER ");
                         }
-
-                    } else {
-                        // The current(old) query doesn't have this row;
-                        // implies it was added
-                    }
-                    break;
-                case RIGHT:
-                    // handle case where a row in cursor2 is unique
-                    if (currentCRMmsDraft == CR_MMS_DRAFT_B) {
-                        // The new query doesn't have this row; implies it
-                        // was deleted
-                        Log.d(TAG, " MMS DELETED FROM DRAFT ");
-                        String id = crMmsDraftB.getString(crMmsDraftB
-                                .getColumnIndex("_id"));
-                        int msgType = getMmsContainingFolder(Integer
-                                .parseInt(id));
-                        if (msgType == -1) {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/DRAFT", null, "MMS");
-                        } else {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            String newFolder = getMAPFolder(msgType);
-                            if ((newFolder != null)
-                                    && (!newFolder.equalsIgnoreCase("draft"))) {
-                                // The message has moved on MAP virtual
-                                // folder representation.
-                                sendMnsEvent(MESSAGE_SHIFT, id, "TELECOM/MSG/"
-                                        + newFolder, "TELECOM/MSG/DRAFT", "MMS");
-                                if ( newFolder.equalsIgnoreCase("sent")) {
-                                    sendMnsEvent(SENDING_SUCCESS, id,
-                                            "TELECOM/MSG/" + newFolder,
-                                            null, "MMS");
-                                }
-                            }
-                        }
-
-                    } else {
-                        // The current(old) query doesn't have this row;
-                        // implies it was added
-                    }
-                    break;
-                case BOTH:
-                    // handle case where a row with the same key is in both
-                    // cursors
-                    break;
-                }
-            }
-        }
-        if (currentCRMmsDraft == CR_MMS_DRAFT_A) {
-            currentCRMmsDraft = CR_MMS_DRAFT_B;
-        } else {
-            currentCRMmsDraft = CR_MMS_DRAFT_A;
-        }
-    }
-
-    /**
-     * Check for change in MMS Inbox folder and send a notification if there is
-     * a change
-     */
-    private void checkMmsInbox() {
-
-        int currentItemCount = 0;
-        int newItemCount = 0;
-
-        if (currentCRMmsInbox == CR_MMS_INBOX_A) {
-            currentItemCount = crMmsInboxA.getCount();
-            crMmsInboxB.requery();
-            newItemCount = crMmsInboxB.getCount();
-        } else {
-            currentItemCount = crMmsInboxB.getCount();
-            crMmsInboxA.requery();
-            newItemCount = crMmsInboxA.getCount();
-        }
-
-        Log.d(TAG, "MMS INBOX current " + currentItemCount + " new "
-                + newItemCount);
-
-        if (currentItemCount > newItemCount) {
-            crMmsInboxA.moveToFirst();
-            crMmsInboxB.moveToFirst();
-
-            CursorJoiner joiner = new CursorJoiner(crMmsInboxA,
-                    new String[] { "_id" }, crMmsInboxB, new String[] { "_id" });
-
-            CursorJoiner.Result joinerResult;
-            while (joiner.hasNext()) {
-                joinerResult = joiner.next();
-                switch (joinerResult) {
-                case LEFT:
-                    // handle case where a row in cursor1 is unique
-                    if (currentCRMmsInbox == CR_MMS_INBOX_A) {
-                        // The new query doesn't have this row; implies it
-                        // was deleted
-                        Log.d(TAG, " MMS DELETED FROM INBOX ");
-                        String id = crMmsInboxA.getString(crMmsInboxA
+                        String id = crMmsFolderA.getString(crMmsFolderA
                                 .getColumnIndex("_id"));
                         int msgInfo = 0;
-                        msgInfo = crMmsInboxA.getInt(crMmsInboxA.getColumnIndex("m_type"));
-                        String mId = crMmsInboxA.getString(crMmsInboxA.getColumnIndex("m_id"));
+                        msgInfo = crMmsFolderA.getInt(crMmsFolderA.getColumnIndex("m_type"));
+                        String mId = crMmsFolderA.getString(crMmsFolderA.getColumnIndex("m_id"));
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id));
                         if (msgType == -1) {
                             // Convert to virtual handle for MMS
                             id = Integer.toString(Integer.valueOf(id)
                                     + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            if( ((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " DELETED MMS ID " + id);
+                            }
+                            if (((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
                                     && (msgInfo != MSG_DELIVERY_RPT_TYPE))
                                     && (mId != null && mId.length() > 0)){
                                 sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/INBOX", null, "MMS");
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/" +
+                                        folderMms, null, "MMS");
                             }
                         } else {
-                            Log.d(TAG, "Shouldn't reach here as you cannot "
-                                    + "move msg from Inbox to any other folder");
+                            if (folderMms != null &&
+                                    folderMms.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
+                                // Convert to virtual handle for MMS
+                                id = Integer.toString(Integer.valueOf(id)
+                                        + MMS_HDLR_CONSTANT);
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " DELETED MMS ID " + id);
+                                }
+                                String newFolder = getMAPFolder(msgType);
+                                if ((newFolder != null)
+                                        && (!newFolder.equalsIgnoreCase(BluetoothMasAppIf.Draft))) {
+                                    // The message has moved on MAP virtual
+                                    // folder representation.
+                                    sendMnsEvent(MESSAGE_SHIFT, id,
+                                            BluetoothMasAppIf.Telecom + "/" +
+                                            BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom +
+                                            "/" + BluetoothMasAppIf.Msg + "/" +
+                                            BluetoothMasAppIf.Draft, "MMS");
+                                    if (newFolder.equalsIgnoreCase("sent")) {
+                                        sendMnsEvent(SENDING_SUCCESS, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                null, "MMS");
+                                    }
+                                }
+                            } else if (folderMms != null &&
+                                    folderMms.equalsIgnoreCase(BluetoothMasAppIf.Outbox)){
+                                String newFolder = getMAPFolder(msgType);
+                                // Convert to virtual handle for MMS
+                                id = Integer.toString(Integer.valueOf(id)
+                                        + MMS_HDLR_CONSTANT);
+
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " MESSAGE_SHIFT MMS ID " + id);
+                                }
+                                if ((newFolder != null)
+                                        && (!newFolder.equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                    // The message has moved on MAP virtual
+                                    // folder representation.
+                                    sendMnsEvent(MESSAGE_SHIFT, id,
+                                            BluetoothMasAppIf.Telecom + "/" +
+                                            BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom + "/"+
+                                            BluetoothMasAppIf.Msg + "/"+
+                                            BluetoothMasAppIf.Outbox, "MMS");
+                                    if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                        sendMnsEvent(SENDING_SUCCESS, id,
+                                                BluetoothMasAppIf.Telecom + "/"+
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                null, "MMS");
+                                    }
+                                }
+                                /* Mms doesn't have failed or queued type
+                                 * Cannot send SENDING_FAILURE as there
+                                 * is no indication if Sending failed
+                                 */
+                            }
                         }
                     } else {
                         // TODO - The current(old) query doesn't have this
@@ -2885,31 +2216,92 @@ public class BluetoothMns {
                     break;
                 case RIGHT:
                     // handle case where a row in cursor2 is unique
-                    if (currentCRMmsInbox == CR_MMS_INBOX_B) {
+                    if (currentCRMmsFolder == CR_MMS_FOLDER_B) {
                         // The new query doesn't have this row; implies it
                         // was deleted
-                        Log.d(TAG, " MMS DELETED FROM INBOX ");
-                        String id = crMmsInboxB.getString(crMmsInboxB
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                            Log.v(TAG, " MMS DELETED FROM "+folderMms);
+                        }
+                        String id = crMmsFolderB.getString(crMmsFolderB
                                 .getColumnIndex("_id"));
                         int msgInfo = 0;
-                        msgInfo = crMmsInboxB.getInt(crMmsInboxB.getColumnIndex("m_type"));
-                        String mId = crMmsInboxB.getString(crMmsInboxB.getColumnIndex("m_id"));
+                        msgInfo = crMmsFolderB.getInt(crMmsFolderB.getColumnIndex("m_type"));
+                        String mId = crMmsFolderB.getString(crMmsFolderB.getColumnIndex("m_id"));
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id));
                         if (msgType == -1) {
                             // Convert to virtual handle for MMS
                             id = Integer.toString(Integer.valueOf(id)
                                     + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            if(((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " DELETED MMS ID " + id);
+                            }
+                            if (((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
                                     && (msgInfo != MSG_DELIVERY_RPT_TYPE))
                                     && (mId != null && mId.length() > 0)){
                                 sendMnsEvent(MESSAGE_DELETED, id,
-                                        "TELECOM/MSG/INBOX", null, "MMS");
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/" +
+                                        folderMms, null, "MMS");
                             }
                         } else {
-                            Log.d(TAG, "Shouldn't reach here as you cannot "
-                                    + "move msg from Inbox to any other folder");
+                            if (folderMms != null &&
+                                    folderMms.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
+                                // Convert to virtual handle for MMS
+                                id = Integer.toString(Integer.valueOf(id)
+                                        + MMS_HDLR_CONSTANT);
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " DELETED MMS ID " + id);
+                                }
+                                String newFolder = getMAPFolder(msgType);
+                                if ((newFolder != null)
+                                        && (!newFolder.equalsIgnoreCase(BluetoothMasAppIf.Draft))) {
+                                    // The message has moved on MAP virtual
+                                    // folder representation.
+                                    sendMnsEvent(MESSAGE_SHIFT, id,
+                                            BluetoothMasAppIf.Telecom + "/" +
+                                            BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom +
+                                            "/" + BluetoothMasAppIf.Msg + "/" +
+                                            BluetoothMasAppIf.Draft, "MMS");
+                                    if (newFolder.equalsIgnoreCase("sent")) {
+                                        sendMnsEvent(SENDING_SUCCESS, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                null, "MMS");
+                                    }
+                                }
+                            } else if (folderMms != null &&
+                                    folderMms.equalsIgnoreCase(BluetoothMasAppIf.Outbox)){
+                                // Convert to virtual handle for MMS
+                                id = Integer.toString(Integer.valueOf(id)
+                                        + MMS_HDLR_CONSTANT);
+                                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                    Log.v(TAG, " DELETED MMS ID " + id);
+                                }
+                                String newFolder = getMAPFolder(msgType);
+                                if ((newFolder != null)
+                                        && (!newFolder.equalsIgnoreCase(BluetoothMasAppIf.Outbox))) {
+                                    // The message has moved on MAP virtual
+                                    // folder representation.
+                                    sendMnsEvent(MESSAGE_SHIFT, id,
+                                            BluetoothMasAppIf.Telecom + "/" +
+                                            BluetoothMasAppIf.Msg + "/"
+                                            + newFolder, BluetoothMasAppIf.Telecom +
+                                            "/" + BluetoothMasAppIf.Msg + "/" +
+                                            BluetoothMasAppIf.Outbox, "MMS");
+                                    if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
+                                        sendMnsEvent(SENDING_SUCCESS, id,
+                                                BluetoothMasAppIf.Telecom + "/" +
+                                                BluetoothMasAppIf.Msg + "/" + newFolder,
+                                                null, "MMS");
+                                    }
+                                }
+                                /* Mms doesn't have failed or queued type
+                                 * Cannot send SENDING_FAILURE as there
+                                 * is no indication if Sending failed
+                                 */
+                            }
                         }
                     } else {
                         // The current(old) query doesn't have this row;
@@ -2923,110 +2315,12 @@ public class BluetoothMns {
                 }
             }
         }
-        if (currentCRMmsInbox == CR_MMS_INBOX_A) {
-            currentCRMmsInbox = CR_MMS_INBOX_B;
+        if (currentCRMmsFolder == CR_MMS_FOLDER_A) {
+            currentCRMmsFolder = CR_MMS_FOLDER_B;
         } else {
-            currentCRMmsInbox = CR_MMS_INBOX_A;
+            currentCRMmsFolder = CR_MMS_FOLDER_A;
         }
-    }
-    /**
-     * Check for change in MMS Sent folder and send a notification if there is
-     * a change
-     */
-    private void checkMmsSent() {
-
-        int currentItemCount = 0;
-        int newItemCount = 0;
-
-        if (currentCRMmsSent == CR_MMS_SENT_A) {
-            currentItemCount = crMmsSentA.getCount();
-            crMmsSentB.requery();
-            newItemCount = crMmsSentB.getCount();
-        } else {
-            currentItemCount = crMmsSentB.getCount();
-            crMmsSentA.requery();
-            newItemCount = crMmsSentA.getCount();
-        }
-
-        Log.d(TAG, "MMS SENT current " + currentItemCount + " new "
-                + newItemCount);
-
-        if (currentItemCount > newItemCount) {
-            crMmsSentA.moveToFirst();
-            crMmsSentB.moveToFirst();
-
-            CursorJoiner joiner = new CursorJoiner(crMmsSentA,
-                    new String[] { "_id" }, crMmsSentB, new String[] { "_id" });
-
-            CursorJoiner.Result joinerResult;
-            while (joiner.hasNext()) {
-                joinerResult = joiner.next();
-                switch (joinerResult) {
-                case LEFT:
-                    // handle case where a row in cursor1 is unique
-                    if (currentCRMmsSent == CR_MMS_SENT_A) {
-                        // The new query doesn't have this row; implies it
-                        // was deleted
-                        Log.d(TAG, " MMS DELETED FROM SENT ");
-                        String id = crMmsSentA.getString(crMmsSentA
-                                .getColumnIndex("_id"));
-                        int msgType = getMmsContainingFolder(Integer
-                                .parseInt(id));
-                        if (msgType == -1) {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/SENT", null, "MMS");
-                        } else {
-                            Log.d(TAG, "Shouldn't reach here as you cannot "
-                                    + "move msg from Sent to any other folder");
-                        }
-                    } else {
-                        // TODO - The current(old) query doesn't have this
-                        // row;
-                        // implies it was added
-                    }
-                    break;
-                case RIGHT:
-                    // handle case where a row in cursor2 is unique
-                    if (currentCRMmsSent == CR_MMS_SENT_B) {
-                        // The new query doesn't have this row; implies it
-                        // was deleted
-                        Log.d(TAG, " MMS DELETED FROM SENT ");
-                        String id = crMmsSentB.getString(crMmsSentB
-                                .getColumnIndex("_id"));
-                        int msgType = getMmsContainingFolder(Integer
-                                .parseInt(id));
-                        if (msgType == -1) {
-                            // Convert to virtual handle for MMS
-                            id = Integer.toString(Integer.valueOf(id)
-                                    + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " DELETED MMS ID " + id);
-                            sendMnsEvent(MESSAGE_DELETED, id,
-                                    "TELECOM/MSG/SENT", null, "MMS");
-                        } else {
-                            Log.d(TAG, "Shouldn't reach here as you cannot "
-                                    + "move msg from Sent to any other folder");
-                        }
-                    } else {
-                        // The current(old) query doesn't have this row;
-                        // implies it was added
-                    }
-                    break;
-                case BOTH:
-                    // handle case where a row with the same key is in both
-                    // cursors
-                    break;
-                }
-            }
-        }
-        if (currentCRMmsSent == CR_MMS_SENT_A) {
-            currentCRMmsSent = CR_MMS_SENT_B;
-        } else {
-            currentCRMmsSent = CR_MMS_SENT_A;
-        }
+        return currentCRMmsFolder;
     }
 
     /**
@@ -3048,14 +2342,16 @@ public class BluetoothMns {
             newItemCount = crMmsA.getCount();
         }
 
-        Log.d(TAG, "MMS current " + currentItemCount + " new " + newItemCount);
+        if (Log.isLoggable(TAG, Log.VERBOSE)){
+            Log.v(TAG, "MMS current " + currentItemCount + " new " + newItemCount);
+        }
 
         if (newItemCount > currentItemCount) {
             crMmsA.moveToFirst();
             crMmsB.moveToFirst();
 
             CursorJoiner joiner = new CursorJoiner(crMmsA,
-                    new String[] { "_id" }, crMmsB, new String[] { "_id" });
+                    new String[] { "_id"}, crMmsB, new String[] { "_id"});
 
             CursorJoiner.Result joinerResult;
             while (joiner.hasNext()) {
@@ -3069,7 +2365,9 @@ public class BluetoothMns {
                     } else {
                         // The current(old) query doesn't have this row;
                         // implies it was added
-                        Log.d(TAG, " MMS ADDED TO INBOX ");
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                            Log.v(TAG, " MMS ADDED TO INBOX ");
+                        }
                         String id1 = crMmsA.getString(crMmsA
                                 .getColumnIndex("_id"));
                         int msgInfo = 0;
@@ -3078,19 +2376,44 @@ public class BluetoothMns {
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id1));
                         String folder = getMAPFolder(msgType);
-                        if (folder != null) {
+                        if (folder != null &&
+                                folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
                             // Convert to virtual handle for MMS
                             id1 = Integer.toString(Integer.valueOf(id1)
                                     + MMS_HDLR_CONSTANT);
-                            Log.d(TAG, " ADDED MMS ID " + id1);
-                            if( ((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED MMS ID " + id1);
+                            }
+                            if (((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
                                     && (msgInfo != MSG_DELIVERY_RPT_TYPE))
                                     && (mId != null && mId.length() > 0)){
-                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                                sendMnsEvent(NEW_MESSAGE, id1, 
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/"
                                         + folder, null, "MMS");
                             }
-                        } else {
-                            Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
+                        } else if (folder != null &&
+                                !folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                            // Convert to virtual handle for MMS
+                            id1 = Integer.toString(Integer.valueOf(id1)
+                                    + MMS_HDLR_CONSTANT);
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED MMS ID " + id1);
+                            }
+                            if (((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                                    && (msgInfo != MSG_DELIVERY_RPT_TYPE))
+                                    && (mId != null && mId.length() > 0)){
+                                sendMnsEvent(MESSAGE_SHIFT, id1,
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/"
+                                        + folder, null, "MMS");
+                            }
+                        }
+
+                        else {
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
+                            }
                         }
                     }
                     break;
@@ -3102,7 +2425,9 @@ public class BluetoothMns {
                     } else {
                         // The current(old) query doesn't have this row;
                         // implies it was added
-                        Log.d(TAG, " MMS ADDED ");
+                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                            Log.v(TAG, " MMS ADDED ");
+                        }
                         String id1 = crMmsB.getString(crMmsB
                                 .getColumnIndex("_id"));
                         int msgInfo = 0;
@@ -3111,20 +2436,44 @@ public class BluetoothMns {
                         int msgType = getMmsContainingFolder(Integer
                                 .parseInt(id1));
                         String folder = getMAPFolder(msgType);
-                        if (folder != null) {
+                        if (folder != null &&
+                                folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
                             // Convert to virtual handle for MMS
                             id1 = Integer.toString(Integer.valueOf(id1)
                                     + MMS_HDLR_CONSTANT);
 
-                            Log.d(TAG, " ADDED MMS ID " + id1);
-                            if( ((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED MMS ID " + id1);
+                            }
+                            if (((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
                                     && (msgInfo != MSG_DELIVERY_RPT_TYPE))
                                     && (mId != null && mId.length() > 0)){
-                                sendMnsEvent(NEW_MESSAGE, id1, "TELECOM/MSG/"
+                                sendMnsEvent(NEW_MESSAGE, id1, 
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/"
+                                        + folder, null, "MMS");
+                            }
+                        } else if (folder != null &&
+                                !folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
+                            // Convert to virtual handle for MMS
+                            id1 = Integer.toString(Integer.valueOf(id1)
+                                    + MMS_HDLR_CONSTANT);
+
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED MMS ID " + id1);
+                            }
+                            if (((msgInfo > 0) && (msgInfo != MSG_META_DATA_TYPE)
+                                    && (msgInfo != MSG_DELIVERY_RPT_TYPE))
+                                    && (mId != null && mId.length() > 0)){
+                                sendMnsEvent(MESSAGE_SHIFT, id1,
+                                        BluetoothMasAppIf.Telecom + "/" +
+                                        BluetoothMasAppIf.Msg + "/"
                                         + folder, null, "MMS");
                             }
                         } else {
-                            Log.d(TAG, " ADDED TO UNKNOWN FOLDER");
+                            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                                Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
+                            }
                         }
                     }
                     break;
