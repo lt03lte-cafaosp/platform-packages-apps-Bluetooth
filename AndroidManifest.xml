@@ -224,5 +224,17 @@
                 <action android:name="android.bluetooth.adapter.action.STATE_CHANGED"/>
             </intent-filter>
         </receiver>
+        <service
+            android:process="@string/process"
+            android:name=".thermometer.BluetoothThermometerServices" >
+        </service>
+        <receiver
+            android:process="@string/process"
+            android:name=".thermometer.BluetoothThermometerReceiver">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.GATT" />
+                <action android:name="android.bluetooth.le.action.THERMOMETER_DEVICE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
