@@ -30,6 +30,7 @@ package com.android.bluetooth.bpp;
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.opp.BluetoothOppService;
+import com.android.bluetooth.opp.BluetoothShare;
 
 import android.content.Intent;
 import android.content.Context;
@@ -41,6 +42,7 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceScreen;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.util.Log;
+import android.telephony.TelephonyManager;
 
 
 public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements OnPreferenceChangeListener{
@@ -84,12 +86,19 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
 
     static Context mContext = null;
 
+    BluetoothBppTransfer bf;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mOPPstop = true;
         mBPPstop = true;
         mContext = this;
+
+        // Menu window only show during the last BPP operation.
+        int id = BluetoothOppService.mBppTransId - 1;
+        bf = BluetoothOppService.mBppTransfer.get(id);
+
         addPreferencesFromResource(R.xml.printing_pref);
 
         PreferenceScreen prefSet = getPreferenceScreen();
@@ -104,22 +113,17 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
         mListOrient.setOnPreferenceChangeListener(this);
         mListSides.setOnPreferenceChangeListener(this);
         mPrintStart.setOnPreferenceChangeListener(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
 
         getPreferenceScreen().setEnabled(true);
 
-        if(BluetoothBppSoap.mPrinter_MaxCopies > 1){
+        if(bf.mSession.bs.mPrinter_MaxCopies > 1){
             mListCopies.setEnabled(true);
             mListCopies.setSummary("Current Setting: "+ mCopies + ", Click to change");
         }else{
             mListCopies.setEnabled(false);
             mListCopies.setSummary("Printer support only 1 copy");
         }
-        if(BluetoothBppSoap.mPrinter_NumberUp > 1){
+        if(bf.mSession.bs.mPrinter_NumberUp > 1){
             mListNumberUp.setEnabled(true);
             mListNumberUp.setSummary("Current Setting: "+ mNumUp+ ", Click to change");
         }
@@ -128,7 +132,7 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
             mListNumberUp.setSummary("Printer support only 1 page per side");
         }
 
-        if(BluetoothBppSoap.mPrinter_Orientation != null){
+        if(bf.mSession.bs.mPrinter_Orientation != null){
             mListOrient.setEnabled(true);
             mListOrient.setSummary("Current Setting: "+ mOrient+ ", Click to change");
         }
@@ -136,7 +140,7 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
             mListOrient.setEnabled(false);
             mListOrient.setSummary("Printer support only portrait");
         }
-        if(BluetoothBppSoap.mPrinter_Sides != null){
+        if(bf.mSession.bs.mPrinter_Sides != null){
             mListSides.setEnabled(true);
             mListSides.setSummary("Current Setting: "+ mSides+ ", Click to change");
         }
@@ -147,6 +151,12 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        mContext = this;
+    }
+
+    @Override
     public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen,
         Preference preference) {
 
@@ -154,7 +164,7 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
 
         if (preference == mPrintStart) {
             if(V)Log.v(TAG,"mPrintStart: ");
-            BluetoothBppTransfer.mSessionHandler.obtainMessage(
+            bf.mSessionHandler.obtainMessage(
                         BluetoothBppTransfer.CREATE_JOB, -1).sendToTarget();
 
             Intent in = new Intent(this, BluetoothBppStatusActivity.class);
@@ -198,24 +208,37 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
         if (V) Log.v(TAG, "onDestroy()");
         super.onDestroy();
         mContext = null;
-        if(mBPPstop){
-            BluetoothBppTransfer.mSessionHandler.obtainMessage(
-                        BluetoothBppTransfer.CANCEL, -1).sendToTarget();
-        }
-        if(mOPPstop){
-            this.stopService(new Intent(this, BluetoothOppService.class));
-        }
     }
 
     @Override
     protected void onStop() {
-        /* When home button, it will not destroy current Activity context,
-                so next time when it comes to the same menu, it will show the previous window.
-                To prevent this, it needs to call finish() in onStop().
-               */
         if (V) Log.v(TAG, "onStop()");
-        finish();
-        onDestroy();
+         /*   There are five cases for exiting from current window focus
+                   1. Back key is pressed -> should stop OppService
+                   2. Incoming call -> should not stop Oppservice
+                   3. Home key is pressed -> should stop Oppservce
+                   4. Next menu -> should not stop Oppservice
+                   5. Power off -> should stop Oppservice
+
+                   mOPPstop is set always except for changing to BluetoothBppStatusActivity Window.
+             */
+        TelephonyManager tm =
+            (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if (V) Log.v(TAG, "Call State: " + tm.getCallState());
+
+        if(mBPPstop){
+            if(bf.mSession != null) {
+                bf.mSessionHandler.obtainMessage(
+                        BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+            }
+        }
+        if(bf.mForceClose
+            ||(mOPPstop && (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
+            bf.mTransferCancelled = true;
+            bf.printResultMsg();
+            bf.markBatchCancelled();
+            finish();
+        }
         super.onStop();
     }
 }

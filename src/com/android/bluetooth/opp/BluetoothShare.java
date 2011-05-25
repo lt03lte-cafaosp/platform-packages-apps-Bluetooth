@@ -136,6 +136,17 @@ public final class BluetoothShare implements BaseColumns {
     public static final String DIRECTION = "direction";
 
     /**
+     * The name of the column containing the owner of the transfer.
+     * <P>
+     * Type: INTEGER
+     * </P>
+     * <P>
+     * Owner can Init/Read
+     * </P>
+     */
+    public static final String OWNER = "owner";
+
+    /**
      * The name of the column containing Bluetooth Device Address that the
      * transfer is associated with.
      * <P>
@@ -233,6 +244,16 @@ public final class BluetoothShare implements BaseColumns {
     public static final int DIRECTION_INBOUND = 1;
 
     /**
+     * This owner is OPP profile, e.g. OPP will handle this file.
+     */
+    public static final int OWNER_OPP = 0;
+
+    /**
+     * This owner is BPP profile, e.g. BPP will handle this file.
+     */
+    public static final int OWNER_BPP = 1;
+
+    /**
      * This transfer is waiting for user confirmation.
      */
     public static final int USER_CONFIRMATION_PENDING = 0;
@@ -323,6 +344,11 @@ public final class BluetoothShare implements BaseColumns {
      * This transfer hasn't stated yet
      */
     public static final int STATUS_PENDING = 190;
+
+    /**
+     * This transfer hasn't stated yet, but put it into transfer queue
+     */
+    public static final int STATUS_QUEUE = 191;
 
     /**
      * This transfer has started

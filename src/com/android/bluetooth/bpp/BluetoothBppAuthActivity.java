@@ -30,6 +30,7 @@
 package com.android.bluetooth.bpp;
 
 import com.android.bluetooth.R;
+import com.android.bluetooth.opp.BluetoothOppService;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -91,6 +92,8 @@ public class BluetoothBppAuthActivity extends AlertActivity implements
 
     private static final int DISMISS_TIMEOUT_DIALOG_VALUE = 2000;
 
+    BluetoothBppTransfer bf;
+
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -105,6 +108,9 @@ public class BluetoothBppAuthActivity extends AlertActivity implements
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Intent i = getIntent();
+        // Menu window only show during the last BPP operation.
+        int idx = BluetoothOppService.mBppTransId - 1;
+        bf = BluetoothOppService.mBppTransfer.get(idx);
 
         showBppDialog(DIALOG_YES_NO_AUTH);
         mCurrentDialog = DIALOG_YES_NO_AUTH;
@@ -134,7 +140,8 @@ public class BluetoothBppAuthActivity extends AlertActivity implements
     }
 
     private String createDisplayText(final int id) {
-        String mRemoteName = BluetoothBppTransfer.getRemoteDeviceName();
+
+        String mRemoteName = bf.getRemoteDeviceName();
         switch (id) {
             case DIALOG_YES_NO_AUTH:
                 String mMessage = getString(R.string.bpp_session_key_dialog_title, mRemoteName);
@@ -201,7 +208,7 @@ public class BluetoothBppAuthActivity extends AlertActivity implements
         mTimeout = true;
         if (mCurrentDialog == DIALOG_YES_NO_AUTH) {
             messageView.setText(getString(R.string.bpp_authentication_timeout_message,
-                    BluetoothBppTransfer.getRemoteDeviceName()));
+                bf.getRemoteDeviceName()));
             mKeyView.setVisibility(View.GONE);
             mKeyView.clearFocus();
             mKeyView.removeTextChangedListener(this);

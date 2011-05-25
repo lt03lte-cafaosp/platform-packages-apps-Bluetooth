@@ -27,6 +27,8 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.android.bluetooth.bpp;
+import com.android.bluetooth.opp.BluetoothOppService;
+import com.android.bluetooth.opp.BluetoothShare;
 
 import com.android.bluetooth.R;
 import android.app.ListActivity;
@@ -36,6 +38,9 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.telephony.TelephonyManager;
+import android.content.Context;
+import android.content.Intent;
 
 public class BluetoothBppSetting extends ListActivity{
     TextView selection;
@@ -44,12 +49,20 @@ public class BluetoothBppSetting extends ListActivity{
     private static final boolean D = BluetoothBppConstant.DEBUG;
     private static final boolean V = BluetoothBppConstant.VERBOSE;
     public static boolean bpp_auth = false;
+    private boolean mBackKeyPressed = false;
+    static Context mContext = null;
+    BluetoothBppTransfer bf;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // TODO Auto-generated method stub
         super.onCreate(savedInstanceState);
         setContentView(R.layout.bpp_setting);
+        mBackKeyPressed = false;
+        mContext = this;
+
+        // Menu window only show during the last BPP operation.
+        int id = BluetoothOppService.mBppTransId - 1;
+        bf = BluetoothOppService.mBppTransfer.get(id);
 
         setListAdapter(new ArrayAdapter<String> (this,
                 android.R.layout.simple_list_item_multiple_choice,items));
@@ -70,14 +83,40 @@ public class BluetoothBppSetting extends ListActivity{
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (V) Log.v(TAG, "onDestroy()");
+        mContext = null;
+    }
+
+    @Override
     protected void onStop() {
-        /* When home button, it will not destroy current Activity context,
-                    so next time when it comes to the same menu, it will show the previous window.
-                    To prevent this, it needs to call finish() in onStop().
-                */
         if (V) Log.v(TAG, "onStop");
         super.onStop();
         BluetoothBppActivity.mSettingMenu = false;
-        finish();
+
+         /*   There are three cases for exiting from current window focus
+                   1. Back key is pressed -> should not stop OppService
+                   2. Incoming call -> should not stop Oppservice
+                   3. Home key is pressed -> should stop Oppservce
+                   4. Power off -> should stop Oppservice
+             */
+        TelephonyManager tm =
+            (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if (V) Log.v(TAG, "Call State: " + tm.getCallState());
+         if (bf.mForceClose ||
+             (!mBackKeyPressed && (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
+             bf.mTransferCancelled = true;
+             bf.printResultMsg();
+             bf.markBatchCancelled();
+             finish();
+         }
+    }
+
+    @Override
+    public void onBackPressed() {
+    if (V) Log.v(TAG, "onBackPressed ");
+        mBackKeyPressed = true;
+        super.onBackPressed();
     }
 }

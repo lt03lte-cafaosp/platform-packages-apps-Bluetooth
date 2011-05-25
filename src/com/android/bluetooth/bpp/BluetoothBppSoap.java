@@ -28,7 +28,9 @@
  */
 package com.android.bluetooth.bpp;
 
-import android.os.Message;
+import com.android.bluetooth.opp.BluetoothShare;
+
+import android.os.Handler;
 import android.util.Log;
 
 public class BluetoothBppSoap {
@@ -36,29 +38,12 @@ public class BluetoothBppSoap {
     private static final boolean D = BluetoothBppConstant.DEBUG;
     private static final boolean V = BluetoothBppConstant.VERBOSE;
 
-    // Parsed database
-    public static byte[] bppJobId = null;
-    public static int bppOperStatusCode;
-    public static String mSoapBodyLen = null;
-
     // SOAP Request Command
     public static final String SOAP_REQ_GET_PR_ATTR     = "GetPrinterAttributes";
     public static final String SOAP_REQ_CREATE_JOB      = "CreateJob";
     public static final String SOAP_REQ_GET_JOB_ATTRS   = "GetJobAttributes";
     public static final String SOAP_REQ_GET_EVT         = "GetEvent";
     public static final String SOAP_REQ_CANCEL_JOB      = "CancelJob";
-
-    // SOAP Printer Attributes
-    public static String    mPrinter_Name           = null;
-    public static String    mPrinter_State          = null;
-    public static String    mPrinter_StateReasons   = null;
-    public static int       mPrinter_DocFormats     = 0;
-    public static Boolean   mPrinter_ColorSupported = false;
-    public static int       mPrinter_MaxCopies      = 0;
-    public static String[]  mPrinter_Sides          = null;
-    public static int       mPrinter_NumberUp       = 0;
-    public static String[]  mPrinter_Orientation    = null;
-    public static String    mPrinter_JobId          = null;
 
     // Document Formats
     public static final int FORMAT_XHTML0_95        = 0x00000001;
@@ -148,8 +133,42 @@ public class BluetoothBppSoap {
     // server-error-multiple-document-jobs-not-supported
     public static final int OP_STATUS_SRV_ERR_MULTI_DOC_JOBS_NOT_SUPPORTED = 0x0509;
 
+    // Parsed database
+    public byte[] bppJobId = null;
+    public int bppOperStatusCode;
+    public String mSoapBodyLen = null;
+
+    // SOAP Printer Attributes
+    public String    mPrinter_Name           = null;
+    public String    mPrinter_State          = null;
+    public String    mPrinter_StateReasons   = null;
+    public int       mPrinter_DocFormats     = 0;
+    public Boolean   mPrinter_ColorSupported = false;
+    public int       mPrinter_MaxCopies      = 0;
+    public String[]  mPrinter_Sides          = null;
+    public int       mPrinter_NumberUp       = 0;
+    public String[]  mPrinter_Orientation    = null;
+    public String    mPrinter_JobId          = null;
+    public boolean   mFileSending            = false;
+    Handler mCallback;
+    public String mPrinterStateReason;
+    public String mOperationStatus;
+    public String mJobStatus;
+    public boolean mDocumentSent;
+    public int mJobResult;
+
+    public BluetoothBppSoap(Handler handle, String JobId){
+        mCallback = handle;
+        mPrinterStateReason = "none";
+        mOperationStatus = "0x0000";
+        mJobStatus = "waiting";
+        mDocumentSent = false;
+        mPrinter_JobId = JobId;
+        mJobResult = 0;
+    }
+
     // SOAP Message Parser
-    synchronized public static boolean Parser(String SoapReq, String SoapRsp){
+    synchronized public boolean Parser(String SoapReq, String SoapRsp){
 
         if (V) Log.v(TAG, "Parsing SOAP Response...");
 
@@ -171,7 +190,7 @@ public class BluetoothBppSoap {
             }
             // PrinterStateReasons
             if( (countParam = ExtractParameter(SoapRsp, "PrinterStateReasons",
-                                                                        paramString )) != 0){
+                paramString )) != 0){
                 mPrinter_StateReasons = paramString[0];
             }
             // DocumentFormat
@@ -208,7 +227,7 @@ public class BluetoothBppSoap {
             String paramString[] = new String[20];
 
             // JobId
-            if(ExtractParameter(SoapRsp, "JobId", paramString ) != 0){
+            if(ExtractParameter(SoapRsp, "JobId", paramString ) != 0) {
                 mPrinter_JobId = paramString[0];
                 int tempId = Integer.parseInt(paramString[0]);
 
@@ -224,7 +243,7 @@ public class BluetoothBppSoap {
                     if(V) Log.v(TAG, "bppJobId : " + bppJobId[j] );
                 }
 
-                BluetoothBppTransfer.mSessionHandler.obtainMessage(
+                mCallback.obtainMessage(
                 BluetoothBppTransfer.START_EVENT_THREAD, -1).sendToTarget();
             }
 
@@ -239,8 +258,8 @@ public class BluetoothBppSoap {
 
             ExtractParameter(SoapRsp, "JobId", paramString );
             ExtractParameter(SoapRsp, "OperationStatus", paramString );
-            BluetoothBppTransfer.mSessionHandler.obtainMessage(
-                     BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
+            mCallback.obtainMessage(
+                        BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
             result = true;
 
         }
@@ -248,24 +267,24 @@ public class BluetoothBppSoap {
             String paramString[] = new String[20];
             if(ExtractParameter(SoapRsp, "JobState", paramString ) != 0){
 
-                BluetoothBppTransfer.mJobStatus = paramString[0];
-                if(V) Log.v(TAG, "Current Job Status : " +  BluetoothBppTransfer.mJobStatus);
+                mJobStatus = paramString[0];
+                if(V) Log.v(TAG, "Current Job Status : " +  mJobStatus);
                 if(paramString[0].compareTo("waiting") == 0){
 
-                    if(BluetoothBppEvent.mDocumentSent == false){
-                        BluetoothBppEvent.mDocumentSent = true;
-                        BluetoothBppTransfer.mSessionHandler.obtainMessage(
+                    if(mDocumentSent == false){
+                        mDocumentSent = true;
+                        mCallback.obtainMessage(
                                 BluetoothBppTransfer.SEND_DOCUMENT, -1).sendToTarget();
                     }
                 }
                 if((paramString[0].compareTo("stopped") == 0) ||
-                   ((paramString[0].compareTo("completed") == 0) &&
-                     !BluetoothBppTransfer.mFileSending ) ||
+                   ((paramString[0].compareTo("completed") == 0) && !mFileSending ) ||
                    (paramString[0].compareTo("aborted") == 0) ||
                    (paramString[0].compareTo("cancelled") == 0) ||
                    (paramString[0].compareTo("unknown") == 0))
                 {
-                    BluetoothBppTransfer.mSessionHandler.obtainMessage(
+                    mJobResult = BluetoothShare.STATUS_CANCELED;
+                    mCallback.obtainMessage(
                     BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
 
                     result = true;
@@ -275,19 +294,21 @@ public class BluetoothBppSoap {
             if(ExtractParameter(SoapRsp, "PrinterState", paramString ) != 0){
                 if(paramString[0].compareTo("stopped") == 0)
                 {
+                    mJobResult = BluetoothShare.STATUS_FORBIDDEN;
                     result = true;
                 }
             }
 
             if(ExtractParameter(SoapRsp, "PrinterStateReasons", paramString ) != 0){
-                BluetoothBppTransfer.mPrinterStateReason = paramString[0];
+                mPrinterStateReason = paramString[0];
             }
 
             if(ExtractParameter(SoapRsp, "OperationStatus", paramString ) != 0){
-                BluetoothBppTransfer.mOperationStatus = paramString[0];
+                mOperationStatus = paramString[0];
                 if(paramString[0].compareTo("0x0000") != 0)
                 {
-                    BluetoothBppTransfer.mSessionHandler.obtainMessage(
+                    mJobResult = BluetoothShare.STATUS_FORBIDDEN;
+                    mCallback.obtainMessage(
                     BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
                     result = true;
                 }
@@ -300,7 +321,7 @@ public class BluetoothBppSoap {
         return result;
     }
 
-    private static int ExtractParameter(String SoapRsp, String AttrName, String[] paramStr ){
+    private int ExtractParameter(String SoapRsp, String AttrName, String[] paramStr ){
         int startIdx = 0;
         int endIdx = 0;
         int paramCount = 0;
@@ -331,7 +352,7 @@ public class BluetoothBppSoap {
         return paramCount;
     }
 
-    private static void AddPrintDocFormat(String DocFormat){
+    private void AddPrintDocFormat(String DocFormat){
 
         if (DocFormat.compareTo(BluetoothBppConstant.MIME_TYPE_XHTML_Print0_95) == 0){
             mPrinter_DocFormats |= FORMAT_XHTML0_95;
@@ -383,7 +404,7 @@ public class BluetoothBppSoap {
         }
     }
 
-    public static boolean CheckPrintDocFormat(String FileName){
+    public boolean CheckPrintDocFormat(String FileName){
         int PrintSupported = 0;
 
         if(FileName.lastIndexOf(".txt") != -1){
@@ -414,7 +435,7 @@ public class BluetoothBppSoap {
     }
 
     // SOAP Message Builder
-    synchronized public static String Builder(String SoapCmd){
+    synchronized public String Builder(String SoapCmd){
         String SoapReqHeader = null;
         String SoapReqBody = null;
         String SoapReq = null;
@@ -434,7 +455,7 @@ public class BluetoothBppSoap {
         return SoapReq;
     }
 
-    private static String CreateSoapHeader(String SoapCmd){
+    private String CreateSoapHeader(String SoapCmd){
         String SoapHdr = null;
 
         SoapHdr =
@@ -444,7 +465,7 @@ public class BluetoothBppSoap {
         return SoapHdr;
     }
 
-    private static String CreateSoapBody(String SoapCmd){
+    private String CreateSoapBody(String SoapCmd){
         String SoapBodyBegin 	= null;
         String SoapBodyMain 	= null;
         String SoapBodyEnd      = null;
@@ -486,8 +507,8 @@ public class BluetoothBppSoap {
                 + "<OrientationRequested>"          + BluetoothBppPrintPrefActivity.mOrient
                 + "</OrientationRequested>\r\n";
         }
-        else if((SoapCmd.compareTo(SOAP_REQ_CANCEL_JOB) == 0)||
-            (SoapCmd.compareTo(SOAP_REQ_GET_EVT) == 0)){
+        else if ((SoapCmd.compareTo(SOAP_REQ_CANCEL_JOB) == 0)
+             || (SoapCmd.compareTo(SOAP_REQ_GET_EVT) == 0)) {
             SoapBodyMain =
                     "<JobId>"                       + mPrinter_JobId
                     + "</JobId>\r\n";

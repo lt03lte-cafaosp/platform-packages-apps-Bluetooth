@@ -29,8 +29,8 @@
 package com.android.bluetooth.bpp;
 
 import javax.obex.ObexTransport;
-import javax.obex.Authenticator;
 
+import com.android.bluetooth.opp.BluetoothOppTransfer;
 import com.android.bluetooth.opp.BluetoothShare;
 import com.android.bluetooth.opp.Constants;
 import com.android.bluetooth.opp.BluetoothOppShareInfo;
@@ -38,7 +38,6 @@ import com.android.bluetooth.opp.BluetoothOppBatch;
 import com.android.bluetooth.opp.BluetoothOppSendFileInfo;
 import com.android.bluetooth.opp.BluetoothOppService;
 import com.android.bluetooth.opp.BluetoothOppManager;
-import com.android.bluetooth.bpp.BluetoothBppObexClientSession.SoapReqSeq;
 
 import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
@@ -51,7 +50,6 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.DialogInterface;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -59,16 +57,12 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Parcelable;
 import android.os.PowerManager;
-import android.os.Process;
 import android.util.Log;
-import android.app.AlertDialog;
+import android.widget.Toast;
 import android.app.Activity;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.UnknownHostException;
 
 /**
  * This class run an actual Opp transfer session (from connect target device to
@@ -107,27 +101,29 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     public static final int USER_TIMEOUT = 22;
 
+    public static final int STATUS_CON_CHANGE = 23;
+
+    public static final int FILE_SENDING = 24;
+
     /* GetEvent Messages */
     public static final int EVENT_GETEVENT_RESPONSE = 30;
 
     private static final int USER_CONFIRM_TIMEOUT_VALUE = 30000;
 
-    private static final int CONNECT_WAIT_TIMEOUT = 45000;
-
-    private static final int CONNECT_RETRY_TIME = 100;
-
     public static final String USER_CONFIRM_TIMEOUT_ACTION =
             "com.android.bluetooth.bpp.userconfirmtimeout";
 
-    private Context mContext;
+    private static Context mContext;
+
+    static private BluetoothBppAuthenticator mAuth = null;
 
     private BluetoothAdapter mAdapter;
 
-    static private BluetoothOppBatch mBatch;
+    private BluetoothOppBatch mBatch;
 
-    private BluetoothBppObexClientSession mSession;
+    public BluetoothBppObexClientSession mSession;
 
-    private BluetoothBppEvent mSessionEvent;
+    public BluetoothBppEvent mSessionEvent;
 
     private BluetoothOppShareInfo mCurrentShare;
 
@@ -137,31 +133,27 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     private HandlerThread mHandlerThread;
 
-    static EventHandler mSessionHandler;
+    EventHandler mSessionHandler = null;
 
-    public static int JobChannel = -1;
+    public int JobChannel = -1;
 
-    public static int StatusChannel = -1;
+    public int StatusChannel = -1;
 
-    static boolean bonding_process;
-    /*
-     * TODO check if we need PowerManager here
-     */
+    boolean bonding_process;
+
     private PowerManager mPowerManager;
 
     private long mTimestamp;
 
-    static private BluetoothBppAuthenticator mAuth = null;
-
-    static public String mJobStatus;
-
-    static public String mPrinterStateReason;
-
-    static public String mOperationStatus;
-
-    static public boolean mFileSending = false;
-
-    private BluetoothOppSendFileInfo mFileInfo = null;
+    public boolean mForceClose = false;
+    
+    private int mTransferStatus =0;
+    
+    private volatile boolean mBPPregisterReceiver;
+    
+    public boolean mTransferCancelled = false;
+    
+    String PrintResultMsg = null;
 
     public BluetoothBppTransfer(Context context, PowerManager powerManager,
             BluetoothOppBatch batch, BluetoothBppObexClientSession session) {
@@ -169,19 +161,62 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         mContext = context;
         mPowerManager = powerManager;
         mBatch = batch;
-        mSession = session;
-
-        mJobStatus = "waiting";
-        mPrinterStateReason = "none";
-        mOperationStatus = "0x0000";
-        mFileSending = false;
+        mForceClose = false;
+        mTransferCancelled = false;
+        PrintResultMsg = null;
 
         mBatch.registerListern(this);
         mAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
-    public BluetoothBppTransfer(Context context, PowerManager powerManager,
-                                     BluetoothOppBatch batch) {
+    private final BroadcastReceiver mBluetoothReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+                    case BluetoothAdapter.STATE_TURNING_OFF:
+                        if (V) Log.v(TAG, "Received DISABLED_ACTION");
+                        ForceCloseBpp();
+                        break;
+                }
+            }
+            else if (action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (V) Log.v(TAG, "ACTION_ACL_DISCONNECTED for device " + device
+                        + "- Printer device: " + mBatch.mDestination);
+                    if (device.equals(mBatch.mDestination) && mBPPregisterReceiver) {
+                        if (V) Log.v(TAG, "Received ACTION_ACL_DISCONNECTED - batch: " + mBatch.mId);
+                        String PrintErrMsg = "Printing failed due to \"Printer got disconnected!!\"";
+                        Toast.makeText(mContext, PrintErrMsg, Toast.LENGTH_SHORT).show();
+                        ForceCloseBpp();
+                }
+            }
+        }
+    };
+
+    private void ForceCloseBpp(){
+        if (V) Log.v(TAG, "BPP Operation got Emergency Stop!!");
+        mForceClose = true;
+
+        mSessionHandler.obtainMessage(BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+
+        if(BluetoothBppStatusActivity.mContext != null){
+            ((Activity) BluetoothBppStatusActivity.mContext).finish();
+        }
+        if(BluetoothBppPrintPrefActivity.mContext != null){
+            ((Activity) BluetoothBppPrintPrefActivity.mContext).finish();
+        }
+        if(BluetoothBppSetting.mContext != null){
+            ((Activity) BluetoothBppSetting.mContext).finish();
+        }
+        if(BluetoothBppActivity.mContext != null){
+            ((Activity) BluetoothBppActivity.mContext).finish();
+        }
+    }
+
+    public BluetoothBppTransfer(Context context, PowerManager powerManager, BluetoothOppBatch batch) {
         this(context, powerManager, batch, null);
     }
 
@@ -222,6 +257,9 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         Log.e(TAG, "SDP query failed!");
                         markBatchFailed(BluetoothShare.STATUS_CONNECTION_ERROR);
                         mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+
+                        String msgError ="Connection fail with the Printer";
+                        Toast.makeText(mContext, msgError, Toast.LENGTH_SHORT).show();
                     }
                     break;
                 case RFCOMM_CONNECT:
@@ -246,10 +284,12 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     mConnectThread = null;
                     markBatchFailed(BluetoothShare.STATUS_CONNECTION_ERROR);
                     mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+                    mTransferStatus = BluetoothShare.STATUS_CONNECTION_ERROR;
                     BluetoothBppActivity.mOPPstop = false;
                     if(BluetoothBppActivity.mContext != null){
                         ((Activity) BluetoothBppActivity.mContext).finish();
                     }
+                    printResultMsg();
                     break;
                 /*
                  * RFCOMM connected is for outbound share only! Create
@@ -270,32 +310,30 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
                 case GET_PRINTER_ATTR:
                     if (V) Log.v(TAG, "Transfer receive GET_PRINTER_ATTR msg");
-                    BluetoothBppObexClientSession.mSoapProcess =
-                                            BluetoothBppObexClientSession.SoapReqSeq.GETATTRIBUTE;
+                    mSession.mSoapProcess = BluetoothBppObexClientSession.GETATTRIBUTE;
                     break;
 
                 case CREATE_JOB:
                     if (V) Log.v(TAG, "Transfer receive CREATE_JOB msg");
-                    BluetoothBppObexClientSession.mSoapProcess =
-                                                BluetoothBppObexClientSession.SoapReqSeq.CREATJOB;
+                    mSession.mSoapProcess = BluetoothBppObexClientSession.CREATJOB;
                     break;
 
                 case GET_EVENT:
                     if (V) Log.v(TAG, "Transfer receive GET_EVENT msg");
-                    BluetoothBppObexClientSession.mSoapProcess =
-                                                BluetoothBppObexClientSession.SoapReqSeq.GETEVENT;
+                    mSession.mSoapProcess = BluetoothBppObexClientSession.GETEVENT;
                     break;
 
                 case SEND_DOCUMENT:
                     if (V) Log.v(TAG, "Transfer receive SEND_DOCUMENT msg");
-                    BluetoothBppObexClientSession.mSoapProcess =
-                                            BluetoothBppObexClientSession.SoapReqSeq.SENDDOCUMENT;
+                    mSession.mSoapProcess = BluetoothBppObexClientSession.SENDDOCUMENT;
                     break;
 
                 case CANCEL:
                     if (V) Log.v(TAG, "Transfer receive CANCEL msg");
-                    BluetoothBppObexClientSession.mSoapProcess =
-                                                BluetoothBppObexClientSession.SoapReqSeq.CANCEL;
+                    mSession.mSoapProcess = BluetoothBppObexClientSession.CANCEL;
+                    if (mSessionEvent != null) {
+                        mSessionEvent.bs.mJobStatus = "cancelled";
+                    }
                     break;
 
                 case START_EVENT_THREAD:
@@ -323,6 +361,16 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     Intent intent = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
                     mContext.sendBroadcast(intent);
                     break;
+                case STATUS_CON_CHANGE:
+                    if (V) Log.v(TAG, "Transfer receive STATUS_CON_CHANGE msg - " + msg.arg1);
+                    mSession.mEventConn =  msg.arg1;
+                    break;
+                case FILE_SENDING:
+                    if (V) Log.v(TAG, "Transfer receive FILE_SENDING msg - " + msg.arg1);
+                    if(mSessionEvent != null) {
+                        mSessionEvent.bs.mFileSending = (msg.arg1==0)? false:true;
+                    }
+                    break;
                 /*
                  * Put next share if available,or finish the transfer.
                  * For outbound session, call session.addShare() to send next file,
@@ -345,14 +393,13 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                             /* for outbound transfer, all shares are processed */
                             if (V) Log.v(TAG, "Batch " + mBatch.mId + " is done");
 
-                            mFileSending = false;
                             /* In case of JobStatus got completed before actual printing is done,
-                                                    it need to stop event Thread here !!
-                                                */
-                            if ((mJobStatus.compareTo("completed")== 0) &&
-                                                                    BluetoothBppEvent.mConnected){
+                               it need to stop event Thread here !!
+                             */
+                            if ((mSessionEvent.bs.mJobStatus.compareTo("completed")== 0)
+                                && mSessionEvent.mConnected){
                                 mSessionEvent.stop();
-                            }else if (BluetoothBppEvent.mConnected == false){
+                            } else if (mSessionEvent.mConnected == false) {
                                 mSession.stop();
                             }
                         }
@@ -377,92 +424,69 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case BluetoothBppObexClientSession.MSG_SESSION_COMPLETE:
                     BluetoothOppShareInfo info1 = (BluetoothOppShareInfo)msg.obj;
                     if (V) Log.v(TAG, "receive MSG_SESSION_COMPLETE for batch " + mBatch.mId);
-                    mBatch.mStatus = Constants.BATCH_STATUS_FINISHED;
 
                     BluetoothBppActivity.mOPPstop = false;
                     BluetoothBppPrintPrefActivity.mOPPstop = false;
 
-              /*
-                         * trigger content provider again to know batch status change
-                         */
-                    tickShareStatus(info1);
-                    if (V) Log.v(TAG, "mJobStatus: " + mJobStatus
-                        + "\r\nmPrinterStateReason: " + mPrinterStateReason
-                        + "\r\nmOperationStatus: " + mOperationStatus);
+                    if (mSessionEvent != null) {
+                        if (V) Log.v(TAG, "mJobStatus: " + mSessionEvent.bs.mJobStatus
+                            + "\r\nmPrinterStateReason: " + mSessionEvent.bs.mPrinterStateReason
+                            + "\r\nmOperationStatus: " + mSessionEvent.bs.mOperationStatus);
 
-                    /* Show AlertDiaglog Message */
-                    if(BluetoothBppStatusActivity.mContext != null){
-                        String PrintResultMsg = null;
-                        if (mJobStatus.compareTo("completed")== 0){
-                            PrintResultMsg = "Printing Completed Successfully";
-                        }
-                        else{
-                            if(mPrinterStateReason.compareTo("none") != 0)
-                                PrintResultMsg = "Printing Fail due to \""
-                                                        + mPrinterStateReason + "\"";
-                            if(mOperationStatus.compareTo("0x0000") != 0)
-                                PrintResultMsg = ((PrintResultMsg == null) ? "" :
-                                (PrintResultMsg + "\r\n") ) + "Operation Fail ("
-                                                        + mOperationStatus + ")";
-                            if((mJobStatus.compareTo("stopped")== 0)
-                                || (mJobStatus.compareTo("aborted")== 0)
-                                || (mJobStatus.compareTo("cancelled")== 0)
-                                || (mJobStatus.compareTo("unknown")== 0)){
-                                PrintResultMsg = ((PrintResultMsg == null) ?
-                                 "" :(PrintResultMsg + "\r\n") )+ "Printing has been " + mJobStatus;
-
-                            }
-                            if(BluetoothBppObexClientSession.mSoapProcess ==
-                                                BluetoothBppObexClientSession.SoapReqSeq.CANCELLED){
-                                PrintResultMsg = "Printing has been cancelled by user";
-                            }
-
-                            if (BluetoothBppEvent.mEventStatus != null){
-                                String msgErr = BluetoothBppEvent.mEventStatus.toString();
-                                msgErr = msgErr.substring("java.io.IOException: ".length());
-                                PrintResultMsg = ((PrintResultMsg == null) ? "" :
-                                                (PrintResultMsg + "\r\n") ) + msgErr;
-                            } else if (BluetoothBppObexClientSession.mJobStatus != null){
-                                String msgErr = BluetoothBppObexClientSession.mJobStatus.toString();
-                                msgErr = msgErr.substring("java.io.IOException: ".length());
-                                PrintResultMsg = ((PrintResultMsg == null) ? "" :
-                                                (PrintResultMsg + "\r\n") ) + msgErr;
-                            }
-                        }
-                        new AlertDialog.Builder(BluetoothBppStatusActivity.mContext)
-                            .setTitle("Bluetooth Printing")
-                            .setMessage(PrintResultMsg)
-                            .setNeutralButton("OK", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    // TODO Auto-generated method stub
-                                    ((Activity) BluetoothBppStatusActivity.mContext).finish();
+                        if (mSessionEvent.bs.mJobStatus.compareTo("completed")== 0) {
+                            mBatch.mStatus = Constants.BATCH_STATUS_FINISHED;
+                            tickShareStatus(info1);
+                        } else {
+                            mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+                            //markBatchFailed(info1.mStatus);
+                            //tickShareStatus(mCurrentShare);
+                            if ( mSessionEvent.bs.mJobResult != 0) {
+                               markBatchError(info1, mSessionEvent.bs.mJobResult);
+                            } else {
+                                if (info1.mStatus > BluetoothShare.STATUS_SUCCESS) {
+                                    markBatchError(info1, info1.mStatus);
+                                } else {
+                                    markBatchError(info1, BluetoothShare.STATUS_UNKNOWN_ERROR);
                                 }
-                            }).show();
+                            }
                         }
+                    }
+                    if(BluetoothBppStatusActivity.mContext != null) {
+                        ((Activity) BluetoothBppStatusActivity.mContext).finish();
+                    }
+                    if(BluetoothBppPrintPrefActivity.mContext != null){
+                        ((Activity) BluetoothBppPrintPrefActivity.mContext).finish();
+                    }
+                    if(BluetoothBppSetting.mContext != null){
+                        ((Activity) BluetoothBppSetting.mContext).finish();
+                    }
+                    if(BluetoothBppActivity.mContext != null){
+                        ((Activity) BluetoothBppActivity.mContext).finish();
+                    }
+                    printResultMsg();
                     break;
 
                 /* Handle the error state of an Obex session */
                 case BluetoothBppObexClientSession.MSG_SESSION_ERROR:
                     if (V) Log.v(TAG, "receive MSG_SESSION_ERROR for batch " + mBatch.mId);
-                    BluetoothOppShareInfo info2 = (BluetoothOppShareInfo)msg.obj;
-                    if((BluetoothBppEvent.mConnected == true) && (mSessionEvent != null )){
-                        mSessionEvent.stop();
-                    }else{
-                        mSession.stop();
-                    }
-                    mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-                    markBatchFailed(info2.mStatus);
-                    tickShareStatus(mCurrentShare);
 
+                    /* In case that error happened between Start Obex session
+                     * and GetPrinterAttribute response, it should close BluetoothActivity.class
+                     */
                     if(BluetoothBppActivity.mContext != null){
                         ((Activity) BluetoothBppActivity.mContext).finish();
                     }
-                    if(BluetoothBppPrintPrefActivity.mContext != null){
-                        ((Activity) BluetoothBppPrintPrefActivity.mContext).finish();
-                    }
-                    if(BluetoothBppStatusActivity.mContext != null){
-                        ((Activity) BluetoothBppStatusActivity.mContext).finish();
+                    BluetoothOppShareInfo info2 = (BluetoothOppShareInfo)msg.obj;
+                    if ( mSessionEvent != null) {
+                        if (mSessionEvent.mConnected == true) {
+                            mSessionEvent.stop();
+                        } else {
+                            mSession.stop();
+                        }
+                    }else{
+                        if (V) Log.v(TAG, "Event Thread has not been started,"+
+                            " so just close obexsession");
+                        mSession.stop();
                     }
                     break;
 
@@ -481,10 +505,10 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         }
                         if (V) Log.v(TAG, "mTransport closed ");
                         mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-                        if (info3 != null) {
-                            markBatchFailed(info3.mStatus);
+                        if (info3.mStatus > BluetoothShare.STATUS_SUCCESS) {
+                            markBatchError(info3, info3.mStatus);
                         } else {
-                            markBatchFailed();
+                            markBatchError(info3, BluetoothShare.STATUS_UNKNOWN_ERROR);
                         }
                         tickShareStatus(mCurrentShare);
                     }
@@ -527,6 +551,46 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         }
     }
 
+    public void printResultMsg(){
+        /* Show AlertDiaglog Message */
+        if ((mSessionEvent != null) && (PrintResultMsg == null)) {
+            if (mSessionEvent.bs.mPrinterStateReason.compareTo("none") != 0) {
+                PrintResultMsg = "Printing Fail due to \""
+                    + mSessionEvent.bs.mPrinterStateReason + "\"";
+            } else if (mSessionEvent.bs.mOperationStatus.compareTo("0x0000") != 0) {
+                PrintResultMsg = ((PrintResultMsg == null) ? "" :(PrintResultMsg + "\r\n") )
+                + "Printer Operation Fail (" + mSessionEvent.bs.mOperationStatus + ")";
+            } else if ((mSessionEvent.bs.mJobStatus.compareTo("stopped")== 0)
+                    || (mSessionEvent.bs.mJobStatus.compareTo("aborted")== 0)
+                    || (mSessionEvent.bs.mJobStatus.compareTo("cancelled")== 0)
+                    || (mSessionEvent.bs.mJobStatus.compareTo("unknown")== 0)) {
+                PrintResultMsg = ((PrintResultMsg == null) ? "" :(PrintResultMsg + "\r\n") )
+                    + "Printing has been " + mSessionEvent.bs.mJobStatus;
+            } else if (mSessionEvent.mEventStatus != 0 ){
+                PrintResultMsg = "Printer refused request(0x"
+                    + Integer.toHexString(mSessionEvent.mEventStatus)+")";
+            } else if (mSessionEvent.bs.mJobStatus.compareTo("completed")== 0){
+                PrintResultMsg = "Printing Completed Successfully";
+            }
+        }
+        if ((mSession != null) && (PrintResultMsg == null)) {
+            if (mSession.mJobStatus != 0 ) {
+                PrintResultMsg = "Printer refused request(0x"
+                    + Integer.toHexString(mSession.mJobStatus)+")";
+            }
+        }
+        if ((mTransferStatus != 0) && (PrintResultMsg == null)) {
+            PrintResultMsg = "Printer refused request(0x"
+                + Integer.toHexString(mTransferStatus)+")";
+        }
+        if ((mTransferCancelled) && (PrintResultMsg == null)) {
+            PrintResultMsg = "Printing has been cancelled";
+        }
+        if (PrintResultMsg != null ) {
+            Toast.makeText(mContext, PrintResultMsg, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void markShareTimeout(BluetoothOppShareInfo share) {
         Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + share.mId);
         ContentValues updateValues = new ContentValues();
@@ -535,7 +599,33 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         mContext.getContentResolver().update(contentUri, updateValues, null, null);
     }
 
-    private void markBatchFailed(int failReason) {
+    public void markBatchCancelled() {
+        if (V) Log.v(TAG, "markBatchCancelled()");
+        BluetoothOppShareInfo info = mBatch.getPendingShare();
+        if (info != null) {
+            mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+            info.mStatus = BluetoothShare.STATUS_CANCELED;
+            Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + info.mId);
+            ContentValues updateValues = new ContentValues();
+            updateValues.put(BluetoothShare.STATUS, info.mStatus);
+            mContext.getContentResolver().update(contentUri, updateValues, null, null);
+        }
+    }
+
+    public void markBatchError(BluetoothOppShareInfo share, int status) {
+        if (V) Log.v(TAG, "markBatchError() - share: " + share + ", status: " + status);
+        if(share == null){
+            if (V) Log.v(TAG, "tickShareStatus() - share is null");
+            return;
+        }
+        Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + share.mId);
+        ContentValues updateValues = new ContentValues();
+        updateValues.put(BluetoothShare.STATUS, status);
+        updateValues.put(BluetoothShare.DIRECTION, share.mDirection);
+        mContext.getContentResolver().update(contentUri, updateValues, null, null);
+    }
+
+       private void markBatchFailed(int failReason) {
         synchronized (this) {
             try {
                 wait(1000);
@@ -583,7 +673,14 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             }
             info = mBatch.getPendingShare();
         }
+    }
 
+    private void markInfoStatus(BluetoothOppShareInfo info, int status) {
+        if (info == null) {
+            Log.e(TAG, "info is null!!");
+        }
+        if (D) Log.d(TAG, "Mark ShareInfo in the batch as " + status );
+        Constants.updateShareStatus(mContext, info.mId, status);
     }
 
     private void markBatchFailed() {
@@ -611,6 +708,10 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
      * Start the transfer
      */
     public void start() {
+        /* Set all pending Share file to Canel Status in case of Device shut down without intention
+         */
+        markInfoStatus(mBatch.getPendingShare(), BluetoothShare.STATUS_QUEUE);
+
         /* check Bluetooth enable status */
         /*
          * normally it's impossible to reach here if BT is disabled. Just check
@@ -658,9 +759,18 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             mSession.stop();
         }
         if (mHandlerThread != null) {
-            mHandlerThread.getLooper().quit();
+            if (V) Log.v(TAG, "mHandlerThread is stopped !!");
+            /* TO-DO --- need to think about how to handle this..*/
+            //mHandlerThread.getLooper().quit();
             mHandlerThread.interrupt();
             mHandlerThread = null;
+            mSessionHandler = null;
+        }
+        if(mBPPregisterReceiver){
+            if (V) Log.v(TAG, "mBluetoothReceiver is unregistered !!");
+            mBPPregisterReceiver = false;
+            mContext.unregisterReceiver(mBluetoothReceiver);
+            if (V) Log.v(TAG, "mBluetoothReceiver - " + mBluetoothReceiver );
         }
     }
 
@@ -670,10 +780,11 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         mCurrentShare = mBatch.getPendingShare();
         if (mCurrentShare == null) {
-            /*
-             * TODO catch this error
-             */
             Log.e(TAG, "Unexpected error happened !");
+            // It should disconnect RFCOMM channel right away.
+            if(mConnectThread != null) {
+                mConnectThread.interrupt();
+            }
             return;
         }
         if (V) Log.v(TAG, "Start session for info " + mCurrentShare.mId + " for batch " +
@@ -696,6 +807,15 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         mSession.start(mSessionHandler, mAuth);
         processCurrentShare();
+
+        /* OBEX channel need to be monitored for unexpected ACL disconnection
+         * such as Printer power off
+         */
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        mContext.registerReceiver(mBluetoothReceiver, filter);
+        mBPPregisterReceiver = true;
     }
 
     static public void notifyAuthKeyInput(final String key) {
@@ -706,8 +826,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             mAuth.setChallenged(true);
             mAuth.notify();
         }
-
-        mSessionHandler.removeMessages(USER_TIMEOUT);
+        Intent intent = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
+        mContext.sendBroadcast(intent);
     }
 
     static public void notifyAuthCancelled() {
@@ -715,12 +835,12 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             mAuth.setCancelled(true);
             mAuth.notify();
         }
-
-        mSessionHandler.removeMessages(USER_TIMEOUT);
+        Intent intent = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
+        mContext.sendBroadcast(intent);
     }
 
 
-    static public String getRemoteDeviceName(){
+    public String getRemoteDeviceName(){
         if(mBatch.mDestination != null){
             return mBatch.mDestination .getName();
         }
@@ -731,7 +851,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         if (V) Log.v(TAG, "Create Client session with transport " + mTransportEvent.toString());
         mSessionEvent = new BluetoothBppEvent(mContext, mTransportEvent);
-        mSessionEvent.start(mSessionHandler);
+        mSessionEvent.start(mSessionHandler, mSession.bs.mPrinter_JobId);
     }
 
 
@@ -827,6 +947,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     private boolean IsNotSupportedDocFormats(String docFormats){
         // Overwriting previous value with cache from BluetoothDevice
+        String extractMime;
         BluetoothBppConstant.mSupportedDocs = docFormats;
 
         if(docFormats != null){
@@ -836,12 +957,30 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             String currFileName = BluetoothOppManager.getInstance(mContext).getSendingFileNameInfo();
             if (V) Log.v(TAG, "File Type: " + currFileType + "\r\nFile Name: "+ currFileName);
 
-            if(docFormats.indexOf(currFileType, 0) == -1 ){
-                if(checkUnknownMimetype(currFileType, currFileName) != null){
-                    return false;
+            if (docFormats.indexOf(currFileType, 0) == -1) {
+                if ((extractMime = checkUnknownMimetype(currFileType, currFileName)) != null) {
+                    if (V) Log.v(TAG, "Set the file type to " + extractMime);
+                    if(docFormats.indexOf(extractMime, 0) != -1 ){
+                        return false;
+                    }
                 }
-                if (V) Log.v(TAG, "No match doc format, let OPP handle it !!");
-                BluetoothOppService.mTransfer.start();
+                if (V) Log.v(TAG, "No match doc format, let OPP handle it !! - batch "
+                    + mBatch.mId );
+                this.stop();
+                BluetoothOppService.mBppTransfer.remove(this);
+                BluetoothOppService.mBppTransId--;
+                mBatch.mOwner = BluetoothShare.OWNER_OPP;
+                mBatch.mStatus = BluetoothShare.STATUS_PENDING;
+                BluetoothOppShareInfo info = mBatch.getPendingShare();
+                BluetoothOppService.markBatchOwnership(mContext, info.mId,
+                    BluetoothShare.OWNER_OPP);
+
+                if (BluetoothOppService.mTransfer == null) {
+                    if (V) Log.v(TAG, "OPP Transfer Start!! - " + mBatch.mId );
+                    BluetoothOppService.mTransfer =
+                        new BluetoothOppTransfer(mContext, mPowerManager, mBatch);
+                    BluetoothOppService.mTransfer.start();
+                }
                 return true;
             }
         }
@@ -853,19 +992,18 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         String mimeType = null;
         if(fileType == null || fileName == null)
             return null;
-        if(fileType.compareTo("application/*") != 0)
-            return null;
-
-        if(fileName.indexOf(".vcf", 0) != -1){
+        if (fileName.endsWith(".vcf")) {
             mimeType = "text/x-vcard";
-        }else if(fileName.indexOf(".vcs", 0) != -1){
+        }else if (fileName.endsWith(".vcs")) {
             mimeType = "text/x-vcalendar";
-        }else if(fileName.indexOf(".vmg", 0) != -1){
+        }else if (fileName.endsWith(".vmg")) {
             mimeType = "text/x-vmessage";
-        }else if(fileName.indexOf(".ical", 0) != -1){
+        }else if (fileName.endsWith(".ical")) {
             mimeType = "text/calendar";
-        }else if(fileName.indexOf(".msg", 0) != -1){
+        }else if (fileName.endsWith(".msg")) {
             mimeType = "text/x-vmessage";
+        }else if (fileName.endsWith(".htm")) {
+            mimeType = "application/vnd.pwg-xhtml-print+xml";
         }
         return mimeType;
     }
@@ -907,6 +1045,41 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                                 .getServiceChannel(BluetoothUuid.PrintingStatus);
                             if (V) Log.v(TAG, "SDP get BPP STS Channel: " + StatusChannel);
                         }
+                        // Get BPP Status RFCOMM Channel number
+                        if ( (StatusChannel == -1) && (JobChannel == -1) &&
+                            (BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.ObexObjectPush))) {
+                            if (V) Log.v(TAG, "This printer doesn't support BPP, but OPP"
+                                + " so, let's start OPP");
+
+                            if (V) Log.v(TAG, "mBppTransfer.size() - "
+                                + BluetoothOppService.mBppTransfer.size()
+                                + "BluetoothOppService.mBppTransId - "
+                                + BluetoothOppService.mBppTransId);
+                            BluetoothBppTransfer bp =
+                                BluetoothOppService.mBppTransfer.get
+                                    ((BluetoothOppService.mBppTransId -1));
+                            bp.stop();
+                            BluetoothOppService.mBppTransfer.remove(bp);
+                            BluetoothOppService.mBppTransId--;
+                            try {
+                                mContext.unregisterReceiver(mReceiver);
+                            } catch (IllegalArgumentException e) {
+                                // ignore
+                            }
+                            mBatch.mOwner = BluetoothShare.OWNER_OPP;
+                            mBatch.mStatus = BluetoothShare.STATUS_PENDING;
+                            BluetoothOppShareInfo info = mBatch.getPendingShare();
+                            BluetoothOppService.markBatchOwnership(mContext, info.mId,
+                                BluetoothShare.OWNER_OPP);
+
+                            if (BluetoothOppService.mTransfer == null) {
+                                if (V) Log.v(TAG, "OPP Transfer Start!! - " + mBatch.mId );
+                                BluetoothOppService.mTransfer =
+                                    new BluetoothOppTransfer(mContext, mPowerManager, mBatch);
+                                BluetoothOppService.mTransfer.start();
+                            }
+                            return;
+                        }
                     }
                     if(bonding_process == false){
                         mSessionHandler.obtainMessage(SDP_RESULT, JobChannel, StatusChannel,
@@ -938,34 +1111,20 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
     private SocketConnectThread mConnectThreadEvent;
 
     private class SocketConnectThread extends Thread {
-        private final String host;
 
         private final BluetoothDevice device;
 
         private final int channel;
 
-        private boolean isConnected;
-
         private long timestamp;
 
         private BluetoothSocket btSocket = null;
-
-        /* create a TCP socket */
-        public SocketConnectThread(String host, int port, int dummy) {
-            super("Socket Connect Thread");
-            this.host = host;
-            this.channel = port;
-            this.device = null;
-            isConnected = false;
-        }
 
         /* create a Rfcomm Socket */
         public SocketConnectThread(BluetoothDevice device, int channel) {
             super("Socket Connect Thread");
             this.device = device;
-            this.host = null;
             this.channel = channel;
-            isConnected = false;
         }
 
         public void interrupt() {
@@ -1026,15 +1185,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             }
         }
 
-        private void markConnectionFailed(Socket s) {
-            try {
-                s.close();
-            } catch (IOException e) {
-                Log.e(TAG, "TCP socket close error");
-            }
-            mSessionHandler.obtainMessage(RFCOMM_ERROR).sendToTarget();
-        }
-
         private void markConnectionFailed(BluetoothSocket s) {
             try {
                 s.close();
@@ -1072,9 +1222,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         BluetoothOppShareInfo info = mBatch.getPendingShare();
         if (info.mDirection == BluetoothShare.DIRECTION_INBOUND) {
             mCurrentShare = mBatch.getPendingShare();
-            /*
-             * TODO what if it's not auto confirmed?
-             */
             if (mCurrentShare != null
                     && mCurrentShare.mConfirm == BluetoothShare.USER_CONFIRMATION_AUTO_CONFIRMED) {
                 /* have additional auto confirmed share to process */

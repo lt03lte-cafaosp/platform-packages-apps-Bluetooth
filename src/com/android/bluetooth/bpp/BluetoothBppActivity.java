@@ -43,6 +43,7 @@ import javax.obex.ObexTransport;
 import javax.obex.ResponseCodes;
 
 import com.android.bluetooth.opp.BluetoothOppService;
+import com.android.bluetooth.opp.BluetoothShare;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -53,6 +54,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -73,6 +75,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Parcelable;
 import android.os.Process;
+import android.telephony.TelephonyManager;
 
 /**
  * This Activity appears as a dialog. It lists any paired devices and
@@ -96,6 +99,8 @@ public class BluetoothBppActivity extends Activity {
     static Context mContext = null;
     static volatile boolean mOPPstop;
     static volatile boolean mSettingMenu;
+    private boolean mButtonClicked;
+    BluetoothBppTransfer bf;
 /*******************************************************************************
        Class Override & Implement Methods
 *******************************************************************************/
@@ -106,10 +111,15 @@ public class BluetoothBppActivity extends Activity {
         mContext = this;
         mOPPstop = true;
         mSettingMenu = false;
+        mButtonClicked = false;
 
         JobChannel    = getIntent().getIntExtra("jobCh", 0);
         StatusChannel = getIntent().getIntExtra("statCh", 0);
         if (V) Log.v(TAG, "BPP Activity Created - " + JobChannel + "," + StatusChannel);
+
+        // Menu window only show during the last BPP operation.
+        int id = BluetoothOppService.mBppTransId - 1;
+        bf = BluetoothOppService.mBppTransfer.get(id);
 
         // Setup the window
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
@@ -135,10 +145,14 @@ public class BluetoothBppActivity extends Activity {
 
         scanButtonRight.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
-                if (V) Log.v(TAG, "Click'd Printing button");
+                if (V) Log.v(TAG, "Click'd Printing button - " + mButtonClicked);
+                // This is for protecting unexpected button click during next step is processing
+                if(mButtonClicked) return;
+                mButtonClicked = true;
 
                 if (JobChannel != -1) {
-                    BluetoothBppTransfer.mSessionHandler.obtainMessage(
+                    if (bf.mSessionHandler != null)
+                       bf.mSessionHandler.obtainMessage(
                                 BluetoothBppTransfer.RFCOMM_CONNECT,
                                 JobChannel, StatusChannel, -1).sendToTarget();
                 }
@@ -151,15 +165,13 @@ public class BluetoothBppActivity extends Activity {
         if (V) Log.v(TAG, "onResume()");
         super.onResume();
         mSettingMenu = false;
+        mContext = this;
     }
 
     @Override
     protected void onDestroy() {
-        if (V) Log.v(TAG, "onDestroy()");
         super.onDestroy();
-        if(mOPPstop){
-            mContext.stopService(new Intent(mContext, BluetoothOppService.class));
-        }
+        if (V) Log.v(TAG, "onDestroy()");
         mContext = null;
     }
 
@@ -171,6 +183,30 @@ public class BluetoothBppActivity extends Activity {
                */
         if (V) Log.v(TAG, "onStop");
         super.onStop();
-        if(mSettingMenu) return;
+         /*   There are five cases for exiting from current window focus
+                   1. Back key is pressed -> should stop OppService
+                   2. Incoming call -> should not stop Oppservice
+                   3. Home key is pressed -> should stop Oppservce
+                   4. Next menu -> should not stop Oppservice
+                   5. Power off -> should stop Oppservice
+
+                   mOPPstop is set always except for in setting menu and after changing to
+                   BluetoothBppPrintPrefActivity Window
+             */
+        TelephonyManager tm =
+            (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if (V) Log.v(TAG, "Call State: " + tm.getCallState());
+
+        if (bf.mForceClose ||
+                (!mSettingMenu && mOPPstop &&
+                (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
+            if (bf.mSession != null) {
+                bf.mSessionHandler.obtainMessage(BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+            }
+            bf.mTransferCancelled = true;
+            bf.printResultMsg();
+            bf.markBatchCancelled();
+            finish();
+        }
     }
 }

@@ -38,7 +38,6 @@ import javax.obex.ClientSession.eventParser;
 import javax.obex.HeaderSet;
 import javax.obex.ObexTransport;
 import javax.obex.ResponseCodes;
-import javax.obex.PrivateInputStream;
 
 import android.content.Context;
 import android.os.Handler;
@@ -50,22 +49,38 @@ import android.util.Log;
 
 public class BluetoothBppEvent {
     private static final String TAG = "BluetoothBppEvent";
+
     private static final boolean D = BluetoothBppConstant.DEBUG;
+
     private static final boolean V = BluetoothBppConstant.VERBOSE;
-    private ClientThread mThread;
-    private ObexTransport mTransport;
-    private Context mContext;
-    private volatile boolean mInterrupted;
-    private volatile boolean mWaitingForRemote;
-    static Handler mCallback;
-    private ClientSession mCs;
+
     static final int MSG_SESSION_COMPLETE = 1;
-    static final int MSG_GET_JOBID = 2;
-    static public boolean mDocumentSent;
+
+    static final int MSG_GET_JOBID		  = 2;
+
+    private ClientThread mThread;
+
+    private ObexTransport mTransport;
+
+    private Context mContext;
+
+    private volatile boolean mInterrupted;
+
+    private volatile boolean mWaitingForRemote;
+
+    static Handler mCallback;
+
+    private ClientSession mCs;
+
     private eventParser bppEp;
+
     private long mTimeStamp;
-    static public boolean mConnected = false;
-    static public IOException mEventStatus = null;
+
+    public boolean mConnected = false;
+
+    public int mEventStatus;
+
+    BluetoothBppSoap bs;
 
     public BluetoothBppEvent(Context context, ObexTransport transport) {
         if (transport == null) {
@@ -76,12 +91,14 @@ public class BluetoothBppEvent {
         mContext = context;
         mTransport = transport;
         mInterrupted = false;
+        mEventStatus = 0;
         bppEp = new BppEventParser();
     }
 
-    public void start(Handler handler) {
+    public void start(Handler handler, String JobId) {
         if (D) Log.d(TAG, "Start!");
         mCallback = handler;
+        bs = new BluetoothBppSoap(handler, JobId);
         mThread = new ClientThread(mContext, mTransport);
         mThread.start();
     }
@@ -104,10 +121,7 @@ public class BluetoothBppEvent {
     }
 
     private class ClientThread extends Thread {
-
-        private static final int sSleepTime = 500;
         private Context mContext1;
-        private volatile boolean waitingForShare;
         private ObexTransport mTransport1;
         private WakeLock wakeLock;
 
@@ -116,9 +130,7 @@ public class BluetoothBppEvent {
             super("BtBpp Event ClientThread");
             mContext1 = context;
             mTransport1 = transport;
-            waitingForShare = false;
             mWaitingForRemote = false;
-            mDocumentSent = false;
 
             PowerManager pm = (PowerManager)mContext1.getSystemService(Context.POWER_SERVICE);
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
@@ -165,7 +177,7 @@ public class BluetoothBppEvent {
                 if (V) Log.v(TAG, "release partial WakeLock");
                 wakeLock.release();
             }
-            BluetoothBppTransfer.mSessionHandler.obtainMessage(
+            mCallback.obtainMessage(
                         BluetoothBppObexClientSession.MSG_SESSION_STOP, -1).sendToTarget();
 
         }
@@ -197,10 +209,11 @@ public class BluetoothBppEvent {
                 }
                 mCs = null;
                 mConnected = false;
+                mCallback.obtainMessage(
+                        BluetoothBppTransfer.STATUS_CON_CHANGE, 0, -1).sendToTarget();
                 if (D) Log.d(TAG, "OBEX session disconnected");
             } catch (IOException e) {
                 Log.w(TAG, "OBEX session disconnect error" + e);
-                mEventStatus = e;
             }
             try {
                 if (mCs != null) {
@@ -210,7 +223,6 @@ public class BluetoothBppEvent {
                 }
             } catch (IOException e) {
                 Log.w(TAG, "OBEX session close error" + e);
-                mEventStatus = e;
             }
             if (mTransport1 != null) {
                 try {
@@ -218,7 +230,6 @@ public class BluetoothBppEvent {
                     mTransport1.close();
                 } catch (IOException e) {
                     Log.e(TAG, "mTransport.close error");
-                    mEventStatus = e;
                 }
             }
         }
@@ -234,21 +245,20 @@ public class BluetoothBppEvent {
             if (mConnected) {
                 mConnected = false;
                 HeaderSet hs = new HeaderSet();
-
                 hs.setHeader(HeaderSet.TARGET, BluetoothBppConstant.STS_Target_UUID);
 
                 synchronized (this) {
                     mWaitingForRemote = true;
                 }
                 try {
-                    int responseCode;
                     mCs.connect(hs);
 
                     if (D) Log.d(TAG, "OBEX session created");
                     mConnected = true;
+                    mCallback.obtainMessage(
+                            BluetoothBppTransfer.STATUS_CON_CHANGE, 1, -1).sendToTarget();
                 } catch (IOException e) {
                     Log.e(TAG, "OBEX session connect error");
-                    mEventStatus = e;
                 }
             }
             synchronized (this) {
@@ -278,6 +288,7 @@ public class BluetoothBppEvent {
             } catch (IOException e) {
                 Log.e(TAG, "Error when get HeaderSet : " + e);
                 error = true;
+                status = BluetoothBppConstant.STATUS_CANCELED;
             }
             synchronized (this) {
                 mWaitingForRemote = false;
@@ -289,6 +300,7 @@ public class BluetoothBppEvent {
                 } catch (IOException e) {
                     Log.e(TAG, "Error when openOutputStream");
                     error = true;
+                    status = BluetoothBppConstant.STATUS_CANCELED;
                 }
             }
 
@@ -296,7 +308,6 @@ public class BluetoothBppEvent {
                 synchronized (this) {
                     mWaitingForRemote = true;
                 }
-
                 if (!error) {
                     int position = 0;
                     int offset = 0;
@@ -309,7 +320,7 @@ public class BluetoothBppEvent {
                     int soapRequestSize = 0;
 
                     // Building SOAP Message based on SOAP Request
-                    soapMsg = BluetoothBppSoap.Builder(soapReq);
+                    soapMsg = bs.Builder(soapReq);
                     soapRequestSize = soapMsg.length();
 
                     if (!mInterrupted && (position != soapRequestSize)) {
@@ -328,8 +339,8 @@ public class BluetoothBppEvent {
                             if (V) Log.v(TAG, "Soap Request is now being sent...");
                             outputStream.write(soapMsg.getBytes(), position, readLength);
 
-                            if (V) Log.v(TAG, "Waiting for Response..." +
-                                                (System.currentTimeMillis() - timestamp) + "ms");
+                            if (V) Log.v(TAG, "Waiting for Response..."
+                                + (System.currentTimeMillis() - timestamp) + "ms");
                             //Wait for response code
                             responseCode = getOperation.getResponseCode();
 
@@ -342,17 +353,17 @@ public class BluetoothBppEvent {
 
                                 outputStream.close();
                                 getOperation.close();
+                                mEventStatus = responseCode;
 
                                 status = BluetoothBppConstant.STATUS_CANCELED;
                                 return status;
                             } else {
-
-                                /* In case that a remote send a length for SOAP response right away
-                                                            after SOAP request..
-                                                        */
-                                if((getOperation.getLength()!= -1) && (readBuff == null)){
+                                /* In case that a remote send a length for SOAP response 
+                                                            right away after SOAP request.
+                                                            */
+                                if ((getOperation.getLength()!= -1) && (readBuff == null)) {
                                     if (V) Log.v(TAG, "#1 Get OBEX Length - "
-                                                                    + getOperation.getLength());
+                                        + getOperation.getLength());
                                     responseLength = (int)getOperation.getLength();
                                     readBuff = new byte[responseLength];
                                 }
@@ -362,36 +373,30 @@ public class BluetoothBppEvent {
                                             " - Total Size : " + soapRequestSize + "bytes" +
                                             "\r\n - Sent Size  : " + position + "bytes" +
                                             "\r\n - Taken Time : " + (System.currentTimeMillis()
-                                                        - timestamp) + " ms");
+                                            - timestamp) + " ms");
                                 }
                             }
-                    }
+                        }
 
-                    // Sending data completely !!
-                    if (V) Log.v(TAG, "outputStream.close()");
-                    outputStream.close();
+                        // Sending data completely !!
+                        outputStream.close();
 
-                    // Prepare to get input data
-                    if (V) Log.v(TAG, "getOperation.openInputStream()");
-                    inputStream = getOperation.openInputStream();
-                    // Check response code from the remote
-                    if (V) Log.v(TAG, "getOperation.getResponseCode()");
+                        // Prepare to get input data
+                        inputStream = getOperation.openInputStream();
+                        // Check response code from the remote
                         mTimeStamp = System.currentTimeMillis();
                         if( (responseCode = getOperation.getResponseCode())
                             == ResponseCodes.OBEX_HTTP_CONTINUE) {
                             if (V) Log.v(TAG, "Rx - OBEX Response: Continue");
                             if((getOperation.getLength()!= -1) && (readBuff == null)){
-                                if (V) Log.v(TAG, "#2 Get OBEX Length - " +
-                                                                getOperation.getLength());
+                                if (V) Log.v(TAG, "#2 Get OBEX Length - " + getOperation.getLength());
                                 responseLength = (int)getOperation.getLength();
                                 readBuff = new byte[responseLength];
                             }
                             if(readBuff != null){
                                 if (V) Log.v(TAG, "Rx - Start Read buffer");
-                                offset += inputStream.read(readBuff, offset,
-                                                                (responseLength - offset));
-                                if (V) Log.v(TAG, "OBEX Data Read: " + offset + "/"
-                                                                + responseLength + "bytes");
+                                offset += inputStream.read(readBuff, offset, (responseLength - offset));
+                                if (V) Log.v(TAG, "OBEX Data Read: " + offset + "/" + responseLength + "bytes");
                                 readBuff= null;
                             }
                         }
@@ -399,6 +404,7 @@ public class BluetoothBppEvent {
                         else
                         {
                             if (V) Log.v(TAG, "OBEX GET: FAIL - " + responseCode );
+                            mEventStatus = responseCode;
                             switch(responseCode)
                             {
                                 case ResponseCodes.OBEX_HTTP_FORBIDDEN:
@@ -409,8 +415,8 @@ public class BluetoothBppEvent {
                                     status = BluetoothBppConstant.STATUS_NOT_ACCEPTABLE;
                                     break;
                                 default:
-                                    status = BluetoothBppConstant.STATUS_CANCELED;
-                                    break;
+                                    status = BluetoothBppConstant.STATUS_UNKNOWN_ERROR;
+                                break;
                             }
                         }
                     }
@@ -418,7 +424,6 @@ public class BluetoothBppEvent {
             } catch (IOException e) {
                 if (V) Log.v(TAG, " IOException e) : " + e);
                 status = BluetoothBppConstant.STATUS_CANCELED;
-                mEventStatus = e;
             } catch (NullPointerException e) {
                 if (V) Log.v(TAG, " NullPointerException : " + e);
                 status = BluetoothBppConstant.STATUS_CANCELED;
@@ -454,8 +459,8 @@ public class BluetoothBppEvent {
         @Override
         public boolean Callback(String data) {
             if (V) Log.v(TAG, "GetEvent Response - taken " + (System.currentTimeMillis()
-                                - mTimeStamp) + "ms");
-            return BluetoothBppSoap.Parser("GetEvent", data);
+               - mTimeStamp) + "ms");
+            return bs.Parser("GetEvent", data);
         }
     }
 }

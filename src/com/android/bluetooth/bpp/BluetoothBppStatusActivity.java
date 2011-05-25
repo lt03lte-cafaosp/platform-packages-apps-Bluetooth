@@ -29,8 +29,11 @@
 package com.android.bluetooth.bpp;
 
 import com.android.bluetooth.R;
+import com.android.bluetooth.opp.BluetoothOppService;
+
 import android.app.Activity;
 import android.os.Bundle;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
@@ -47,20 +50,22 @@ public class BluetoothBppStatusActivity extends Activity{
     public static ProgressBar mTrans_Progress, mPrint_Progress;
     public static TextView mTrans_View, mPrint_View;
     static volatile Context mContext = null;
+    BluetoothBppTransfer bf;
 
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+
+        // Menu window only show during the last BPP operation.
+        int id = BluetoothOppService.mBppTransId - 1;
+        bf = BluetoothOppService.mBppTransfer.get(id);
 
         mContext = this;
         setContentView(R.layout.print_status);
         mTrans_View = (TextView) findViewById(R.id.transfer_percent);
         mTrans_Progress = (ProgressBar) findViewById(R.id.transfer_status);
 
-        mPrint_View = (TextView) findViewById(R.id.print_percent);
-
         mTrans_View.setText("File Transfer");
-        mPrint_View.setText("Printing Status");
 
         Button cancel = (Button) findViewById(R.id.bpp_cancel_button);
 
@@ -68,7 +73,7 @@ public class BluetoothBppStatusActivity extends Activity{
             public void onClick(View v) {
                 if (V) Log.v(TAG, "Click'd bpp_cancel_button");
 
-                BluetoothBppTransfer.mSessionHandler.obtainMessage(
+                bf.mSessionHandler.obtainMessage(
                             BluetoothBppTransfer.CANCEL, -1).sendToTarget();
                 finish();
             }
@@ -84,8 +89,6 @@ public class BluetoothBppStatusActivity extends Activity{
     protected void onDestroy() {
         if (V) Log.v(TAG, "onDestroy()");
         mContext = null;
-        BluetoothBppTransfer.mSessionHandler.obtainMessage(
-                    BluetoothBppTransfer.CANCEL, -1).sendToTarget();
         super.onDestroy();
     }
 
@@ -97,5 +100,13 @@ public class BluetoothBppStatusActivity extends Activity{
                */
         if (V) Log.v(TAG, "onStop");
         super.onStop();
+        TelephonyManager tm = (TelephonyManager)
+            mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if (V) Log.v(TAG, "Call State: " + tm.getCallState());
+
+        if(bf.mForceClose
+                ||(tm.getCallState() != TelephonyManager.CALL_STATE_RINGING)) {
+            finish();
+        }
     }
 }
