@@ -3400,6 +3400,11 @@ public class BluetoothMasAppIf {
             } else {
                 folderName = splitStrings[tmp - 1];
             }
+            if(folderName != null && folderName.equalsIgnoreCase(Deleted)){
+                rsp.msgHandle = null;
+                rsp.response = ResponseCodes.OBEX_HTTP_FORBIDDEN;
+                return rsp;
+            }
             MmsHandle = addToMmsFolder(folderName, readStr);
             rsp.msgHandle = MmsHandle;
             rsp.response = ResponseCodes.OBEX_HTTP_OK;
@@ -3424,6 +3429,11 @@ public class BluetoothMasAppIf {
                 }
             } else {
                 folderName = splitStrings[tmp - 1];
+            }
+            if(folderName != null && folderName.equalsIgnoreCase(Deleted)){
+                rsp.msgHandle = null;
+                rsp.response = ResponseCodes.OBEX_HTTP_FORBIDDEN;
+                return rsp;
             }
             SmsHandle = addToSmsFolder(folderName, PhoneAddress, SmsText);
             rsp.msgHandle = SmsHandle;
