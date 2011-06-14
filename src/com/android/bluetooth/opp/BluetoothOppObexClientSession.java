@@ -250,6 +250,10 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                     mWaitingForRemote = true;
                 }
                 try {
+                    if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                        if (V) Log.v(TAG, "Connect: Client SRM_SUPPORTED header added");
+                        hs.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_SUPPORTED);
+                    }
                     mCs.connect(hs);
                     if (D) Log.d(TAG, "OBEX session created");
                     mConnected = true;
@@ -361,10 +365,8 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             //(whether this is OBEX-over-L2CAP, or not)
             ObexHelper.setLocalSrmCapability(((BluetoothOppTransport)mTransport1).isSrmCapable());
 
-            // Add the SRM header if both client and server are SRM capable
-            boolean remoteSrmStatus = ObexHelper.getRemoteSrmStatus();
-            if ( ( ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE )
-                && ( remoteSrmStatus == ObexHelper.SRM_CAPABLE ) ) {
+            // Add the SRM header if both client is SRM capable
+            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                 Log.v(TAG, "SRM status: Enable SRM for first PUT");
                 ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
                 request.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
