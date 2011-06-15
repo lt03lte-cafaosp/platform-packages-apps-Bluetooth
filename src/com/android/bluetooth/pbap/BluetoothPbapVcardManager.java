@@ -252,6 +252,10 @@ public class BluetoothPbapVcardManager {
                 for (contactCursor.moveToFirst(); !contactCursor.isAfterLast(); contactCursor
                         .moveToNext()) {
                     String number = contactCursor.getString(PHONE_NUMBER_COLUMN_INDEX);
+                    if (number == null) {
+                        if (V) Log.v(TAG, "number is null");
+                        continue;
+                    }
                     StringBuilder onlyNumber = new StringBuilder();
                     for (int j=0; j<number.length(); j++) {
                         char c = number.charAt(j);
