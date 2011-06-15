@@ -526,7 +526,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                             Log.i(TAG, "Remote reject, Response code is " + responseCode);
                         }
                     }
-
+                    long beginTime = System.currentTimeMillis();
                     while (!mInterrupted && okToProceed && (position != fileInfo.mLength)) {
                         {
                             if (V) timestamp = System.currentTimeMillis();
@@ -565,8 +565,17 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                         Log.i(TAG, "Remote reject file type " + fileInfo.mMimetype);
                         status = BluetoothShare.STATUS_NOT_ACCEPTABLE;
                     } else if (!mInterrupted && position == fileInfo.mLength) {
+                        long endTime = System.currentTimeMillis();
                         Log.i(TAG, "SendFile finished send out file " + fileInfo.mFileName
                                 + " length " + fileInfo.mLength);
+                        long diffTime = endTime - beginTime;
+                        /*Make sure, diffTime has some value in case if the
+                        xfer is fast*/
+                        if (diffTime == 0) {
+                            diffTime = 1;
+                        }
+                        Log.i(TAG, "Tx data rate:" +
+                                ((fileInfo.mLength/1024)/((diffTime)/1000))*8 + "KbPs");
                         outputStream.close();
                     } else {
                         error = true;
