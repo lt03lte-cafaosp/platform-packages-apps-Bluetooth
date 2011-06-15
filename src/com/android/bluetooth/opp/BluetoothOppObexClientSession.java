@@ -456,6 +456,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                 if (!error) {
                     int position = 0;
                     int readLength = 0;
+                    long readbytesleft = 0;
                     boolean okToProceed = false;
                     long timestamp = 0;
                     int outputBufferSize = putOperation.getMaxPacketSize();
@@ -463,6 +464,12 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                     BufferedInputStream a = new BufferedInputStream(fileInfo.mInputStream, 0x4000);
 
                     if (!mInterrupted && (position != fileInfo.mLength)) {
+
+                        readbytesleft = fileInfo.mLength - position;
+                        if(readbytesleft < outputBufferSize) {
+                            outputBufferSize = (int) readbytesleft;
+                        }
+
                         readLength = a.read(buffer, 0, outputBufferSize);
 
                         mCallback.sendMessageDelayed(mCallback
@@ -530,6 +537,11 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                     while (!mInterrupted && okToProceed && (position != fileInfo.mLength)) {
                         {
                             if (V) timestamp = System.currentTimeMillis();
+
+                            readbytesleft = fileInfo.mLength - position;
+                            if(readbytesleft < outputBufferSize) {
+                                outputBufferSize = (int) readbytesleft;
+                            }
 
                             readLength = a.read(buffer, 0, outputBufferSize);
                             outputStream.write(buffer, 0, readLength);
