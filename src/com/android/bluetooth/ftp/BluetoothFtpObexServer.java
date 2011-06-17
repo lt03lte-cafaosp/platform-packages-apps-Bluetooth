@@ -532,6 +532,14 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             long finishtimestamp = System.currentTimeMillis();
             Log.i(TAG,"Put Request TP analysis : Received  "+ positioninfile +
                       " bytes in " + (finishtimestamp - starttimestamp)+"ms");
+            long diffTime = finishtimestamp - starttimestamp;
+            /*Make sure, diffTime has some value in case if the
+            xfer is fast*/
+            if (diffTime == 0) {
+                diffTime = 1;
+            }
+            Log.i(TAG, "Rx data rate:" +
+                      ((positioninfile/1024)/((diffTime)/1000))*8 + "KbPs");
             if (buff_op_stream != null) {
                 try {
                     buff_op_stream.close();
@@ -864,6 +872,15 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         if(position == fileinfo.length()) {
             Log.i(TAG,"Get Request TP analysis : Transmitted "+ position +
                   " bytes in" + (finishtimestamp - starttimestamp)  + "ms");
+            long diffTime = finishtimestamp - starttimestamp;
+            /*Make sure, diffTime has some value in case if the
+            xfer is fast*/
+            if (diffTime == 0) {
+                diffTime = 1;
+            }
+            Log.i(TAG, "Tx data rate:" +
+                      ((position/1024)/((diffTime)/1000))*8 + "KbPs");
+
             return ResponseCodes.OBEX_HTTP_OK;
         }else {
             return ResponseCodes.OBEX_HTTP_CONTINUE;
