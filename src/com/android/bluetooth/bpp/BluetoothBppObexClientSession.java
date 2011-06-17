@@ -57,6 +57,13 @@ import android.os.Process;
 import android.content.Intent;
 import android.app.Activity;
 
+/**
+ * This class handles Job Channel connection, disconnection, SOAP request/response,
+ * and sending document.
+ * It has a Thread to handle a file to send from content provider as well.
+ * From BPP specification, Job Channel should be disconnected after Status Channel is disconnected.
+ * So, after file transfer is done, it will wait for Status Channel disconnected notification.
+ */
 public class BluetoothBppObexClientSession{
     private static final String TAG = "BluetoothBppObexClientSession";
 
@@ -99,6 +106,8 @@ public class BluetoothBppObexClientSession{
     static final int CANCELLED        = 9;
 
     static final int DONE             = 10;
+
+    static final int MAX_OBEX_PACKET_LENGTH = 65000;
 
     private ClientThread mThread;
 
@@ -147,7 +156,6 @@ public class BluetoothBppObexClientSession{
     public void stop() {
         if (D) Log.d(TAG, "Stop!");
         if (mThread != null) {
-            mInterrupted = true;
             try {
                 mThread.interrupt();
                 if (V) Log.v(TAG, "waiting for thread to terminate");
@@ -236,7 +244,8 @@ public class BluetoothBppObexClientSession{
                         msg.obj = mInfo;
                         msg.sendToTarget();
                     }else {
-                        if (D) Log.d(TAG, "#### mInterrupted - " + mInterrupted );
+                        // Check if this operation is mInterrupted, otherwise,
+                        // it will proceed next procedure
                         if (!mInterrupted) {
                             Intent in = new Intent(mContext1, BluetoothBppPrintPrefActivity.class);
                             in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -343,6 +352,7 @@ public class BluetoothBppObexClientSession{
             try {
                 mCs = new ClientSession(mTransport1);
                 mCs.setAuthenticator(mAuth);
+                mCs.setMaxPacketSize(MAX_OBEX_PACKET_LENGTH);
                 mConnected = true;
             } catch (IOException e1) {
                 Log.e(TAG, "OBEX session create error");
@@ -429,9 +439,8 @@ public class BluetoothBppObexClientSession{
         }
 
         /*
-                * Validate this ShareInfo
-                */
-
+         * Validate this ShareInfo
+         */
         private BluetoothOppSendFileInfo processShareInfo() {
             if (V) Log.v(TAG, "Client thread processShareInfo() " + mInfo.mId);
 
@@ -690,6 +699,8 @@ public class BluetoothBppObexClientSession{
             Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + mInfo.mId);
             ContentValues updateValues;
             HeaderSet request;
+            int newBufferSize = 0;
+            byte[] newBuffer = null;
 
             if(bs.bppJobId == null){
                 status = BluetoothBppConstant.STATUS_OBEX_DATA_ERROR;
@@ -791,6 +802,7 @@ public class BluetoothBppObexClientSession{
                         // first packet will block here
                         outputStream.write(buffer, 0, readLength);
                         position += readLength;
+                        Log.d(TAG, "Obex Packet size - " +  readLength);
                         BluetoothBppStatusActivity.updateProgress(position, 0);
 
                         if (position != fileInfo.mLength) {
@@ -821,14 +833,22 @@ public class BluetoothBppObexClientSession{
                             bs.mPrinterStateReason = "\"Printer reject operation\"";
                         }
                     }
+                    // After first packet, add unused obex header size to current obex packet buffer
+                    // to increase throughput
+                    newBufferSize = outputBufferSize /* Current buffer size */
+                                    + (fileInfo.mFileName.length()+ 3) /* File name field length */
+                                    + (fileInfo.mMimetype.length() + 3) /* Mime type field length */
+                                    + (appParam.length + 3) /* Application parameter field length */
+                                    + 5;  /* File size field length */
+                    newBuffer = new byte[newBufferSize];
 
                     while (!mInterrupted && okToProceed && (position != fileInfo.mLength)
                             && (mSoapProcess != CANCEL)) {
                         {
                             if (V) timestamp = System.currentTimeMillis();
-
-                            readLength = a.read(buffer, 0, outputBufferSize);
-                            outputStream.write(buffer, 0, readLength);
+                            readLength = a.read(newBuffer, 0, newBufferSize);
+                            outputStream.write(newBuffer, 0, readLength);
+                            Log.d(TAG, "New Obex Packet size - " +  readLength);
 
                             // check remote abort
                             responseCode = putOperation.getResponseCode();
@@ -840,7 +860,6 @@ public class BluetoothBppObexClientSession{
                             } else {
                                 position += readLength;
                                 BluetoothBppStatusActivity.updateProgress(position, 0);
-
                                 if (V) {
                                     Log.v(TAG, "Sending file position = " + position
                                         + " readLength " + readLength + " bytes took "
@@ -932,21 +951,11 @@ public class BluetoothBppObexClientSession{
         @Override
         public void interrupt() {
             super.interrupt();
-            if (mWaitingForRemote) {
-                if (V) Log.v(TAG, "Interrupted when waitingForRemote");
-                try {
-                    mTransport1.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "mTransport.close error");
-                }
-
-                Message msg = Message.obtain(mCallback);
-                msg.what = BluetoothBppObexClientSession.MSG_SHARE_INTERRUPTED;
-                if (mInfo != null) {
-                    msg.obj = mInfo;
-                }
-                msg.sendToTarget();
+            if(mInterrupted){
+                if (V) Log.v(TAG, "Interupt already in progress");
+                return;
             }
+            mInterrupted = true;
         }
     }
 

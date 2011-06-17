@@ -42,6 +42,10 @@ import android.telephony.TelephonyManager;
 import android.content.Context;
 import android.content.Intent;
 
+/**
+ * This activity class is for OBEX authentication setting.
+ * It will show check box to enable OBEX authentication.
+ */
 public class BluetoothBppSetting extends ListActivity{
     TextView selection;
     String[] items = {"OBEX Authentication"};

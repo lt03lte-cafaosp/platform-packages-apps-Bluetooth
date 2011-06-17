@@ -37,7 +37,7 @@ import javax.obex.Authenticator;
 import javax.obex.PasswordAuthentication;
 
 /**
- * BluetoothFtpAuthenticator is a used by BluetoothObexServer for obex
+ * BluetoothBppAuthenticator is a used by BluetoothBppObexClentSession for obex
  * authentication procedure.
  */
 public class BluetoothBppAuthenticator implements Authenticator {
