@@ -472,6 +472,11 @@ public class BluetoothFtpService extends Service {
     private final void closeService() {
         if (VERBOSE) Log.v(TAG, "Ftp Service closeService");
 
+        if (mServerSession != null) {
+            mServerSession.close();
+            mServerSession = null;
+        }
+
         try {
             closeRfcommSocket(true, true);
             closeL2capSocket(true, true);
@@ -502,11 +507,6 @@ public class BluetoothFtpService extends Service {
         mRfcommServerSocket = null;
         mL2capServerSocket = null;
         mConnSocket = null;
-
-        if (mServerSession != null) {
-            mServerSession.close();
-            mServerSession = null;
-        }
 
         mHasStarted = false;
         if (stopSelfResult(mStartId)) {
