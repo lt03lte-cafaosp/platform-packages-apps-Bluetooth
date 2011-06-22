@@ -441,7 +441,6 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         /*
          * implement receive file
          */
-        long beginTime = 0;
         int status = -1;
         BufferedOutputStream bos = null;
 
@@ -474,7 +473,6 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             int readLength = 0;
             long timestamp = 0;
             try {
-                beginTime = System.currentTimeMillis();
                 while ((!mInterrupted) && (position != fileInfo.mLength)) {
 
                     if (V) timestamp = System.currentTimeMillis();
@@ -512,15 +510,6 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         } else {
             if (position == fileInfo.mLength) {
                 if (D) Log.d(TAG, "Receiving file completed for " + fileInfo.mFileName);
-                long endTime = System.currentTimeMillis();
-                long diffTime = endTime - beginTime;
-                /*Make sure, diffTime has some value in case if the
-                xfer is fast*/
-                if (diffTime == 0) {
-                    diffTime = 1;
-                }
-                Log.i(TAG, "Rx data rate:" +
-                        ((fileInfo.mLength/1024)/((diffTime)/1000))*8 + "KbPs");
                 status = BluetoothShare.STATUS_SUCCESS;
             } else {
                 if (D) Log.d(TAG, "Reading file failed at " + position + " of " + fileInfo.mLength);
