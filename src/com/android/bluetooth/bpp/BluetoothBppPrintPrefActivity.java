@@ -44,7 +44,10 @@ import android.preference.Preference.OnPreferenceChangeListener;
 import android.util.Log;
 import android.telephony.TelephonyManager;
 
-
+/**
+ * This class is for Printer Preference setting.
+ * However, most BPP printers do not support this feature.
+ */
 public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements OnPreferenceChangeListener{
     private static final String TAG = "BluetoothBppPrintPrefActivity";
 

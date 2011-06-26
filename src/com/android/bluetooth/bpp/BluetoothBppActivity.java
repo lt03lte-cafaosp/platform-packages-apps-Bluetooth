@@ -78,10 +78,12 @@ import android.os.Process;
 import android.telephony.TelephonyManager;
 
 /**
- * This Activity appears as a dialog. It lists any paired devices and
- * devices detected in the area after discovery. When a device is chosen
- * by the user, the MAC address of the device is sent back to the parent
- * Activity in the result Intent.
+ * This Activity appears as the first dialog for BPP. However, it is called only
+ * when SDP find BPP record from a printer. So, even though a remote device is a
+ * printer but it doesn't support BPP, then this activity will never be called.
+ * This activity provide user "Setting" and "Print" option. For "Setting", user
+ * can set authentication for BPP connection. For "Print", it start connection to
+ * the printer.
  */
 public class BluetoothBppActivity extends Activity {
 /*******************************************************************************
@@ -143,6 +145,10 @@ public class BluetoothBppActivity extends Activity {
             }
         });
 
+        /**
+         * When "Print" button is pressed, it will start RFCOMM connection with RFCOMM channel
+         * number which was passed through intent from BluetoothBppTransfer Class
+         */
         scanButtonRight.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
                 if (V) Log.v(TAG, "Click'd Printing button - " + mButtonClicked);
@@ -175,6 +181,13 @@ public class BluetoothBppActivity extends Activity {
         mContext = null;
     }
 
+    /**
+     * onStop() is called when current window focus is changed. There are 5 cases for window
+     * focus change: 1) Back key, 2) Incoming call, 3) Home Key, 4) Next menu, 5) Power off
+     * Currently, there is no way to find who tries to change current window focus, so this is
+     * only way to check the condition and close BPP activity gracefully to prevent from keeping
+     * showing BPP menu again when it go to the same menu.
+     */
     @Override
     protected void onStop() {
         /* When home button, it will not destroy current Activity context,
@@ -198,7 +211,7 @@ public class BluetoothBppActivity extends Activity {
         if (V) Log.v(TAG, "Call State: " + tm.getCallState());
 
         if (bf.mForceClose ||
-                (!mSettingMenu && mOPPstop &&
+                (!mSettingMenu && mOPPstop && !bf.mAuthChallProcess &&
                 (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
             if (bf.mSession != null) {
                 bf.mSessionHandler.obtainMessage(BluetoothBppTransfer.CANCEL, -1).sendToTarget();

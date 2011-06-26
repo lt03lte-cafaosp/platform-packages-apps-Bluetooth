@@ -47,6 +47,17 @@ import android.os.Process;
 import android.os.PowerManager.WakeLock;
 import android.util.Log;
 
+/**
+ * This class handles BPP Status Channel connection, disconnection, GetEvent.
+ * Currently, BluetoothBppEvent class is running after GetPrinterAttribute request.
+ * It has a Thread to get GetEvent response after a status channel is established.
+ * However, GetEvent response from a remote printer occurred only when any printer or job state
+ * is changed. Therefore, until it get a response, it goes in infinite loop.
+ * Note that javax obex implementation is that when it get "CONTINUE" response, it keeps wait
+ * any data until it gets "OK"
+ * Once it get "completed" GetEvent response, it is regarded as printing is done and it will close
+ * status channel and job channel.
+ */
 public class BluetoothBppEvent {
     private static final String TAG = "BluetoothBppEvent";
 
@@ -95,6 +106,11 @@ public class BluetoothBppEvent {
         bppEp = new BppEventParser();
     }
 
+    /**
+     * This will start Event ClientThread.
+     * @param handler This is eventhandler to send event to BluetoothBppTransfer class
+     * @param JobId This is JobId from CreateJob response to use for GetEvent request.
+     */
     public void start(Handler handler, String JobId) {
         if (D) Log.d(TAG, "Start!");
         mCallback = handler;
@@ -191,15 +207,6 @@ public class BluetoothBppEvent {
                 return;
             }
             mInterrupted = true;
-
-            if (mWaitingForRemote) {
-                if (V) Log.v(TAG, "Interrupted when waitingForRemote");
-                try {
-                    mTransport1.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "mTransport.close error");
-                }
-            }
         }
 
         private void disconnect() {
@@ -455,6 +462,9 @@ public class BluetoothBppEvent {
         }
     }
 
+    /**
+     * This is interface implement class which calls SOAP parser for GetEvent Response.
+     */
     public class BppEventParser implements eventParser{
         @Override
         public boolean Callback(String data) {

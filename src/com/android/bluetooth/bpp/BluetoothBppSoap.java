@@ -33,6 +33,9 @@ import com.android.bluetooth.opp.BluetoothShare;
 import android.os.Handler;
 import android.util.Log;
 
+/**
+ * This class contains SOAP message builder and parser
+ */
 public class BluetoothBppSoap {
     private static final String TAG = "BluetoothBppSoap";
     private static final boolean D = BluetoothBppConstant.DEBUG;
@@ -167,7 +170,12 @@ public class BluetoothBppSoap {
         mJobResult = 0;
     }
 
-    // SOAP Message Parser
+    /**
+     * SOAP Message Parser
+     * @param SoapReq Soap Request for current Soap Response
+     * @param SoapRsp Soap Response String data
+     * @return When it return true, it will invoke "ABORT" OBEX request to stop GetEvent Operation.
+     */
     synchronized public boolean Parser(String SoapReq, String SoapRsp){
 
         if (V) Log.v(TAG, "Parsing SOAP Response...");
@@ -269,26 +277,28 @@ public class BluetoothBppSoap {
 
                 mJobStatus = paramString[0];
                 if(V) Log.v(TAG, "Current Job Status : " +  mJobStatus);
-                if(paramString[0].compareTo("waiting") == 0){
-
-                    if(mDocumentSent == false){
-                        mDocumentSent = true;
-                        mCallback.obtainMessage(
-                                BluetoothBppTransfer.SEND_DOCUMENT, -1).sendToTarget();
-                    }
+                if(mDocumentSent == false){
+                    mDocumentSent = true;
+                    mCallback.obtainMessage(
+                            BluetoothBppTransfer.SEND_DOCUMENT, -1).sendToTarget();
                 }
                 if((paramString[0].compareTo("stopped") == 0) ||
-                   ((paramString[0].compareTo("completed") == 0) && !mFileSending ) ||
-                   (paramString[0].compareTo("aborted") == 0) ||
-                   (paramString[0].compareTo("cancelled") == 0) ||
-                   (paramString[0].compareTo("unknown") == 0))
-                {
+                       (paramString[0].compareTo("aborted") == 0) ||
+                       (paramString[0].compareTo("cancelled") == 0) ||
+                       (paramString[0].compareTo("unknown") == 0)) {
+
+                    mJobResult = BluetoothShare.STATUS_CANCELED;
+                    mCallback.obtainMessage(
+                        BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+                    result = true;
+                }
+
+                if(paramString[0].compareTo("completed") == 0) {
                     mJobResult = BluetoothShare.STATUS_CANCELED;
                     mCallback.obtainMessage(
                     BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
-
                     result = true;
-                }
+                 }
             }
 
             if(ExtractParameter(SoapRsp, "PrinterState", paramString ) != 0){
@@ -434,7 +444,11 @@ public class BluetoothBppSoap {
         return ((PrintSupported == 0)? false: true);
     }
 
-    // SOAP Message Builder
+    /**
+     * SOAP Message Builder
+     * @param SoapCmd Soap Request String value which can add into Soap message.
+     * @return It will return completed SOAP request message.
+     */
     synchronized public String Builder(String SoapCmd){
         String SoapReqHeader = null;
         String SoapReqBody = null;

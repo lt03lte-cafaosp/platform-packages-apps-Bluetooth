@@ -65,8 +65,13 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * This class run an actual Opp transfer session (from connect target device to
+ * This class run an actual BPP transfer session (from connect target device to
  * disconnect)
+ * It has a Thread and event handler to handle event from BluetoothBppObexClientSession
+ * or BluetoothBppEvent class.
+ * It also has Broadcast receiver for BT shutdown or ACL disconnect to handle unexpected
+ * event.
+ * This class also control entire BPP operation process.
  */
 public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatchListener {
     private static final String TAG = "BluetoothBppTransfer";
@@ -155,6 +160,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
     
     String PrintResultMsg = null;
 
+    public boolean mAuthChallProcess = false;
+
     public BluetoothBppTransfer(Context context, PowerManager powerManager,
             BluetoothOppBatch batch, BluetoothBppObexClientSession session) {
 
@@ -164,6 +171,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         mForceClose = false;
         mTransferCancelled = false;
         PrintResultMsg = null;
+        mAuthChallProcess = false;
 
         mBatch.registerListern(this);
         mAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -331,7 +339,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case CANCEL:
                     if (V) Log.v(TAG, "Transfer receive CANCEL msg");
                     mSession.mSoapProcess = BluetoothBppObexClientSession.CANCEL;
-                    if (mSessionEvent != null) {
+                    if (mSessionEvent != null ) {
                         mSessionEvent.bs.mJobStatus = "cancelled";
                     }
                     break;
@@ -349,6 +357,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
                 case MSG_OBEX_AUTH_CHALL:
                     if (V) Log.v(TAG, "Transfer receive MSG_OBEX_AUTH_CHALL msg");
+                    mAuthChallProcess = true;
                     Intent in = new Intent(mContext, BluetoothBppAuthActivity.class);
                     in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     mContext.startActivity(in);
@@ -415,12 +424,14 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case BluetoothBppObexClientSession.MSG_SESSION_STOP:
                     if (V) Log.v(TAG, "receive MSG_SESSION_STOP");
                     /* Disconnect Job Channel */
-                    mSession.stop();
+                    if (!mSessionEvent.bs.mFileSending) {
+                        mSession.stop();
+                    }
                     break;
               /*
-                         * Handle session completed status Set batch status to
-                         * finished
-                         */
+               * Handle session completed status Set batch status to
+               * finished
+               */
                 case BluetoothBppObexClientSession.MSG_SESSION_COMPLETE:
                     BluetoothOppShareInfo info1 = (BluetoothOppShareInfo)msg.obj;
                     if (V) Log.v(TAG, "receive MSG_SESSION_COMPLETE for batch " + mBatch.mId);
@@ -438,8 +449,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                             tickShareStatus(info1);
                         } else {
                             mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-                            //markBatchFailed(info1.mStatus);
-                            //tickShareStatus(mCurrentShare);
                             if ( mSessionEvent.bs.mJobResult != 0) {
                                markBatchError(info1, mSessionEvent.bs.mJobResult);
                             } else {
@@ -945,6 +954,13 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         mSessionHandler.sendMessageDelayed(msg, 2000);
     }
 
+    /**
+     * This function check the MIME type of the current file and compare with Printer supported
+     * formats. If the MIME type doesn't match with the printer supported formats, it will invoke
+     * OPP operation instead of BPP.
+     * @param docFormats Printer supported document formats.
+     * @return If true, BPP operation will be finished.
+     */
     private boolean IsNotSupportedDocFormats(String docFormats){
         // Overwriting previous value with cache from BluetoothDevice
         String extractMime;
@@ -957,7 +973,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             String currFileName = BluetoothOppManager.getInstance(mContext).getSendingFileNameInfo();
             if (V) Log.v(TAG, "File Type: " + currFileType + "\r\nFile Name: "+ currFileName);
 
-            if (docFormats.indexOf(currFileType, 0) == -1) {
+            if ( docFormats.indexOf(currFileType, 0) == -1 ) {
                 if ((extractMime = checkUnknownMimetype(currFileType, currFileName)) != null) {
                     if (V) Log.v(TAG, "Set the file type to " + extractMime);
                     if(docFormats.indexOf(extractMime, 0) != -1 ){

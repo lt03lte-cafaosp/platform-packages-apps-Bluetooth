@@ -42,6 +42,10 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.content.Context;
 
+/**
+ * This activity class shows file transfer progress bar.
+ * There is "Cancel" button to cancel current operation.
+ */
 public class BluetoothBppStatusActivity extends Activity{
     private static final String TAG = "BluetoothBppStatusActivity";
     private static final boolean D = BluetoothBppConstant.DEBUG;

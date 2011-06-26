@@ -56,6 +56,11 @@ import android.text.InputFilter.LengthFilter;
 import com.android.internal.app.AlertActivity;
 import com.android.internal.app.AlertController;
 
+/**
+ * This activity start Bluetooth Pincode user input dialog. This is different from bonding
+ * which is general secure method for new link. This activity is dedicatedly used for BPP
+ * authentication operation.
+ */
 public class BluetoothBppAuthActivity extends AlertActivity implements
         DialogInterface.OnClickListener, Preference.OnPreferenceChangeListener, TextWatcher {
     private static final String TAG = "BluetoothBppActivity";
@@ -119,6 +124,9 @@ public class BluetoothBppAuthActivity extends AlertActivity implements
                 BluetoothBppTransfer.USER_CONFIRM_TIMEOUT_ACTION));
     }
 
+    /*
+     * Creates a Button with Yes/No dialog
+     */
     private void showBppDialog(int id) {
         final AlertController.AlertParams p = mAlertParams;
         switch (id) {
@@ -151,6 +159,9 @@ public class BluetoothBppAuthActivity extends AlertActivity implements
         }
     }
 
+    /*
+     * Creates a view for the dialog and text to get the user inputs
+     */
     private View createView(final int id) {
         switch (id) {
             case DIALOG_YES_NO_AUTH:

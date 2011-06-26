@@ -30,17 +30,21 @@ package com.android.bluetooth.bpp;
 
 import android.os.ParcelUuid;
 
+/**
+ * Bluetooth BPP internal constants definition
+ */
 public class BluetoothBppConstant {
+    /** Tag used for debugging/logging */
+    public static final boolean DEBUG = false;
 
-    public static final boolean DEBUG = true;
-
-    public static final boolean VERBOSE = true;
+    /** Tag used for verbose logging */
+    public static final boolean VERBOSE = false;
 
     public static final String BTBPP_NAME_PREFERENCE = "btbpp_names";
 
     public static final String BTBPP_CHANNEL_PREFERENCE = "btbpp_channels";
 
-    // MIME Media Type header
+    /** MIME Media Type header */
     public static final String MIME_TYPE_XHTML_Print0_95            = "application/vnd.pwg-xhtml-print+xml:0.95";
     public static final String MIME_TYPE_XHTML_Print1_0             = "application/vnd.pwg-xhtml-print+xml:1.0";
     public static final String MIME_TYPE_XHTML_Print_Inline_Img     = "application/vnd.pwg-multiplexed";
@@ -57,8 +61,6 @@ public class BluetoothBppConstant {
     public static final String MIME_TYPE_PDF            = "application/PDF";
     public static final String MIME_TYPE_JPEG           = "image/jpeg";
     public static final String MIME_TYPE_GIF89a         = "image/gif:89A";
-
-    // OBEX Type Header
     public static final String MIME_TYPE_REF_SIMPLE     = "text/x-ref-simple";
     public static final String MIME_TYPE_REF_XML        = "text/x-ref-xml";
     public static final String MIME_TYPE_REF_LIST       = "text/x-ref-list";
@@ -66,53 +68,51 @@ public class BluetoothBppConstant {
     public static final String MIME_TYPE_REFOBJ         = "x-obex/referencedobject";
     public static final String MIME_TYPE_RUI            = "x-obex/RUI";
 
-
-    // SOAP Request
-    // GetPrinterAttributes
-
-
-    // Constants that indicate the current connection state
+    /** Constants that indicate the current connection state */
     public static final short DPS_UUID16 = 0x1118; /* Direct Printing */
     public static final short PBR_UUID16 = 0x1119; /* Printing by Reference */
     public static final short RUI_UUID16 = 0x1121; /* Reflected UI */
     public static final short STS_UUID16 = 0x1123; /* Printing Status */
     public static String mSupportedDocs = null;
 
-    /* Direct Printing */
+    /** Direct Printing UUID128 */
     public static final ParcelUuid DPS_UUID128 =
         ParcelUuid.fromString("00001118-0000-1000-8000-00805F9B34FB");
 
-    /* Printing by Reference */
+    /** Printing by Reference UUID128 */
     public static final ParcelUuid PBR_UUID128 =
         ParcelUuid.fromString("00001119-0000-1000-8000-00805F9B34FB");
 
-    /* Reflected UI */
+    /** Reflected UI UUID128 */
     public static final ParcelUuid RUI_UUID128 =
         ParcelUuid.fromString("00001121-0000-1000-8000-00805F9B34FB");
 
-    /* Printing Status */
+    /** Printing Status UUID128 */
     public static final ParcelUuid STS_UUID128 =
         ParcelUuid.fromString("00001123-0000-1000-8000-00805F9B34FB");
 
-
+    /** Direct Printing OBEX Target UUID */
     public static final byte[] DPS_Target_UUID =
         { (byte) 0x00, (byte) 0x00, (byte) 0x11, (byte) 0x18,
           (byte) 0x00, (byte) 0x00, (byte) 0x10, (byte) 0x00,
           (byte) 0x80, (byte) 0x00, (byte) 0x00, (byte) 0x80,
           (byte) 0x5F, (byte) 0x9B, (byte) 0x34, (byte) 0xFB };
 
+    /** Printing by Reference OBEX Target UUID */
     public static final byte[] PBR_Target_UUID =
         { (byte) 0x00, (byte) 0x00, (byte) 0x11, (byte) 0x19,
           (byte) 0x00, (byte) 0x00, (byte) 0x10, (byte) 0x00,
           (byte) 0x80, (byte) 0x00, (byte) 0x00, (byte) 0x80,
           (byte) 0x5F, (byte) 0x9B, (byte) 0x34, (byte) 0xFB };
 
+    /** Reflected UI OBEX Target UUID */
     public static final byte[] RUI_Target_UUID =
         { (byte) 0x00, (byte) 0x00, (byte) 0x11, (byte) 0x21,
           (byte) 0x00, (byte) 0x00, (byte) 0x10, (byte) 0x00,
           (byte) 0x80, (byte) 0x00, (byte) 0x00, (byte) 0x80,
           (byte) 0x5F, (byte) 0x9B, (byte) 0x34, (byte) 0xFB };
 
+    /** Printing Status OBEX Target UUID */
     public static final byte[] STS_Target_UUID =
         { (byte) 0x00, (byte) 0x00, (byte) 0x11, (byte) 0x23,
           (byte) 0x00, (byte) 0x00, (byte) 0x10, (byte) 0x00,
@@ -120,20 +120,16 @@ public class BluetoothBppConstant {
           (byte) 0x5F, (byte) 0x9B, (byte) 0x34, (byte) 0xFB };
 
 
-
-    /*
-        *   BPP OBEX Application Parameter Header Tag No
-        */
-    // Offset
+    /** BPP OBEX Application Parameter Header Tag: Offset */
     public static final int OBEX_HDR_APP_PARAM_OFFSET = 1;
 
-    // Count
+    /** BPP OBEX Application Parameter Header Tag: Count */
     public static final int OBEX_HDR_APP_PARAM_COUNT = 2;
 
-    // JobId
+    /** BPP OBEX Application Parameter Header Tag: JobId */
     public static final int OBEX_HDR_APP_PARAM_JOBID = 3;
 
-    // FileSize
+    /** BPP OBEX Application Parameter Header Tag: FileSize */
     public static final int OBEX_HDR_APP_PARAM_FILESIZE = 4;
 
     /**
