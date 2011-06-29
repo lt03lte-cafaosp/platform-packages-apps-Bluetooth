@@ -602,8 +602,6 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         final int listSize = nameList.size();
         String compareValue = "", currentValue, tmpCurrentValue;
 
-        if (listSize > 1)
-            Collections.sort(nameList, String.CASE_INSENSITIVE_ORDER);
 
         if (D) Log.d(TAG, "search by " + type + ", requestSize=" + requestSize + " offset="
                     + listStartOffset + " searchValue=" + searchValue);
@@ -611,8 +609,6 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         if (type.equals("number")) {
             // query the number, to get the names
             ArrayList<String> names = mVcardManager.getContactNamesByNumber(searchValue);
-            if (names.size() > 1)
-                Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
             for (int i = 0; i < names.size(); i++) {
                 compareValue = names.get(i).trim();
                 if (D) Log.d(TAG, "compareValue=" + compareValue);
