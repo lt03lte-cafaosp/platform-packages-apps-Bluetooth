@@ -240,6 +240,7 @@ public class BluetoothPbapVcardManager {
 
     public final ArrayList<String> getContactNamesByNumber(final String phoneNumber) {
         ArrayList<String> nameList = new ArrayList<String>();
+        ArrayList<String> startNameList = new ArrayList<String>();
 
         Cursor contactCursor = null;
         final Uri uri = Data.CONTENT_URI;
@@ -265,13 +266,23 @@ public class BluetoothPbapVcardManager {
                     }
                     String tmpNumber = onlyNumber.toString();
                     if (V) Log.v(TAG, "number: "+number+" onlyNumber:"+onlyNumber+" tmpNumber:"+tmpNumber);
+                    if (tmpNumber.endsWith(phoneNumber)) {
+                        String name = contactCursor.getString(CONTACTS_DISPLAY_NAME_COLUMN_INDEX);
+                        if (TextUtils.isEmpty(name)) {
+                            name = mContext.getString(android.R.string.unknownName);
+                        }
+                        if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber);
+                        if (V) Log.v(TAG, "Adding to end name list");
+                        nameList.add(name);
+                    }
                     if (tmpNumber.startsWith(phoneNumber)) {
                         String name = contactCursor.getString(CONTACTS_DISPLAY_NAME_COLUMN_INDEX);
                         if (TextUtils.isEmpty(name)) {
                             name = mContext.getString(android.R.string.unknownName);
                         }
                         if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber);
-                        nameList.add(name);
+                        if (V) Log.v(TAG, "Adding to start name list");
+                        startNameList.add(name);
                     }
                 }
             }
@@ -280,6 +291,13 @@ public class BluetoothPbapVcardManager {
                 contactCursor.close();
             }
         }
+        int startListSize = startNameList.size();
+        for (int index = 0; index < startListSize; index++) {
+            String object = startNameList.get(index);
+            if (!nameList.contains(object))
+                nameList.add(object);
+        }
+
         return nameList;
     }
 
