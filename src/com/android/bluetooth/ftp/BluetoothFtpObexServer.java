@@ -808,6 +808,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         BufferedInputStream bis;
         long finishtimestamp;
         long starttimestamp;
+        long readbytesleft = 0;
+        long filelength = fileinfo.length();
 
         byte[] buffer = new byte[outputBufferSize];
         try {
@@ -820,16 +822,19 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         bis = new BufferedInputStream(fileInputStream, 0x4000);
         starttimestamp = System.currentTimeMillis();
         try {
-            while ((position != fileinfo.length())) {
+            while ((position != filelength)) {
                 if (sIsAborted) {
                     ((ServerOperation)op).isAborted = true;
                     sIsAborted = false;
                     break;
                 }
                 timestamp = System.currentTimeMillis();
-                if(position != fileinfo.length()){
-                    readLength = bis.read(buffer, 0, outputBufferSize);
+
+                readbytesleft = filelength - position;
+                if(readbytesleft < outputBufferSize) {
+                    outputBufferSize = (int) readbytesleft;
                 }
+                readLength = bis.read(buffer, 0, outputBufferSize);
                 if (D) Log.d(TAG,"Read File");
                 outputStream.write(buffer, 0, readLength);
                 position += readLength;
@@ -861,7 +866,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         }
 
         if (D) Log.d(TAG,"sendFile - position = " + position );
-        if(position == fileinfo.length()) {
+        if(position == filelength) {
             Log.i(TAG,"Get Request TP analysis : Transmitted "+ position +
                   " bytes in" + (finishtimestamp - starttimestamp)  + "ms");
             return ResponseCodes.OBEX_HTTP_OK;
