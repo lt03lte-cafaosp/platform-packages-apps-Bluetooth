@@ -213,12 +213,11 @@ public class BluetoothBppActivity extends Activity {
         if (bf.mForceClose ||
                 (!mSettingMenu && mOPPstop && !bf.mAuthChallProcess &&
                 (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
-            if (bf.mSession != null) {
-                bf.mSessionHandler.obtainMessage(BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+
+            if (!bf.mForceClose) {
+                bf.mStatusFinal = BluetoothShare.STATUS_CANCELED;
+                bf.printResultMsg();                
             }
-            bf.mTransferCancelled = true;
-            bf.printResultMsg();
-            bf.markBatchCancelled();
             finish();
         }
     }

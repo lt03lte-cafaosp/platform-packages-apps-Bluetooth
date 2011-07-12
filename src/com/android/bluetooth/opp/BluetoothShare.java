@@ -446,4 +446,95 @@ public final class BluetoothShare implements BaseColumns {
      */
     public static final int STATUS_CONNECTION_ERROR = 497;
 
+    // Bluetooth Printing Profile Error code
+    /**
+     * This transfer couldn't be completed because of media jam from a printer
+     */
+    public static final int STATUS_BPP_MEDIA_JAM = 501;
+
+    /**
+     * This transfer couldn't be completed because of paused from a printer
+     */
+    public static final int STATUS_BPP_PAUSED = 502;
+
+    /**
+     * This transfer couldn't be completed because of door open from a printer
+     */
+    public static final int STATUS_BPP_DOOR_OPEN = 503;
+
+    /**
+     * This transfer couldn't be completed because of media low from a printer
+     */
+    public static final int STATUS_BPP_MEDIA_LOW = 504;
+
+    /**
+     * This transfer couldn't be completed because of media empty from a printer
+     */
+    public static final int STATUS_BPP_MEDIA_EMPTY = 505;
+
+    /**
+     * This transfer couldn't be completed because of output area almost full from a printer
+     */
+
+    public static final int STATUS_BPP_OUTPUT_AREA_ALMOST_FULL = 506;
+    /**
+     * This transfer couldn't be completed because of output area full from a printer
+     */
+    public static final int STATUS_BPP_OUTPUT_AREA_FULL = 507;
+
+    /**
+     * This transfer couldn't be completed because of marker supply low from a printer
+     */
+    public static final int STATUS_BPP_MARKER_SUPPLY_LOW = 508;
+
+    /**
+     * This transfer couldn't be completed because of marker supply empty from a printer
+     */
+    public static final int STATUS_BPP_MARKER_SUPPLY_EMPTY = 509;
+
+    /**
+     * This transfer couldn't be completed because of marker failure from a printer
+     */
+    public static final int STATUS_BPP_MARKER_FAILURE = 510;
+
+    /**
+     * This transfer couldn't be completed because of stopped from a printer
+     */
+    public static final int STATUS_BPP_STOPPED_BY_PRINTER = 511;
+
+    /**
+     * This transfer couldn't be completed because of aborted from a printer
+     */
+    public static final int STATUS_BPP_ABORTED_BY_PRINTER = 512;
+
+    /**
+     * This transfer couldn't be completed because of canceled from a printer
+     */
+    public static final int STATUS_BPP_CANCELED_BY_PRINTER = 513;
+
+    /**
+     * This transfer couldn't be completed because of unknown error from a printer
+     */
+    public static final int STATUS_BPP_UNKNOWN_ERROR_BY_PRINTER = 514;
+
+    /**
+     * This transfer couldn't be completed because of operation fail from a printer
+     */
+    public static final int STATUS_BPP_REFUSED_BY_PRINTER = 515;
+
+    /**
+     * This transfer couldn't be completed because of operation fail from a printer
+     */
+    public static final int STATUS_BPP_CANCELED_BY_USER = 516;
+
+    /**
+     * This transfer has successfully completed
+     */
+    public static final int STATUS_BPP_SUCCESS = 517;
+
+    /**
+     * This transfer couldn't be completed because of bluetooth connection lost
+     */
+    public static final int STATUS_BPP_DISCONNECTED = 518;
+
 }

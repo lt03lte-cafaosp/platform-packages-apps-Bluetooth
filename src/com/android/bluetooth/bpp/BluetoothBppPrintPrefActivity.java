@@ -32,6 +32,7 @@ import com.android.bluetooth.R;
 import com.android.bluetooth.opp.BluetoothOppService;
 import com.android.bluetooth.opp.BluetoothShare;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.Context;
 import android.os.Bundle;
@@ -83,9 +84,9 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
 
     static String mSides    = "one-sided";
 
-    static volatile boolean mOPPstop = false;
+    static public boolean mOPPstop = false;
 
-    static volatile boolean mBPPstop = false;
+    static public boolean mBPPstop = false;
 
     static Context mContext = null;
 
@@ -170,14 +171,13 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
             bf.mSessionHandler.obtainMessage(
                         BluetoothBppTransfer.CREATE_JOB, -1).sendToTarget();
 
-            Intent in = new Intent(this, BluetoothBppStatusActivity.class);
+            Intent in = new Intent(mContext, BluetoothBppStatusActivity.class);
             in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            this.startActivity(in);
+            mContext.startActivity(in);
             mOPPstop = false;
             mBPPstop = false;
             finish();
         }
-
         return true;
     }
 
@@ -230,16 +230,17 @@ public class BluetoothBppPrintPrefActivity extends PreferenceActivity implements
         if (V) Log.v(TAG, "Call State: " + tm.getCallState());
 
         if(mBPPstop){
-            if(bf.mSession != null) {
+            if (bf.mSession != null && bf.mSessionHandler != null) {
                 bf.mSessionHandler.obtainMessage(
                         BluetoothBppTransfer.CANCEL, -1).sendToTarget();
             }
         }
         if(bf.mForceClose
             ||(mOPPstop && (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
-            bf.mTransferCancelled = true;
-            bf.printResultMsg();
-            bf.markBatchCancelled();
+            if (!bf.mForceClose) {
+                bf.mStatusFinal = BluetoothShare.STATUS_CANCELED;
+                bf.printResultMsg();                
+            }
             finish();
         }
         super.onStop();

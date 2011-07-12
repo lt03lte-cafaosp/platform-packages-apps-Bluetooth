@@ -110,9 +110,10 @@ public class BluetoothBppSetting extends ListActivity{
         if (V) Log.v(TAG, "Call State: " + tm.getCallState());
          if (bf.mForceClose ||
              (!mBackKeyPressed && (tm.getCallState() != TelephonyManager.CALL_STATE_RINGING))) {
-             bf.mTransferCancelled = true;
-             bf.printResultMsg();
-             bf.markBatchCancelled();
+             if (!bf.mForceClose) {
+                 bf.mStatusFinal = BluetoothShare.STATUS_CANCELED;
+                 bf.printResultMsg();                
+             }
              finish();
          }
     }
