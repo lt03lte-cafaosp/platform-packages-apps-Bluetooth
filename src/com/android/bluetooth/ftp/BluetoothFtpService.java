@@ -161,6 +161,11 @@ public class BluetoothFtpService extends Service {
     private static final int MSG_INTERNAL_USER_TIMEOUT = 2;
 
     private static final int MSG_INTERNAL_AUTH_TIMEOUT = 3;
+
+    private static final int MSG_INTERNAL_OBEX_RFCOMM_SESSION_UP = 10;
+
+    private static final int MSG_INTERNAL_OBEX_L2CAP_SESSION_UP = 11;
+
     //Port number for FTP RFComm Socket
     private static final int PORT_NUM = 20;
 
@@ -371,7 +376,7 @@ public class BluetoothFtpService extends Service {
             }
         }
 
-        if (initSocketOK) {
+        if (initSocketOK && (mRfcommServerSocket != null) ) {
             if (VERBOSE) Log.v(TAG, "Succeed to create listening socket on channel " + PORT_NUM);
 
         } else {
@@ -383,7 +388,7 @@ public class BluetoothFtpService extends Service {
     private final void closeRfcommSocket(boolean server, boolean accept) throws IOException {
         if (server == true) {
             // Stop the possible trying to init serverSocket
-            mInterrupted = true;
+            mInterrupted = false;
 
             if (mRfcommServerSocket != null) {
                 mRfcommServerSocket.close();
@@ -443,7 +448,7 @@ public class BluetoothFtpService extends Service {
             }
         }
 
-        if (initSocketOK) {
+        if (initSocketOK && (mL2capServerSocket != null) ) {
             if (VERBOSE) Log.v(TAG, "Succeed to create listening socket on psm " + DEFAULT_FTP_PSM);
 
         } else {
@@ -455,7 +460,7 @@ public class BluetoothFtpService extends Service {
     private final void closeL2capSocket(boolean server, boolean accept) throws IOException {
         if (server == true) {
             // Stop the possible trying to init serverSocket
-            mInterrupted = true;
+            mInterrupted = false;
 
             if (mL2capServerSocket != null) {
                 mL2capServerSocket.close();
@@ -659,6 +664,8 @@ public class BluetoothFtpService extends Service {
                     if (TextUtils.isEmpty(sRemoteDeviceName)) {
                         sRemoteDeviceName = getString(R.string.defaultname);
                     }
+                    mSessionStatusHandler.sendMessage(mSessionStatusHandler
+                           .obtainMessage(MSG_INTERNAL_OBEX_RFCOMM_SESSION_UP));
                     boolean trust = mRemoteDevice.getTrustState();
                     if (VERBOSE) Log.v(RTAG, "GetTrustState() = " + trust);
 
@@ -680,9 +687,9 @@ public class BluetoothFtpService extends Service {
                     }
                     stopped = true; // job done ,close this thread;
                 } catch (IOException ex) {
-                    if (stopped) {
-                        break;
-                    }
+                    stopped = true; //IO exception, close the thread
+                    //Since IO exception happened, Assign the socket handle to null.
+                    mRfcommServerSocket = null;
                     if (VERBOSE) Log.v(RTAG, "Accept exception: " + ex.toString());
                 }
             }
@@ -730,6 +737,8 @@ public class BluetoothFtpService extends Service {
                     if (TextUtils.isEmpty(sRemoteDeviceName)) {
                         sRemoteDeviceName = getString(R.string.defaultname);
                     }
+                    mSessionStatusHandler.sendMessage(mSessionStatusHandler
+                          .obtainMessage(MSG_INTERNAL_OBEX_L2CAP_SESSION_UP));
                     boolean trust = mRemoteDevice.getTrustState();
                     if (VERBOSE) Log.v(LTAG, "GetTrustState() = " + trust);
 
@@ -752,9 +761,9 @@ public class BluetoothFtpService extends Service {
                     }
                     stopped = true; // job done ,close this thread;
                 } catch (IOException ex) {
-                    if (stopped) {
-                        break;
-                    }
+                    stopped = true; //IO exception, close the thread
+                    //Since IO exception happened, Assign socket the handle to null.
+                    mL2capServerSocket = null;
                     if (VERBOSE) Log.v(LTAG, "Accept exception: " + ex.toString());
                 }
             }
@@ -832,6 +841,22 @@ public class BluetoothFtpService extends Service {
                      */
                     if((msg.arg1 == FTP_MEDIA_DELETE) || (msg.arg1 == FTP_MEDIA_FILES_DELETE)) {
                         notifyContentResolver(uri);
+                    }
+                    break;
+                case MSG_INTERNAL_OBEX_RFCOMM_SESSION_UP:
+                    if (VERBOSE) Log.v(TAG,"MSG_INTERNAL_OBEX_RFCOMM_SESSION_UP");
+                    try {
+                      closeL2capSocket(true, false);
+                    } catch (IOException ex) {
+                      Log.e(TAG, "CloseSocket error: " + ex);
+                    }
+                    break;
+                case MSG_INTERNAL_OBEX_L2CAP_SESSION_UP:
+                    if (VERBOSE) Log.v(TAG,"MSG_INTERNAL_OBEX_L2CAP_SESSION_UP");
+                    try {
+                      closeRfcommSocket(true, false);
+                    } catch (IOException ex) {
+                      Log.e(TAG, "CloseSocket error: " + ex);
                     }
                     break;
                 default:
