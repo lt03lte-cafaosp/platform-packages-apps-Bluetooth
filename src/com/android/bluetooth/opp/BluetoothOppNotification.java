@@ -100,6 +100,8 @@ class BluetoothOppNotification {
 
     private int mActiveNotificationId = 0;
 
+    final Notification n = new Notification();
+
     /**
      * This inner class is used to describe some properties for one transfer.
      */
@@ -285,7 +287,6 @@ class BluetoothOppNotification {
                     .formatProgressText(item.totalTotal, item.totalCurrent));
 
             // Build the notification object
-            Notification n = new Notification();
             if (item.direction == BluetoothShare.DIRECTION_OUTBOUND) {
                 n.icon = android.R.drawable.stat_sys_upload;
                 expandedView.setImageViewResource(R.id.appIcon, android.R.drawable.stat_sys_upload);
