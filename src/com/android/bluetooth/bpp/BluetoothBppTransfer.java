@@ -31,6 +31,7 @@ package com.android.bluetooth.bpp;
 import javax.obex.ObexTransport;
 
 import com.android.bluetooth.opp.BluetoothOppTransfer;
+import com.android.bluetooth.opp.BluetoothOppUtility;
 import com.android.bluetooth.opp.BluetoothShare;
 import com.android.bluetooth.opp.Constants;
 import com.android.bluetooth.opp.BluetoothOppShareInfo;
@@ -110,6 +111,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     public static final int FILE_SENDING = 24;
 
+    public static final int STATUS_UPDATE = 25;
+
     /* GetEvent Messages */
     public static final int EVENT_GETEVENT_RESPONSE = 30;
 
@@ -152,8 +155,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     public boolean mForceClose = false;
     
-    private int mTransferStatus =0;
-    
     private volatile boolean mBPPregisterReceiver;
     
     public boolean mTransferCancelled = false;
@@ -161,6 +162,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
     String PrintResultMsg = null;
 
     public boolean mAuthChallProcess = false;
+
+    public int mStatusFinal = 0;
 
     public BluetoothBppTransfer(Context context, PowerManager powerManager,
             BluetoothOppBatch batch, BluetoothBppObexClientSession session) {
@@ -172,6 +175,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         mTransferCancelled = false;
         PrintResultMsg = null;
         mAuthChallProcess = false;
+        mStatusFinal = 0;
 
         mBatch.registerListern(this);
         mAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -196,8 +200,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         + "- Printer device: " + mBatch.mDestination);
                     if (device.equals(mBatch.mDestination) && mBPPregisterReceiver) {
                         if (V) Log.v(TAG, "Received ACTION_ACL_DISCONNECTED - batch: " + mBatch.mId);
-                        String PrintErrMsg = "Printing failed due to \"Printer got disconnected!!\"";
-                        Toast.makeText(mContext, PrintErrMsg, Toast.LENGTH_SHORT).show();
+                        mStatusFinal = BluetoothShare.STATUS_BPP_DISCONNECTED;
+                        printResultMsg();
                         ForceCloseBpp();
                 }
             }
@@ -263,11 +267,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     } else {
                         /* SDP query fail case */
                         Log.e(TAG, "SDP query failed!");
-                        markBatchFailed(BluetoothShare.STATUS_CONNECTION_ERROR);
-                        mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-
-                        String msgError ="Connection fail with the Printer";
-                        Toast.makeText(mContext, msgError, Toast.LENGTH_SHORT).show();
+                        mStatusFinal = BluetoothShare.STATUS_CONNECTION_ERROR;
+                        printResultMsg();
                     }
                     break;
                 case RFCOMM_CONNECT:
@@ -279,8 +280,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     } else {
                         /* SDP query fail case */
                         Log.e(TAG, "SDP query failed!");
-                        markBatchFailed(BluetoothShare.STATUS_CONNECTION_ERROR);
-                        mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+                        mStatusFinal = BluetoothShare.STATUS_CONNECTION_ERROR;
+                        printResultMsg();
                     }
                     break;
                 /*
@@ -290,13 +291,11 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case RFCOMM_ERROR:
                     if (V) Log.v(TAG, "receive RFCOMM_ERROR msg");
                     mConnectThread = null;
-                    markBatchFailed(BluetoothShare.STATUS_CONNECTION_ERROR);
-                    mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-                    mTransferStatus = BluetoothShare.STATUS_CONNECTION_ERROR;
                     BluetoothBppActivity.mOPPstop = false;
                     if(BluetoothBppActivity.mContext != null){
                         ((Activity) BluetoothBppActivity.mContext).finish();
                     }
+                    mStatusFinal = BluetoothShare.STATUS_CONNECTION_ERROR;
                     printResultMsg();
                     break;
                 /*
@@ -337,10 +336,15 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     break;
 
                 case CANCEL:
-                    if (V) Log.v(TAG, "Transfer receive CANCEL msg");
-                    mSession.mSoapProcess = BluetoothBppObexClientSession.CANCEL;
+                    if (V) Log.v(TAG, "Transfer receive CANCEL msg: " + msg.arg1);
+                    if (mSession != null) {
+                        mSession.mSoapProcess = BluetoothBppObexClientSession.CANCEL;
+                    }
                     if (mSessionEvent != null ) {
                         mSessionEvent.bs.mJobStatus = "cancelled";
+                    }
+                    if ((msg.arg1 > 0) && (mStatusFinal != BluetoothShare.STATUS_CANCELED) ) {
+                        mStatusFinal = msg.arg1;
                     }
                     break;
 
@@ -358,9 +362,9 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case MSG_OBEX_AUTH_CHALL:
                     if (V) Log.v(TAG, "Transfer receive MSG_OBEX_AUTH_CHALL msg");
                     mAuthChallProcess = true;
-                    Intent in = new Intent(mContext, BluetoothBppAuthActivity.class);
-                    in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    mContext.startActivity(in);
+                    Intent in2 = new Intent(mContext, BluetoothBppAuthActivity.class);
+                    in2.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mContext.startActivity(in2);
                     mSessionHandler.sendMessageDelayed(mSessionHandler
                         .obtainMessage(USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
                     break;
@@ -380,6 +384,12 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         mSessionEvent.bs.mFileSending = (msg.arg1==0)? false:true;
                     }
                     break;
+                case STATUS_UPDATE:
+                    if (V) Log.v(TAG, "Transfer receive STATUS_UPDATE msg - " + msg.arg1);
+                    if (mStatusFinal == 0) {
+                        mStatusFinal = msg.arg1;
+                    }
+                    break;
                 /*
                  * Put next share if available,or finish the transfer.
                  * For outbound session, call session.addShare() to send next file,
@@ -390,13 +400,17 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case BluetoothBppObexClientSession.MSG_SHARE_COMPLETE:
                     BluetoothOppShareInfo info = (BluetoothOppShareInfo)msg.obj;
                     if (V) Log.v(TAG, "receive MSG_SHARE_COMPLETE for info " + info.mId);
+                    if (mStatusFinal == 0) {
+                        mStatusFinal = info.mStatus;
+                    }
                     if (mBatch.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
-                        mCurrentShare = mBatch.getPendingShare();
+                        BluetoothOppShareInfo newShare = mBatch.getPendingShare();
 
-                        if (mCurrentShare != null) {
+                        if (newShare != null) {
                             /* we have additional share to process */
                             if (V) Log.v(TAG, "continue session for info " + mCurrentShare.mId +
                                     " from batch " + mBatch.mId);
+                            mCurrentShare = newShare;
                             processCurrentShare();
                         } else {
                             /* for outbound transfer, all shares are processed */
@@ -418,13 +432,16 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE:
                     if (V) Log.v(TAG, "receive MSG_SESSION_EVENT_COMPLETE");
                     /* Disconnect Status Channel */
+                    if (msg.arg1 > 0) {
+                        mSessionEvent.mEnforceClose = true;
+                    }
                     mSessionEvent.stop();
                     break;
 
                 case BluetoothBppObexClientSession.MSG_SESSION_STOP:
                     if (V) Log.v(TAG, "receive MSG_SESSION_STOP");
                     /* Disconnect Job Channel */
-                    if (!mSessionEvent.bs.mFileSending) {
+                    if (!mSessionEvent.bs.mFileSending || mSessionEvent.mEnforceClose) {
                         mSession.stop();
                     }
                     break;
@@ -436,30 +453,17 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     BluetoothOppShareInfo info1 = (BluetoothOppShareInfo)msg.obj;
                     if (V) Log.v(TAG, "receive MSG_SESSION_COMPLETE for batch " + mBatch.mId);
 
+                    mContext.unregisterReceiver(mBluetoothReceiver);
+                    mBPPregisterReceiver = false;
+
                     BluetoothBppActivity.mOPPstop = false;
                     BluetoothBppPrintPrefActivity.mOPPstop = false;
 
-                    if (mSessionEvent != null) {
-                        if (V) Log.v(TAG, "mJobStatus: " + mSessionEvent.bs.mJobStatus
-                            + "\r\nmPrinterStateReason: " + mSessionEvent.bs.mPrinterStateReason
-                            + "\r\nmOperationStatus: " + mSessionEvent.bs.mOperationStatus);
-
-                        if (mSessionEvent.bs.mJobStatus.compareTo("completed")== 0) {
-                            mBatch.mStatus = Constants.BATCH_STATUS_FINISHED;
-                            tickShareStatus(info1);
-                        } else {
-                            mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-                            if ( mSessionEvent.bs.mJobResult != 0) {
-                               markBatchError(info1, mSessionEvent.bs.mJobResult);
-                            } else {
-                                if (info1.mStatus > BluetoothShare.STATUS_SUCCESS) {
-                                    markBatchError(info1, info1.mStatus);
-                                } else {
-                                    markBatchError(info1, BluetoothShare.STATUS_UNKNOWN_ERROR);
-                                }
-                            }
-                        }
+                    if (mStatusFinal == 0 ) {
+                        mStatusFinal = info1.mStatus;
                     }
+                    printResultMsg();
+
                     if(BluetoothBppStatusActivity.mContext != null) {
                         ((Activity) BluetoothBppStatusActivity.mContext).finish();
                     }
@@ -472,7 +476,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     if(BluetoothBppActivity.mContext != null){
                         ((Activity) BluetoothBppActivity.mContext).finish();
                     }
-                    printResultMsg();
                     break;
 
                 /* Handle the error state of an Obex session */
@@ -486,8 +489,12 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         ((Activity) BluetoothBppActivity.mContext).finish();
                     }
                     BluetoothOppShareInfo info2 = (BluetoothOppShareInfo)msg.obj;
+                    if (mStatusFinal == 0) {
+                        mStatusFinal = info2.mStatus;
+                    }
                     if ( mSessionEvent != null) {
                         if (mSessionEvent.mConnected == true) {
+                            mSessionEvent.mEnforceClose = true;
                             mSessionEvent.stop();
                         } else {
                             mSession.stop();
@@ -502,6 +509,9 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 case BluetoothBppObexClientSession.MSG_SHARE_INTERRUPTED:
                     if (V) Log.v(TAG, "receive MSG_SHARE_INTERRUPTED for batch " + mBatch.mId);
                     BluetoothOppShareInfo info3 = (BluetoothOppShareInfo)msg.obj;
+                    if (mStatusFinal == 0) {
+                        mStatusFinal = info3.mStatus;
+                    }
                     if (mBatch.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
                         try {
                             if (mTransport == null) {
@@ -513,13 +523,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                             Log.e(TAG, "failed to close mTransport");
                         }
                         if (V) Log.v(TAG, "mTransport closed ");
-                        mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-                        if (info3.mStatus > BluetoothShare.STATUS_SUCCESS) {
-                            markBatchError(info3, info3.mStatus);
-                        } else {
-                            markBatchError(info3, BluetoothShare.STATUS_UNKNOWN_ERROR);
-                        }
-                        tickShareStatus(mCurrentShare);
+                        printResultMsg();
                     }
                     break;
 
@@ -539,21 +543,10 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                             Log.e(TAG, "failed to close mTransport");
                         }
                         if (V) Log.v(TAG, "mTransport closed ");
-                    } else {
-                        /*
-                         * For inbound transfer, the block point is waiting for
-                         * user confirmation we can interrupt it nicely
-                         */
-
-                        // Remove incoming file confirm notification
-                        NotificationManager nm = (NotificationManager)mContext
-                                .getSystemService(Context.NOTIFICATION_SERVICE);
-                        nm.cancel(mCurrentShare.mId);
-                        // Send intent to UI for timeout handling
-                        Intent i = new Intent(BluetoothShare.USER_CONFIRMATION_TIMEOUT_ACTION);
-                        mContext.sendBroadcast(i);
-
-                        markShareTimeout(mCurrentShare);
+                        if (mStatusFinal == 0) {
+                            mStatusFinal = BluetoothShare.STATUS_CONNECTION_ERROR;                            
+                        }
+                        printResultMsg();
                     }
                     break;
             }
@@ -561,43 +554,13 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
     }
 
     public void printResultMsg(){
+        if (mForceClose) return;
+        if (V) Log.v(TAG, "printResultMsg: " + mStatusFinal);
+        markBatchResult(mStatusFinal);
         /* Show AlertDiaglog Message */
-        if ((mSessionEvent != null) && (PrintResultMsg == null)) {
-            if (mSessionEvent.bs.mPrinterStateReason.compareTo("none") != 0) {
-                PrintResultMsg = "Printing Fail due to \""
-                    + mSessionEvent.bs.mPrinterStateReason + "\"";
-            } else if (mSessionEvent.bs.mOperationStatus.compareTo("0x0000") != 0) {
-                PrintResultMsg = ((PrintResultMsg == null) ? "" :(PrintResultMsg + "\r\n") )
-                + "Printer Operation Fail (" + mSessionEvent.bs.mOperationStatus + ")";
-            } else if ((mSessionEvent.bs.mJobStatus.compareTo("stopped")== 0)
-                    || (mSessionEvent.bs.mJobStatus.compareTo("aborted")== 0)
-                    || (mSessionEvent.bs.mJobStatus.compareTo("cancelled")== 0)
-                    || (mSessionEvent.bs.mJobStatus.compareTo("unknown")== 0)) {
-                PrintResultMsg = ((PrintResultMsg == null) ? "" :(PrintResultMsg + "\r\n") )
-                    + "Printing has been " + mSessionEvent.bs.mJobStatus;
-            } else if (mSessionEvent.mEventStatus != 0 ){
-                PrintResultMsg = "Printer refused request(0x"
-                    + Integer.toHexString(mSessionEvent.mEventStatus)+")";
-            } else if (mSessionEvent.bs.mJobStatus.compareTo("completed")== 0){
-                PrintResultMsg = "Printing Completed Successfully";
-            }
-        }
-        if ((mSession != null) && (PrintResultMsg == null)) {
-            if (mSession.mJobStatus != 0 ) {
-                PrintResultMsg = "Printer refused request(0x"
-                    + Integer.toHexString(mSession.mJobStatus)+")";
-            }
-        }
-        if ((mTransferStatus != 0) && (PrintResultMsg == null)) {
-            PrintResultMsg = "Printer refused request(0x"
-                + Integer.toHexString(mTransferStatus)+")";
-        }
-        if ((mTransferCancelled) && (PrintResultMsg == null)) {
-            PrintResultMsg = "Printing has been cancelled";
-        }
-        if (PrintResultMsg != null ) {
-            Toast.makeText(mContext, PrintResultMsg, Toast.LENGTH_SHORT).show();
-        }
+        mStatusFinal = (mStatusFinal==200)?(BluetoothShare.STATUS_BPP_SUCCESS): mStatusFinal;
+        String msg = BluetoothOppUtility.getStatusDescription(mContext, mStatusFinal, null);
+        Toast.makeText(mContext, msg, Toast.LENGTH_SHORT).show();
     }
 
     private void markShareTimeout(BluetoothOppShareInfo share) {
@@ -608,81 +571,34 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         mContext.getContentResolver().update(contentUri, updateValues, null, null);
     }
 
-    public void markBatchCancelled() {
-        if (V) Log.v(TAG, "markBatchCancelled()");
+    public void markBatchResult(int statusCode) {
         BluetoothOppShareInfo info = mBatch.getPendingShare();
+        if (info == null) {
+            info = mCurrentShare;
+        }
+        if (V) Log.v(TAG, "info: " + info+ ","+ mCurrentShare);
         if (info != null) {
-            mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
-            info.mStatus = BluetoothShare.STATUS_CANCELED;
+            if (statusCode == BluetoothShare.STATUS_SUCCESS) {
+                mBatch.mStatus = Constants.BATCH_STATUS_FINISHED;
+            } else {
+                mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+            }
+            info.mStatus = statusCode;
             Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + info.mId);
             ContentValues updateValues = new ContentValues();
             updateValues.put(BluetoothShare.STATUS, info.mStatus);
+
+            BluetoothOppSendFileInfo fileInfo = BluetoothOppSendFileInfo.generateFileInfo(mContext,
+                    info.mUri, info.mMimetype, info.mDestination);
+            if (fileInfo.mFileName != null) {
+                updateValues.put(BluetoothShare.FILENAME_HINT, fileInfo.mFileName);
+                updateValues.put(BluetoothShare.TOTAL_BYTES, fileInfo.mLength);
+                updateValues.put(BluetoothShare.MIMETYPE, fileInfo.mMimetype);
+            }
             mContext.getContentResolver().update(contentUri, updateValues, null, null);
         }
     }
 
-    public void markBatchError(BluetoothOppShareInfo share, int status) {
-        if (V) Log.v(TAG, "markBatchError() - share: " + share + ", status: " + status);
-        if(share == null){
-            if (V) Log.v(TAG, "tickShareStatus() - share is null");
-            return;
-        }
-        Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + share.mId);
-        ContentValues updateValues = new ContentValues();
-        updateValues.put(BluetoothShare.STATUS, status);
-        updateValues.put(BluetoothShare.DIRECTION, share.mDirection);
-        mContext.getContentResolver().update(contentUri, updateValues, null, null);
-    }
-
-       private void markBatchFailed(int failReason) {
-        synchronized (this) {
-            try {
-                wait(1000);
-            } catch (InterruptedException e) {
-                if (V) Log.v(TAG, "Interrupted waiting for markBatchFailed");
-            }
-        }
-
-        if (D) Log.d(TAG, "Mark all ShareInfo in the batch as failed");
-        if (mCurrentShare != null) {
-            if (V) Log.v(TAG, "Current share has status " + mCurrentShare.mStatus);
-            if (BluetoothShare.isStatusError(mCurrentShare.mStatus)) {
-                failReason = mCurrentShare.mStatus;
-            }
-            if (mCurrentShare.mDirection == BluetoothShare.DIRECTION_INBOUND
-                    && mCurrentShare.mFilename != null) {
-                new File(mCurrentShare.mFilename).delete();
-            }
-        }
-
-        BluetoothOppShareInfo info = mBatch.getPendingShare();
-        while (info != null) {
-            if (info.mStatus < 200) {
-                info.mStatus = failReason;
-                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + info.mId);
-                ContentValues updateValues = new ContentValues();
-                updateValues.put(BluetoothShare.STATUS, info.mStatus);
-                /* Update un-processed outbound transfer to show some info */
-                if (info.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
-                    BluetoothOppSendFileInfo fileInfo = null;
-                    fileInfo = BluetoothOppSendFileInfo.generateFileInfo(mContext, info.mUri,
-                            info.mMimetype, info.mDestination);
-                    if (fileInfo.mFileName != null) {
-                        updateValues.put(BluetoothShare.FILENAME_HINT, fileInfo.mFileName);
-                        updateValues.put(BluetoothShare.TOTAL_BYTES, fileInfo.mLength);
-                        updateValues.put(BluetoothShare.MIMETYPE, fileInfo.mMimetype);
-                    }
-                } else {
-                    if (info.mStatus < 200 && info.mFilename != null) {
-                        new File(info.mFilename).delete();
-                    }
-                }
-                mContext.getContentResolver().update(contentUri, updateValues, null, null);
-                Constants.sendIntentIfCompleted(mContext, contentUri, info.mStatus);
-            }
-            info = mBatch.getPendingShare();
-        }
-    }
 
     private void markInfoStatus(BluetoothOppShareInfo info, int status) {
         if (info == null) {
@@ -690,10 +606,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         }
         if (D) Log.d(TAG, "Mark ShareInfo in the batch as " + status );
         Constants.updateShareStatus(mContext, info.mId, status);
-    }
-
-    private void markBatchFailed() {
-        markBatchFailed(BluetoothShare.STATUS_UNKNOWN_ERROR);
     }
 
     /*
@@ -728,8 +640,8 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
          */
         if (!mAdapter.isEnabled()) {
             Log.e(TAG, "Can't start transfer when Bluetooth is disabled for " + mBatch.mId);
-            markBatchFailed();
-            mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+            mStatusFinal = BluetoothShare.STATUS_PRECONDITION_FAILED;
+            printResultMsg();
             return;
         }
 
@@ -766,6 +678,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         if (mSession != null) {
             if (V) Log.v(TAG, "Stop mSession");
             mSession.stop();
+            mSession = null;
         }
         if (mHandlerThread != null) {
             if (V) Log.v(TAG, "mHandlerThread is stopped !!");

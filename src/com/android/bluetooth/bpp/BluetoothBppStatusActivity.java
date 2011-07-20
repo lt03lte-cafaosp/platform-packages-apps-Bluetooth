@@ -30,6 +30,7 @@ package com.android.bluetooth.bpp;
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.opp.BluetoothOppService;
+import com.android.bluetooth.opp.BluetoothShare;
 
 import android.app.Activity;
 import android.os.Bundle;
@@ -76,9 +77,11 @@ public class BluetoothBppStatusActivity extends Activity{
         cancel.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
                 if (V) Log.v(TAG, "Click'd bpp_cancel_button");
-
-                bf.mSessionHandler.obtainMessage(
+                bf.mStatusFinal = BluetoothShare.STATUS_CANCELED;
+                if (bf.mSession != null && bf.mSessionHandler != null) {
+                    bf.mSessionHandler.obtainMessage(
                             BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+                }
                 finish();
             }
         });

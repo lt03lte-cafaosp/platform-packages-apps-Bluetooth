@@ -39,11 +39,11 @@ import javax.obex.HeaderSet;
 import javax.obex.ObexTransport;
 import javax.obex.ResponseCodes;
 
+import com.android.bluetooth.opp.BluetoothShare;
+
 import android.content.Context;
 import android.os.Handler;
-import android.os.Message;
 import android.os.PowerManager;
-import android.os.Process;
 import android.os.PowerManager.WakeLock;
 import android.util.Log;
 
@@ -89,9 +89,9 @@ public class BluetoothBppEvent {
 
     public boolean mConnected = false;
 
-    public int mEventStatus;
-
     BluetoothBppSoap bs;
+
+    public boolean mEnforceClose;
 
     public BluetoothBppEvent(Context context, ObexTransport transport) {
         if (transport == null) {
@@ -102,7 +102,7 @@ public class BluetoothBppEvent {
         mContext = context;
         mTransport = transport;
         mInterrupted = false;
-        mEventStatus = 0;
+        mEnforceClose = false;
         bppEp = new BppEventParser();
     }
 
@@ -122,7 +122,6 @@ public class BluetoothBppEvent {
     public void stop() {
         if (D) Log.d(TAG, "Stop!");
         if (mThread != null) {
-        //mInterrupted = true;
             try {
                 if (V) Log.v(TAG, "try interrupt");
                 mThread.interrupt();
@@ -155,7 +154,7 @@ public class BluetoothBppEvent {
         @Override
         public void run() {
 
-            int status = BluetoothBppConstant.STATUS_SUCCESS;
+            int status = BluetoothShare.STATUS_SUCCESS;
             long timestamp = 0;
 
             if (V) Log.v(TAG, "acquire partial WakeLock");
@@ -174,7 +173,9 @@ public class BluetoothBppEvent {
             while(!mInterrupted){
                 if (D) Log.d(TAG, "SOAP Request: GetEvent");
                 status = sendSoapRequest(BluetoothBppSoap.SOAP_REQ_GET_EVT);
-                if(status != BluetoothBppConstant.STATUS_SUCCESS){
+                if(status != BluetoothShare.STATUS_SUCCESS){
+                    mCallback.obtainMessage(
+                            BluetoothBppTransfer.STATUS_UPDATE, status, -1).sendToTarget();
                     break;
                 }
                 try {
@@ -207,6 +208,22 @@ public class BluetoothBppEvent {
                 return;
             }
             mInterrupted = true;
+            if (mEnforceClose) {
+                try {
+                    // This thread is currently under infinite while loop to
+                    // wait new data after get continue response, so it wouldn't
+                    // get out of the OBEX routine, therefore, it should enforcedly
+                    // close RFCOMM.
+                    if (V) Log.v(TAG, "Disconnect RFCOMM on status Channel");
+                    if (!mConnected) {
+                        if (V) Log.v(TAG, "Status Channel already disconnected");
+                        return;
+                    }
+                    mTransport1.close();
+                } catch (IOException e) {
+                    Log.e(TAG, "mTransport.close error");
+                }
+            }
         }
 
         private void disconnect() {
@@ -277,7 +294,7 @@ public class BluetoothBppEvent {
             boolean error = false;
             int responseCode = -1;
             HeaderSet request;
-            int status = BluetoothBppConstant.STATUS_SUCCESS;
+            int status = BluetoothShare.STATUS_SUCCESS;
             int responseLength = 0;
 
             ClientOperation getOperation = null;
@@ -295,7 +312,7 @@ public class BluetoothBppEvent {
             } catch (IOException e) {
                 Log.e(TAG, "Error when get HeaderSet : " + e);
                 error = true;
-                status = BluetoothBppConstant.STATUS_CANCELED;
+                status = BluetoothShare.STATUS_CONNECTION_ERROR;
             }
             synchronized (this) {
                 mWaitingForRemote = false;
@@ -307,7 +324,7 @@ public class BluetoothBppEvent {
                 } catch (IOException e) {
                     Log.e(TAG, "Error when openOutputStream");
                     error = true;
-                    status = BluetoothBppConstant.STATUS_CANCELED;
+                    status = BluetoothShare.STATUS_CONNECTION_ERROR;
                 }
             }
 
@@ -360,9 +377,8 @@ public class BluetoothBppEvent {
 
                                 outputStream.close();
                                 getOperation.close();
-                                mEventStatus = responseCode;
 
-                                status = BluetoothBppConstant.STATUS_CANCELED;
+                                status = BluetoothShare.STATUS_OBEX_DATA_ERROR;
                                 return status;
                             } else {
                                 /* In case that a remote send a length for SOAP response 
@@ -411,18 +427,17 @@ public class BluetoothBppEvent {
                         else
                         {
                             if (V) Log.v(TAG, "OBEX GET: FAIL - " + responseCode );
-                            mEventStatus = responseCode;
                             switch(responseCode)
                             {
                                 case ResponseCodes.OBEX_HTTP_FORBIDDEN:
                                 case ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE:
-                                    status = BluetoothBppConstant.STATUS_FORBIDDEN;
+                                    status = BluetoothShare.STATUS_FORBIDDEN;
                                     break;
                                 case ResponseCodes.OBEX_HTTP_UNSUPPORTED_TYPE:
-                                    status = BluetoothBppConstant.STATUS_NOT_ACCEPTABLE;
+                                    status = BluetoothShare.STATUS_NOT_ACCEPTABLE;
                                     break;
                                 default:
-                                    status = BluetoothBppConstant.STATUS_UNKNOWN_ERROR;
+                                    status = BluetoothShare.STATUS_UNKNOWN_ERROR;
                                 break;
                             }
                         }
@@ -430,13 +445,13 @@ public class BluetoothBppEvent {
                 }
             } catch (IOException e) {
                 if (V) Log.v(TAG, " IOException e) : " + e);
-                status = BluetoothBppConstant.STATUS_CANCELED;
+                status = BluetoothShare.STATUS_OBEX_DATA_ERROR;
             } catch (NullPointerException e) {
                 if (V) Log.v(TAG, " NullPointerException : " + e);
-                status = BluetoothBppConstant.STATUS_CANCELED;
+                status = BluetoothShare.STATUS_OBEX_DATA_ERROR;
             } catch (IndexOutOfBoundsException e) {
                 if (V) Log.v(TAG, " IndexOutOfBoundsException : " + e);
-                status = BluetoothBppConstant.STATUS_CANCELED;
+                status = BluetoothShare.STATUS_OBEX_DATA_ERROR;
             } finally {
                 if (inputStream != null) {
                     try {

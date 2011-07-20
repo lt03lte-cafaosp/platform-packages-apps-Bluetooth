@@ -167,7 +167,7 @@ public class BluetoothBppSoap {
         mJobStatus = "waiting";
         mDocumentSent = false;
         mPrinter_JobId = JobId;
-        mJobResult = 0;
+        mJobResult = BluetoothShare.STATUS_SUCCESS;
     }
 
     /**
@@ -267,34 +267,32 @@ public class BluetoothBppSoap {
             ExtractParameter(SoapRsp, "JobId", paramString );
             ExtractParameter(SoapRsp, "OperationStatus", paramString );
             mCallback.obtainMessage(
-                        BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
+                        BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE,
+                        1, -1).sendToTarget();
             result = true;
 
         }
         else if( SoapReq.compareTo(SOAP_REQ_GET_EVT) == 0 ){
+            if(mDocumentSent == false){
+                mDocumentSent = true;
+                mCallback.obtainMessage(
+                        BluetoothBppTransfer.SEND_DOCUMENT, -1).sendToTarget();
+            }
+
             String paramString[] = new String[20];
             if(ExtractParameter(SoapRsp, "JobState", paramString ) != 0){
-
-                mJobStatus = paramString[0];
-                if(V) Log.v(TAG, "Current Job Status : " +  mJobStatus);
-                if(mDocumentSent == false){
-                    mDocumentSent = true;
-                    mCallback.obtainMessage(
-                            BluetoothBppTransfer.SEND_DOCUMENT, -1).sendToTarget();
-                }
+                if(V) Log.v(TAG, "Current Job Status : " +  paramString[0]);
+                setStatus(paramString[0]);
                 if((paramString[0].compareTo("stopped") == 0) ||
                        (paramString[0].compareTo("aborted") == 0) ||
                        (paramString[0].compareTo("cancelled") == 0) ||
                        (paramString[0].compareTo("unknown") == 0)) {
-
-                    mJobResult = BluetoothShare.STATUS_CANCELED;
                     mCallback.obtainMessage(
-                        BluetoothBppTransfer.CANCEL, -1).sendToTarget();
+                        BluetoothBppTransfer.CANCEL, mJobResult, -1).sendToTarget();
                     result = true;
                 }
 
                 if(paramString[0].compareTo("completed") == 0) {
-                    mJobResult = BluetoothShare.STATUS_CANCELED;
                     mCallback.obtainMessage(
                     BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
                     result = true;
@@ -302,24 +300,31 @@ public class BluetoothBppSoap {
             }
 
             if(ExtractParameter(SoapRsp, "PrinterState", paramString ) != 0){
-                if(paramString[0].compareTo("stopped") == 0)
-                {
-                    mJobResult = BluetoothShare.STATUS_FORBIDDEN;
+                setStatus(paramString[0]);
+                if(paramString[0].compareTo("stopped") == 0) {
+                    mCallback.obtainMessage(
+                            BluetoothBppTransfer.CANCEL, mJobResult, -1).sendToTarget();
                     result = true;
                 }
             }
 
             if(ExtractParameter(SoapRsp, "PrinterStateReasons", paramString ) != 0){
-                mPrinterStateReason = paramString[0];
+                setStatus(paramString[0]);
+                if(!((paramString[0].compareTo("none") == 0) ||
+                        (paramString[0].compareTo("None") == 0))) {
+                    mCallback.obtainMessage(
+                            BluetoothBppTransfer.CANCEL, mJobResult, -1).sendToTarget();
+                    result = true;
+                }
             }
 
             if(ExtractParameter(SoapRsp, "OperationStatus", paramString ) != 0){
                 mOperationStatus = paramString[0];
                 if(paramString[0].compareTo("0x0000") != 0)
                 {
-                    mJobResult = BluetoothShare.STATUS_FORBIDDEN;
+                    mJobResult = BluetoothShare.STATUS_BPP_REFUSED_BY_PRINTER;
                     mCallback.obtainMessage(
-                    BluetoothBppObexClientSession.MSG_SESSION_EVENT_COMPLETE, -1).sendToTarget();
+                            BluetoothBppTransfer.CANCEL, mJobResult, -1).sendToTarget();
                     result = true;
                 }
             }
@@ -329,6 +334,38 @@ public class BluetoothBppSoap {
         }
 
         return result;
+    }
+
+    private void setStatus(String status) {
+        if (status.compareTo("media-jam") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_MEDIA_JAM;
+        } else if (status.compareTo("paused") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_PAUSED;
+        } else if (status.compareTo("door-open") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_DOOR_OPEN;
+        } else if (status.compareTo("media-low") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_MEDIA_LOW;
+        } else if (status.compareTo("media-empty") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_MEDIA_EMPTY;
+        } else if (status.compareTo("output-area-almost-full") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_OUTPUT_AREA_ALMOST_FULL;
+        } else if (status.compareTo("output-area-full") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_OUTPUT_AREA_FULL;
+        } else if (status.compareTo("marker-supply-low") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_MARKER_SUPPLY_LOW;
+        } else if (status.compareTo("marker-supply-empty") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_MARKER_SUPPLY_EMPTY;
+        } else if (status.compareTo("marker-failure") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_MARKER_FAILURE;
+        } else if (status.compareTo("stopped") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_STOPPED_BY_PRINTER;
+        } else if (status.compareTo("aborted") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_ABORTED_BY_PRINTER;
+        } else if (status.compareTo("cancelled") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_CANCELED_BY_PRINTER;
+        } else if (status.compareTo("unknown") == 0) {
+            mJobResult = BluetoothShare.STATUS_BPP_UNKNOWN_ERROR_BY_PRINTER;
+        }
     }
 
     private int ExtractParameter(String SoapRsp, String AttrName, String[] paramStr ){
