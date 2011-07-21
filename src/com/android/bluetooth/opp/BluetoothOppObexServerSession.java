@@ -37,6 +37,9 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.FileInputStream;
+import java.io.BufferedInputStream;
 import java.util.Arrays;
 
 import android.content.ContentValues;
@@ -57,6 +60,7 @@ import javax.obex.Operation;
 import javax.obex.ResponseCodes;
 import javax.obex.ServerRequestHandler;
 import javax.obex.ServerSession;
+import javax.obex.ServerOperation;
 
 /**
  * This class runs as an OBEX server
@@ -67,6 +71,11 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     private static final String TAG = "BtOppObexServer";
     private static final boolean D = Constants.DEBUG;
     private static final boolean V = Constants.VERBOSE;
+
+    private static final String OPP_SERVER_DIR_PATH = "/data/bluetooth/oppserver";
+    private static final String OPP_MIME_TYPE = "text/x-vcard";
+    private static final String OPP_DEFAULT_vCARD_NAME = "default.vcf";
+    private static final int OPP_LOCAL_BUF_SIZE  = 0x4000;
 
     private ObexTransport mTransport;
 
@@ -545,6 +554,82 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             Log.v(TAG, "status    :" + fileInfo.mStatus);
         }
         return fileInfo;
+    }
+
+    public File getMyBusinessCard ( ) {
+        File myCard = new File(OPP_SERVER_DIR_PATH, OPP_DEFAULT_vCARD_NAME);
+        return myCard;
+    }
+
+    @Override
+    public int onGet(Operation op) {
+        if (D) Log.d(TAG, "onGet() +");
+
+        HeaderSet request = null;
+        String type = "";
+        String name = "";
+        OutputStream outputStream;
+        FileInputStream  fis;
+        BufferedInputStream bis;
+        long fileLength = 0;
+        long fileReadPos = 0;
+        int readLength;
+
+        File myCard = getMyBusinessCard ( );
+        int outputBufferSize = op.getMaxPacketSize();
+
+        /* Extract the name and type header from operation object */
+        try {
+            request = op.getReceivedHeader();
+            type = (String)request.getHeader(HeaderSet.TYPE);
+
+            name = (String)request.getHeader(HeaderSet.NAME);
+
+        } catch (IOException e) {
+            Log.e(TAG,"onGet request headers "+ e.toString());
+            if (D) Log.d(TAG, "request headers error");
+        }
+        if (Constants.mimeTypeMatches(type, OPP_MIME_TYPE)  == false) {
+            return ResponseCodes.OBEX_HTTP_UNSUPPORTED_TYPE;
+        }
+
+        if (D) Log.d(TAG,"type = " + type);
+        if (D && (name != null)) Log.d(TAG, " name = " + name);
+        if ((myCard.exists() != true) || (myCard.length() == 0)) {
+            Log.e(TAG, "Default Business Card Not Found ! ");
+            return ResponseCodes.OBEX_HTTP_NOT_FOUND;
+        }
+
+        try {
+            fis = new FileInputStream(myCard);
+            outputStream = op.openOutputStream();
+        } catch(IOException e) {
+            Log.e(TAG,"OPP Pull Business Card : open stream Exception"+ e.toString());
+            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        }
+
+        byte[] buffer = new byte[outputBufferSize];
+
+        /* Read the file and send */
+        fileLength = myCard.length ( );
+        bis = new BufferedInputStream(fis, OPP_LOCAL_BUF_SIZE);
+        try {
+            while (fileReadPos != fileLength) {
+                readLength = bis.read(buffer, 0, outputBufferSize);
+                fileReadPos += readLength;
+
+                if(((ServerOperation)op).isAborted != true) {
+                    outputStream.write(buffer, 0, readLength);
+                } else {
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "OPP Pull Business Card : Write outputstrem failed" + e.toString());
+            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        }
+        if (D) Log.d(TAG, "onGet() -");
+        return ResponseCodes.OBEX_HTTP_OK;
     }
 
     @Override
