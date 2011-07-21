@@ -808,10 +808,13 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         BufferedInputStream bis;
         long finishtimestamp;
         long starttimestamp;
-        long readbytesleft = 0;
-        long filelength = fileinfo.length();
 
         byte[] buffer = new byte[outputBufferSize];
+
+        if(fileinfo.exists() != true) {
+          return ResponseCodes.OBEX_HTTP_NOT_FOUND;
+        }
+
         try {
             fileInputStream = new FileInputStream(fileinfo);
             outputStream = op.openOutputStream();
@@ -822,20 +825,29 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         bis = new BufferedInputStream(fileInputStream, 0x4000);
         starttimestamp = System.currentTimeMillis();
         try {
-            while ((position != filelength)) {
+            while ((position != fileinfo.length())) {
                 if (sIsAborted) {
                     ((ServerOperation)op).isAborted = true;
                     sIsAborted = false;
                     break;
                 }
                 timestamp = System.currentTimeMillis();
-
-                readbytesleft = filelength - position;
-                if(readbytesleft < outputBufferSize) {
-                    outputBufferSize = (int) readbytesleft;
-                }
+                if(position != fileinfo.length()){
                 readLength = bis.read(buffer, 0, outputBufferSize);
+                }
+
                 if (D) Log.d(TAG,"Read File");
+                /* Do not write down anything on the socket once we get
+                * a abort for the current operation
+                */
+                if (ObexHelper.getLocalSrmStatus() == ObexHelper.LOCAL_SRM_ENABLED) {
+                   if (((ServerOperation)op).isAborted()) {
+                      ((ServerOperation)op).isAborted = true;
+                      sIsAborted = false;
+                      break;
+                  }
+                }
+
                 outputStream.write(buffer, 0, readLength);
                 position += readLength;
                 if (V) {
@@ -865,8 +877,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
         }
 
-        if (D) Log.d(TAG,"sendFile - position = " + position );
-        if(position == filelength) {
+        if(position == fileinfo.length() || (((ServerOperation)op).isAborted == true)) {
             Log.i(TAG,"Get Request TP analysis : Transmitted "+ position +
                   " bytes in" + (finishtimestamp - starttimestamp)  + "ms");
             return ResponseCodes.OBEX_HTTP_OK;
