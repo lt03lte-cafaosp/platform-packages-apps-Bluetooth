@@ -159,7 +159,8 @@ public class BluetoothMns {
 
     public String deletedFolderName = null;
     private EmailFolderContentObserverClass[] arrObj;
-    private SmsMmsFolderContentObserverClass[] arrObjSmsMms;
+    private ArrayList<SmsMmsFolderContentObserverClass> arrObjSmsMms =
+        new ArrayList<SmsMmsFolderContentObserverClass>();
 
     List<String> folderList;
     List<String> folderListSmsMms;
@@ -192,7 +193,6 @@ public class BluetoothMns {
         SmsMmsUtils smu = new SmsMmsUtils();
         folderListSmsMms = new ArrayList<String>();
         folderListSmsMms = smu.folderListSmsMmsMns(folderListSmsMms);
-        arrObjSmsMms = new SmsMmsFolderContentObserverClass[folderListSmsMms.size()];
 
         EmailUtils eu = new EmailUtils();
         folderList = eu.folderListMns(mContext);
@@ -455,34 +455,32 @@ public class BluetoothMns {
      * of change on cursor.
      */
     private void registerUpdates() {
+        final ContentResolver cr = mContext.getContentResolver();
 
         Log.d(TAG, "REGISTER MNS UPDATES");
 
         Uri smsUri = Uri.parse("content://sms/");
-        crSmsA = mContext.getContentResolver().query(smsUri,
+        crSmsA = cr.query(smsUri,
                 new String[] { "_id", "body", "type"}, null, null, "_id asc");
-        crSmsB = mContext.getContentResolver().query(smsUri,
+        crSmsB = cr.query(smsUri,
                 new String[] { "_id", "body", "type"}, null, null, "_id asc");
 
         Uri smsObserverUri = Uri.parse("content://mms-sms/");
-        mContext.getContentResolver().registerContentObserver(smsObserverUri,
-                true, smsContentObserver);
+        cr.registerContentObserver(smsObserverUri, true, smsContentObserver);
 
         Uri mmsUri = Uri.parse("content://mms/");
-        crMmsA = mContext.getContentResolver()
-                .query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
+        crMmsA = cr.query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
                         null, "_id asc");
-        crMmsB = mContext.getContentResolver()
-                .query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
+        crMmsB = cr.query(mmsUri, new String[] { "_id", "read", "m_type", "m_id" }, null,
                         null, "_id asc");
 
         if (folderListSmsMms != null && folderListSmsMms.size() > 0){
             for (int i=0; i < folderListSmsMms.size(); i++){
                 folderNameSmsMms = folderListSmsMms.get(i);
                 Uri smsFolderUri =  Uri.parse("content://sms/"+folderNameSmsMms.trim()+"/");
-                crSmsFolderA = mContext.getContentResolver().query(smsFolderUri,
+                crSmsFolderA = cr.query(smsFolderUri,
                         new String[] { "_id", "body", "type"}, null, null, "_id asc");
-                crSmsFolderB = mContext.getContentResolver().query(smsFolderUri,
+                crSmsFolderB = cr.query(smsFolderUri,
                         new String[] { "_id", "body", "type"}, null, null, "_id asc");
                 Uri mmsFolderUri;
                 if (folderNameSmsMms != null
@@ -491,20 +489,19 @@ public class BluetoothMns {
                 } else{
                     mmsFolderUri = Uri.parse("content://mms/"+folderNameSmsMms.trim()+"/");
                 }
-                crMmsFolderA = mContext.getContentResolver()
-                .query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
+                crMmsFolderA = cr.query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
                         null, null, "_id asc");
-                crMmsFolderB = mContext.getContentResolver()
-                .query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
+                crMmsFolderB = cr.query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
                         null, null, "_id asc");
 
-                arrObjSmsMms[i] = new SmsMmsFolderContentObserverClass(folderNameSmsMms,
-                        crSmsFolderA, crSmsFolderB, crMmsFolderA, crMmsFolderB,
-                        CR_SMS_FOLDER_A, CR_MMS_FOLDER_A);
+                if (crMmsFolderA != null) {
+                    SmsMmsFolderContentObserverClass observer = new SmsMmsFolderContentObserverClass(
+                            folderNameSmsMms, crSmsFolderA, crSmsFolderB, crMmsFolderA, crMmsFolderB,
+                            CR_SMS_FOLDER_A, CR_MMS_FOLDER_A);
 
-                Uri smsFolderObserverUri = Uri.parse("content://mms-sms/"+folderNameSmsMms.trim());
-                mContext.getContentResolver().registerContentObserver(
-                        smsFolderObserverUri, true, arrObjSmsMms[i]);
+                    observer.registerSelf(cr);
+                    arrObjSmsMms.add(observer);
+                }
             }
         }
 
@@ -551,16 +548,15 @@ public class BluetoothMns {
      * Stop listening to changes in cursor
      */
     private void deregisterUpdates() {
+        final ContentResolver cr = mContext.getContentResolver();
 
         if (updatesRegistered == true){
             updatesRegistered = false;
             Log.d(TAG, "DEREGISTER MNS SMS UPDATES");
 
-            mContext.getContentResolver().unregisterContentObserver(
-                    smsContentObserver);
+            cr.unregisterContentObserver(smsContentObserver);
 
-            mContext.getContentResolver().unregisterContentObserver(
-                    emailContentObserver);
+            cr.unregisterContentObserver(emailContentObserver);
 
             mContext.unregisterReceiver(mStorageStatusReceiver);
 
@@ -584,15 +580,11 @@ public class BluetoothMns {
                 }
             }
 
-            if (arrObjSmsMms != null && arrObj.length > 0){
-                for (int i=0; i < arrObj.length; i++){
-                    arrObjSmsMms[i].crSmsFolderA.close();
-                    arrObjSmsMms[i].crSmsFolderB.close();
-                    arrObjSmsMms[i].currentCRSmsFolder = CR_SMS_FOLDER_A;
-                    arrObjSmsMms[i].crMmsFolderA.close();
-                    arrObjSmsMms[i].crMmsFolderB.close();
-                    arrObjSmsMms[i].currentCRMmsFolder = CR_MMS_FOLDER_A;
+            if (arrObjSmsMms != null){
+                for (SmsMmsFolderContentObserverClass observer : arrObjSmsMms) {
+                    observer.deregisterSelf(cr);
                 }
+                arrObjSmsMms.clear();
             }
 
         }
@@ -1065,8 +1057,31 @@ public class BluetoothMns {
             this.currentCRMmsFolder = currentCRMmsFolder;
         }
 
+        public void registerSelf(ContentResolver cr) {
+            Uri smsFolderObserverUri = Uri.parse("content://mms-sms/" + folder);
+            cr.registerContentObserver(smsFolderObserverUri, true, this);
+        }
+
+        public void deregisterSelf(ContentResolver cr) {
+            cr.unregisterContentObserver(this);
+            if (crSmsFolderA != null) {
+                crSmsFolderA.close();
+            }
+            if (crSmsFolderB != null) {
+                crSmsFolderB.close();
+            }
+            currentCRSmsFolder = CR_SMS_FOLDER_A;
+            if (crMmsFolderA != null) {
+                crMmsFolderA.close();
+            }
+            if (crMmsFolderB != null) {
+                crMmsFolderB.close();
+            }
+            currentCRMmsFolder = CR_MMS_FOLDER_A;
+        }
+
         @Override
-                public void onChange(boolean selfChange) {
+        public void onChange(boolean selfChange) {
             super.onChange(selfChange);
 
             int currentItemCount = 0;
