@@ -132,6 +132,21 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <activity android:name=".sap.BluetoothSapActivity"
+            android:process="@string/process"
+            android:excludeFromRecents="true"
+            android:theme="@*android:style/Theme.Dialog.Alert">
+            <intent-filter>
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:process="@string/process"
+            android:name=".sap.BluetoothSapReceiver">
+            <intent-filter>
+                <action android:name="com.android.bluetooth.sap.accessrequest"/>
+            </intent-filter>
+        </receiver>
         <activity android:name=".bpp.BluetoothBppActivity"
             android:label="@string/app_name_bpp"
             android:screenOrientation="portrait"

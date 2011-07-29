@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="sap_acceptance_dialog_title">%1$s would like to access your SIM. Give access to %2$s?</string>
+    <string name="sap_acceptance_dialog_header">SIM Access</string>
+    <string name="sap_acceptance_timeout_message">There was time out to accept connection with %1$s</string>
+    <string name="sap_notif_ticker">SAP access request</string>
+    <string name="sap_notif_title">SAP request</string>
+    <string name="sap_notif_message">Allow SIM access by %1$s</string>
+    <string name="sap_alwaysallowed">Always allowed?</string>
+</resources>
