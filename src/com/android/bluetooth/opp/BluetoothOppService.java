@@ -61,7 +61,6 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.util.Log;
 import android.os.Process;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -615,24 +614,27 @@ public class BluetoothOppService extends Service {
         if (info.isReadyToStart()) {
             if (info.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
                 /* check if the file exists */
-                InputStream i;
-                try {
-                    i = getContentResolver().openInputStream(Uri.parse(info.mUri));
-                } catch (FileNotFoundException e) {
-                    Log.e(TAG, "Can't open file for OUTBOUND info " + info.mId);
-                    Constants.updateShareStatus(this, info.mId, BluetoothShare.STATUS_BAD_REQUEST);
-                    return;
-                } catch (SecurityException e) {
-                    Log.e(TAG, "Exception:" + e.toString() + " for OUTBOUND info " + info.mId);
-                    Constants.updateShareStatus(this, info.mId, BluetoothShare.STATUS_BAD_REQUEST);
-                    return;
-                }
+                if(!info.mUri.contains("as_multi_vcard")) {
+                    InputStream i;
+                    try {
+                        if (V) Log.v(TAG, "Check The presence of file");
+                        i = getContentResolver().openInputStream(Uri.parse(info.mUri));
+                    } catch (FileNotFoundException e) {
+                        Log.e(TAG, "Can't open file for OUTBOUND info " + info.mId);
+                        Constants.updateShareStatus(this, info.mId, BluetoothShare.STATUS_BAD_REQUEST);
+                        return;
+                    } catch (SecurityException e) {
+                        Log.e(TAG, "Exception:" + e.toString() + " for OUTBOUND info " + info.mId);
+                        Constants.updateShareStatus(this, info.mId, BluetoothShare.STATUS_BAD_REQUEST);
+                        return;
+                    }
 
-                try {
-                    i.close();
-                } catch (IOException ex) {
-                    Log.e(TAG, "IO error when close file for OUTBOUND info " + info.mId);
-                    return;
+                    try {
+                        i.close();
+                    } catch (IOException ex) {
+                        Log.e(TAG, "IO error when close file for OUTBOUND info " + info.mId);
+                        return;
+                    }
                 }
             }
 

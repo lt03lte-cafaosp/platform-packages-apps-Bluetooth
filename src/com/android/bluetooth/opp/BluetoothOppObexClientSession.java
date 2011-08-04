@@ -57,6 +57,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.Thread;
+import android.widget.RemoteViews;
+import android.app.PendingIntent;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.content.Intent;
 
 /**
  * This class runs as an OBEX client
@@ -310,6 +315,19 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
          */
         private BluetoothOppSendFileInfo processShareInfo() {
             if (V) Log.v(TAG, "Client thread processShareInfo() " + mInfo.mId);
+            int icon = android.R.drawable.stat_sys_upload;
+            CharSequence tickerText = "Preparing Bluetooth Share";
+            long when = System.currentTimeMillis();
+            Context context = mContext1;
+            CharSequence contentTitle = "Bluetooth Share";
+            CharSequence contentText = "Preparing...";
+
+            Notification n = new Notification(icon, tickerText, when);
+
+            Intent intent = new Intent(Constants.ACTION_LIST);
+            PendingIntent contentIntent = PendingIntent.getActivity(context, 0, intent, 0);
+            n.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
+            ((NotificationManager)(context.getSystemService(context.NOTIFICATION_SERVICE))).notify(mInfo.mId, n);
 
             BluetoothOppSendFileInfo fileInfo = BluetoothOppSendFileInfo.generateFileInfo(
                     mContext1, mInfo.mUri, mInfo.mMimetype, mInfo.mDestination);
@@ -335,6 +353,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                 mContext1.getContentResolver().update(contentUri, updateValues, null, null);
 
             }
+            ((NotificationManager)(context.getSystemService(context.NOTIFICATION_SERVICE))).cancel(mInfo.mId);
             return fileInfo;
         }
 
