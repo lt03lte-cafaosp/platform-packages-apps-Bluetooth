@@ -67,6 +67,7 @@ import android.text.format.Time;
 import android.util.Log;
 import android.util.TimeFormatException;
 import android.os.Binder;
+import android.os.Handler;
 
 import com.android.bluetooth.map.MapUtils.BmessageConsts;
 import com.android.bluetooth.map.MapUtils.MapUtils;
@@ -144,11 +145,11 @@ public class BluetoothMasAppIf {
 
     private final BluetoothMns mnsClient;
 
-    public BluetoothMasAppIf(Context context, String mode) {
+    public BluetoothMasAppIf(Context context, Handler sessionStatusHandler, String mode) {
         this.context = context;
         this.mode = mode;
         mu = new MapUtils();
-        mnsClient = new BluetoothMns(context);
+        mnsClient = new BluetoothMns(context, sessionStatusHandler);
 
         // Clear out deleted items from database
         clearDeletedItems();

@@ -533,7 +533,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
     public BluetoothMasObexServer(Handler callback,
             BluetoothDevice remoteDevice, Context context) {
         super();
-        appIf = new BluetoothMasAppIf(context, "SMS_MMS_EMAIL");
+        appIf = new BluetoothMasAppIf(context, callback, "SMS_MMS_EMAIL");
         mConnectionId = -1;
         mCallback = callback;
         mContext = context;
@@ -669,6 +669,8 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     @Override
     public void onClose() {
+
+        appIf.stopMnsSession(mRemoteDevice);
 
         if (mCallback != null) {
             Message msg = Message.obtain(mCallback);

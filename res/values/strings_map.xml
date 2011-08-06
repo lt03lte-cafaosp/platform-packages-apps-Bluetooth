@@ -40,4 +40,5 @@
     <string name="map_notif_title">MAP request</string>
     <!-- Notification message when a Bluetooth device wants to pair with us -->
     <string name="map_notif_message">Allow root folder access by %1$s</string>
+    <string name="map_alert_conn_failed_message">Bluetooth MAP connection failed.</string>
 </resources>
