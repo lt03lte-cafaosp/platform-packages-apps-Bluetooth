@@ -34,8 +34,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -148,6 +146,8 @@ public class BluetoothMns {
 
     private EventHandler mSessionHandler;
 
+    private Handler mSessionStatusHandler;
+
     private BluetoothDevice mDestination;
 
     private MapUtils mu = null;
@@ -164,7 +164,7 @@ public class BluetoothMns {
 
     List<String> folderList;
     List<String> folderListSmsMms;
-    public BluetoothMns(Context context) {
+    public BluetoothMns(Context context, Handler sessionStatusHandler) {
         /* check Bluetooth enable status */
         /*
          * normally it's impossible to reach here if BT is disabled. Just check
@@ -175,6 +175,8 @@ public class BluetoothMns {
         mContext = context;
 
         mDestination = BluetoothMasService.mRemoteDevice;
+
+        mSessionStatusHandler = sessionStatusHandler;
 
         mu = new MapUtils();
 
@@ -201,6 +203,12 @@ public class BluetoothMns {
 
     public Handler getHandler() {
         return mSessionHandler;
+    }
+
+    private void notifyConnectionFailure() {
+        if (mSessionStatusHandler != null) {
+            mSessionStatusHandler.sendEmptyMessage(BluetoothMasService.MSG_INTERNAL_CONNECTION_FAILED);
+        }
     }
 
     /*
@@ -260,6 +268,7 @@ public class BluetoothMns {
             case RFCOMM_ERROR:
                 if (V) Log.v(TAG, "receive RFCOMM_ERROR msg");
                 mConnectThread = null;
+                notifyConnectionFailure();
 
                 break;
             /*
@@ -1759,7 +1768,10 @@ public class BluetoothMns {
             mSession.disconnect();
             mSession = null;
         }
-        // TODO Do this somewhere else - Should the handler thread be gracefully closed.
+        if (mSessionStatusHandler != null) {
+            mSessionStatusHandler.obtainMessage(BluetoothMasService.MSG_INTERNAL_KILL_THREAD,
+                    mHandlerThread).sendToTarget();
+        }
     }
 
     /**
@@ -1784,31 +1796,7 @@ public class BluetoothMns {
 
         mTimestamp = System.currentTimeMillis();
 
-        int channel = -1;
-
-        Method m;
-        try {
-            m = mDestination.getClass().getMethod("getServiceChannel",
-                    new Class[] { ParcelUuid.class});
-            channel = (Integer) m.invoke(mDestination, BluetoothUuid_ObexMns);
-        } catch (SecurityException e2) {
-            // TODO Auto-generated catch block
-            e2.printStackTrace();
-        } catch (NoSuchMethodException e2) {
-            // TODO Auto-generated catch block
-            e2.printStackTrace();
-        } catch (IllegalArgumentException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        // TODO: channel = mDestination.getServiceChannel(BluetoothUuid_ObexMns);
+        int channel = mDestination.getServiceChannel(BluetoothUuid_ObexMns);
 
         if (channel != -1) {
             if (D)
@@ -1821,34 +1809,10 @@ public class BluetoothMns {
             return;
 
         } else {
-
-            boolean result = false;
             if (V)
                 Log.v(TAG, "Remote Service channel not in cache");
 
-            Method m2;
-            try {
-                m2 = mDestination.getClass().getMethod("fetchUuidsWithSdp",
-                        new Class[] {});
-                result = (Boolean) m2.invoke(mDestination);
-
-            } catch (SecurityException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            } catch (NoSuchMethodException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            } catch (IllegalArgumentException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
+            boolean result = mDestination.fetchUuidsWithSdp();
             if (result == false) {
                 Log.e(TAG, "Start SDP query failed");
             } else {
@@ -1897,77 +1861,19 @@ public class BluetoothMns {
                         // TODO Fix this error
                         result = true;
 
-                        try {
-                            Class c = Class
-                                    .forName("android.bluetooth.BluetoothUuid");
-                            Method m = c.getMethod("isUuidPresent",
-                                    new Class[] { ParcelUuid[].class,
-                                        ParcelUuid.class});
-
-                            Boolean bool = false;
-                            bool = (Boolean) m.invoke(c, uuids,
-                                    BluetoothUuid_ObexMns);
-                            result = bool.booleanValue();
-
-                        } catch (ClassNotFoundException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        } catch (SecurityException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        } catch (NoSuchMethodException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        } catch (IllegalArgumentException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        } catch (IllegalAccessException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        } catch (InvocationTargetException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        }
+                        result = android.bluetooth.BluetoothUuid.isUuidPresent(uuids, BluetoothUuid_ObexMns);
 
                         if (result) {
-                            // TODO: Check if UUID IS PRESENT
                             if (V)
                                 Log.v(TAG, "SDP get MNS result for device "
                                         + device);
 
-                            // TODO: Get channel from mDestination
-                            // TODO: .getServiceChannel(BluetoothUuid_ObexMns);
-                            Method m1;
-                            try {
-
-                                m1 = device.getClass().getMethod(
-                                        "getServiceChannel",
-                                        new Class[] { ParcelUuid.class});
-                                Integer chan = (Integer) m1.invoke(device,
-                                        BluetoothUuid_ObexMns);
-
-                                channel = chan.intValue();
-                                Log.d(TAG, " MNS SERVER Channel no " + channel);
-                                if (channel == -1) {
-                                    channel = 2;
-                                    Log.d(TAG, " MNS SERVER USE TEMP CHANNEL "
-                                            + channel);
-                                }
-                            } catch (SecurityException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
-                            } catch (NoSuchMethodException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
-                            } catch (IllegalArgumentException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
-                            } catch (IllegalAccessException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
-                            } catch (InvocationTargetException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
+                            channel = device.getServiceChannel(BluetoothUuid_ObexMns);
+                            Log.d(TAG, " MNS SERVER Channel no " + channel);
+                            if (channel == -1) {
+                                channel = 2;
+                                Log.d(TAG, " MNS SERVER USE TEMP CHANNEL "
+                                        + channel);
                             }
                         }
                     }
@@ -2016,27 +1922,7 @@ public class BluetoothMns {
 
             /* Use BluetoothSocket to connect */
             try {
-                try {
-                    Method m = device.getClass().getMethod(
-                            "createInsecureRfcommSocket",
-                            new Class[] { int.class });
-                    btSocket = (BluetoothSocket) m.invoke(device, channel);
-                } catch (SecurityException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (NoSuchMethodException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (IllegalArgumentException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                btSocket = device.createInsecureRfcommSocket(channel);
             } catch (Exception e1) {
                 // TODO Auto-generated catch block
                 Log.e(TAG, "Rfcomm socket create error");
@@ -2062,7 +1948,7 @@ public class BluetoothMns {
                 mSessionHandler.obtainMessage(RFCOMM_CONNECTED, transport)
                         .sendToTarget();
             } catch (IOException e) {
-                Log.e(TAG, "Rfcomm socket connect exception ");
+                Log.e(TAG, "Rfcomm socket connect exception " + e.getMessage());
                 BluetoothMnsPreference.getInstance(mContext).removeChannel(
                         device, MNS_UUID16);
                 markConnectionFailed(btSocket);
@@ -2522,5 +2408,4 @@ public class BluetoothMns {
         cursor.close();
         return folderNum;
     }
-
 }
