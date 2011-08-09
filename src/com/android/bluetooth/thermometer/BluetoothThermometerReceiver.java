@@ -28,17 +28,26 @@
 
 package com.android.bluetooth.thermometer;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.os.ParcelUuid;
 import android.util.Log;
-import android.widget.Toast;
 
 public class BluetoothThermometerReceiver extends BroadcastReceiver {
 
-    private final String TAG = "BluetoothThermometerReceiver";
+    private static final int ACTION_GATT_PARAMS_NO = 3;
+
+    private final static String TAG = "BluetoothThermometerReceiver";
+
+    private static Handler handler = null;
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -48,54 +57,48 @@ public class BluetoothThermometerReceiver extends BroadcastReceiver {
         in.setClass(context, BluetoothThermometerServices.class);
         in.putExtra("action", action);
 
-        if (action
-                .equalsIgnoreCase((BluetoothThermometerServices.THERMOMETER_SERVICE_WAKEUP))) {
-            BluetoothDevice remoteDevice = intent
-                    .getParcelableExtra(BluetoothThermometerServices.THERMOMETER_DEVICE);
-            String deviceName = remoteDevice.getName();
-            Log.d(TAG, "Received BT device selected intent, bt device: "
-                    + remoteDevice.getAddress());
-            String toastMsg;
-            toastMsg = " The user selected the device named " + deviceName;
-            Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show();
-            context.startService(in);
-        } else if (action.equals(BluetoothDevice.ACTION_GATT)) {
+        if (action.equals(BluetoothDevice.ACTION_GATT)) {
+            try {
+                Log.d(TAG,
+                      " ACTION GATT INTENT RECEIVED as a result of gatGattService");
+                BluetoothDevice remoteDevice = intent
+                                               .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                Log.d(TAG, "Remote Device: " + remoteDevice.getAddress());
 
-            Log.d(TAG,
-                    " ACTION GATT INTENT RECVD as a result of gatGattService");
-            BluetoothDevice remoteDevice = intent
-                    .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            Log.d(TAG, "Remote Device: " + remoteDevice.getAddress());
+                ParcelUuid uuid = (ParcelUuid) intent
+                                  .getExtra(BluetoothDevice.EXTRA_UUID);
+                Log.d(TAG, " UUID: " + uuid);
 
-            ParcelUuid uuid = (ParcelUuid) intent
-                    .getExtra(BluetoothDevice.EXTRA_UUID);
-            Log.d(TAG, " UUID: " + uuid);
-
-            BluetoothThermometerServices.mDevice.BDevice = remoteDevice;
-
-            String[] ObjectPathArray = (String[]) intent
-                    .getExtra(BluetoothDevice.EXTRA_GATT);
-            BluetoothThermometerServices.mDevice.ServiceObjPathArray = ObjectPathArray;
-
-            if (ObjectPathArray == null) {
-                Log.d(TAG, " +++  ERROR NO OBJECT PATH HANDLE FOUND +++++++");
-                String deviceName = remoteDevice.getName();
-                String toastMsg;
-                toastMsg = " ERROR: The user selected the device named "
-                        + deviceName + " doesnt have the service ";
-                Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show();
-                return;
-            } else {
-
-                BluetoothThermometerServices.mDevice.ServiceUUIDArray = new ParcelUuid[ObjectPathArray.length];
-
-                Log.d(TAG, " Object Path (length): " + ObjectPathArray.length);
-                for (int i = 0; i < ObjectPathArray.length; i++) {
-                    Log.d(TAG, " Object Path at " + i + ": "
-                            + ObjectPathArray[i]);
-                    BluetoothThermometerServices.mDevice.ServiceUUIDArray[i] = uuid;
+                String[] ObjectPathArray = (String[]) intent
+                                           .getExtra(BluetoothDevice.EXTRA_GATT);
+                if (ObjectPathArray != null) {
+                    Log.d(TAG, " objPathList length : " + ObjectPathArray.length);
+                    Message objMsg = new Message();
+                    objMsg.what = BluetoothThermometerServices.GATT_SERVICE_STARTED_OBJ;
+                    Bundle objBundle = new Bundle();
+                    ArrayList<String> objPathList = new ArrayList<String>(Arrays.asList(ObjectPathArray));
+                    objBundle.putStringArrayList(
+                                                BluetoothThermometerServices.ACTION_GATT_SERVICE_EXTRA_OBJ,
+                                                objPathList);
+                    Log.d(TAG, " objPathList  : " + objPathList.get(0));
+                    objMsg.setData(objBundle);
+                    Log.d(TAG, " before sendmessage : " + objMsg.what);
+                    handler.sendMessage(objMsg);
+                } else {
+                    Log.e(TAG, "No object paths in the ACTION GATT intent");
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
+    }
+
+    public static void registerHandler(Handler handle)
+    {
+        Log.d(TAG, " Registered Thermometer Service Handler ::");
+        handler = handle;
+        Log.d(TAG,
+              " after Registered Thermometer Service Handler : "
+              + handler.toString());
     }
 }

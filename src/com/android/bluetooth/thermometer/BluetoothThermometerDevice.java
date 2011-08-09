@@ -28,15 +28,20 @@
 
 package com.android.bluetooth.thermometer;
 
+import java.util.HashMap;
+import java.util.List;
+
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattService;
 import android.os.ParcelUuid;
 
 public class BluetoothThermometerDevice {
     public BluetoothDevice BDevice = null;
-    public ParcelUuid[] ServiceUUIDArray = null;
+    public List<ParcelUuid> ServiceUUIDArray = null;
     public ParcelUuid SelectedServiceUUID = null;
-    public String[] ServiceObjPathArray = null;
+    public List<String> ServiceObjPathArray = null;
     public String SelectedServiceObjPath = null;
     public BluetoothGattService gattService = null;
+    public HashMap<ParcelUuid, String> uuidObjPathMap;
+    public HashMap<String, ParcelUuid> objPathUuidMap;
 }
