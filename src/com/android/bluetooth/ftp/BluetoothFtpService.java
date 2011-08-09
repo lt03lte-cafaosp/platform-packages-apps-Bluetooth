@@ -548,14 +548,13 @@ public class BluetoothFtpService extends Service {
             transport = new BluetoothFtpTransport(mConnSocket,BluetoothFtpTransport.TYPE_L2CAP);
         }
 
-        // Turn on/off SRM based on transport capability (whether this is OBEX-over-L2CAP, or not)
-        ObexHelper.setLocalSrmCapability(((BluetoothFtpTransport)transport).isSrmCapable());
-        if (!ObexHelper.getLocalSrmCapability()) {
-            ObexHelper.setLocalSrmParamStatus(ObexHelper.SRMP_DISABLED);
-        }
-
         mServerSession = new ServerSession(transport, mFtpServer, mAuth);
 
+        // Turn on/off SRM based on transport capability (whether this is OBEX-over-L2CAP, or not)
+        mServerSession.mSrmServer.setLocalSrmCapability(((BluetoothFtpTransport)transport).isSrmCapable());
+        if (!mServerSession.mSrmServer.getLocalSrmCapability()) {
+          mServerSession.mSrmServer.setLocalSrmParamStatus(ObexHelper.SRMP_DISABLED);
+        }
         if (VERBOSE) {
             Log.v(TAG, "startObexServerSession() success!");
         }

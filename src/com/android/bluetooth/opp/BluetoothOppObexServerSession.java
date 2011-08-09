@@ -136,10 +136,10 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             if (D) Log.d(TAG, "Setting ServerSession mps " + mps);
 
             // Turn on/off SRM based on transport capability (whether this is OBEX-over-L2CAP, or not)
-            ObexHelper.setLocalSrmCapability(((BluetoothOppTransport)mTransport).isSrmCapable());
+            mSession.mSrmServer.setLocalSrmCapability(((BluetoothOppTransport)mTransport).isSrmCapable());
 
-            if (!ObexHelper.getLocalSrmCapability()) {
-                ObexHelper.setLocalSrmParamStatus(ObexHelper.SRMP_DISABLED);
+            if (!mSession.mSrmServer.getLocalSrmCapability()) {
+                mSession.mSrmServer.setLocalSrmParamStatus(ObexHelper.SRMP_DISABLED);
             }
         } catch (IOException e) {
             Log.e(TAG, "Create server session error" + e);
@@ -210,20 +210,20 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             length = (Long)request.getHeader(HeaderSet.LENGTH);
             mimeType = (String)request.getHeader(HeaderSet.TYPE);
 
-            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+            if (((ServerOperation)op).mSrmServerSession.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                 if (V) Log.v(TAG, "Local Device SRM: Capable");
 
                 srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                 if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                     if (V) Log.v(TAG, "SRM status: Enabled");
-                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
                 } else {
                     if (V) Log.v(TAG, "SRM status: Disabled");
-                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
                 }
             } else {
                 if (V) Log.v(TAG, "Local Device SRM: Incapable");
-                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
             }
 
             if (length == 0) {

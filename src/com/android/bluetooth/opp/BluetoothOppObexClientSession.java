@@ -359,18 +359,18 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
             // Turn on/off SRM based on transport capability
             //(whether this is OBEX-over-L2CAP, or not)
-            ObexHelper.setLocalSrmCapability(((BluetoothOppTransport)mTransport1).isSrmCapable());
+            mCs.mSrmClient.setLocalSrmCapability(((BluetoothOppTransport)mTransport1).isSrmCapable());
 
             // Add the SRM header if both client is SRM capable
-            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+            if (mCs.mSrmClient.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                 Log.v(TAG, "SRM status: Enable SRM for first PUT");
-                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                mCs.mSrmClient.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
                 request.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
             } else {
                 Log.v(TAG, "SRM status: Disable SRM for first PUT");
-                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                mCs.mSrmClient.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
             }
-            ObexHelper.setLocalSrmpWait(false);
+            mCs.mSrmClient.setLocalSrmpWait(false);
 
             ClientOperation putOperation = null;
             OutputStream outputStream = null;
@@ -507,20 +507,20 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                             Byte srm = (Byte)reply.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                             if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                                 Log.v(TAG, "SRM status: Enabled by Server response");
-                                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                                mCs.mSrmClient.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
                                 Byte srmp = (Byte)reply.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
                                 Log.v(TAG, "SRMP header (CONTINUE or OK): " + srmp);
                                 if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
                                     Log.v(TAG, "SRMP status: WAIT");
-                                    ObexHelper.setLocalSrmpWait(true);
+                                    mCs.mSrmClient.setLocalSrmpWait(true);
                                 } else {
                                     Log.v(TAG, "SRMP status: NONE");
-                                    ObexHelper.setLocalSrmpWait(false);
+                                    mCs.mSrmClient.setLocalSrmpWait(false);
                                 }
                             } else {
                                 Log.v(TAG, "SRM status: Disabled by Server response");
-                                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
-                                ObexHelper.setLocalSrmpWait(false);
+                                mCs.mSrmClient.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                                mCs.mSrmClient.setLocalSrmpWait(false);
                             }
                             okToProceed = true;
                             updateValues = new ContentValues();
