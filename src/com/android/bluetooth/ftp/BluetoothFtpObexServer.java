@@ -424,21 +424,21 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             if (D) Log.d(TAG,"type = " + filetype + " name = " + name
                     + " Current Path = " + mCurrentPath + "length = " + length);
 
-            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+            if (((ServerOperation)op).mSrmServerSession.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                 if (V) Log.v(TAG, "Local Device SRM: Capable");
 
                 Byte srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                 if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                     if (V) Log.v(TAG, "SRM status: Enabled");
-                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
                 } else {
                     if (V) Log.v(TAG, "SRM status: Disabled");
-                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
                 }
             }
             else {
                 if (V) Log.v(TAG, "Local Device SRM: Incapable");
-                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
             }
 
             if (length == 0) {
@@ -709,21 +709,21 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         if (D) Log.d(TAG,"validName = " + validName);
 
         try {
-            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+            if (((ServerOperation)op).mSrmServerSession.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                 if (V) Log.v(TAG, "Local Device SRM: Capable");
 
                 Byte srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                 if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                     if (V) Log.v(TAG, "SRM status: Enabled");
-                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
                 } else {
                     if (V) Log.v(TAG, "SRM status: Disabled");
-                    ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
                 }
             }
             else {
                 if (V) Log.v(TAG, "Local Device SRM: Incapable");
-                ObexHelper.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
             }
         } catch (IOException e) {
             Log.e(TAG,"onGet "+ e.toString());
@@ -808,6 +808,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         BufferedInputStream bis;
         long finishtimestamp;
         long starttimestamp;
+        long readbytesleft = 0;
+        long filelength = fileinfo.length();
 
         byte[] buffer = new byte[outputBufferSize];
 
@@ -825,22 +827,24 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         bis = new BufferedInputStream(fileInputStream, 0x4000);
         starttimestamp = System.currentTimeMillis();
         try {
-            while ((position != fileinfo.length())) {
+            while ((position != filelength)) {
                 if (sIsAborted) {
                     ((ServerOperation)op).isAborted = true;
                     sIsAborted = false;
                     break;
                 }
                 timestamp = System.currentTimeMillis();
-                if(position != fileinfo.length()){
-                readLength = bis.read(buffer, 0, outputBufferSize);
-                }
 
+                readbytesleft = filelength - position;
+                if(readbytesleft < outputBufferSize) {
+                    outputBufferSize = (int) readbytesleft;
+                }
+                readLength = bis.read(buffer, 0, outputBufferSize);
                 if (D) Log.d(TAG,"Read File");
                 /* Do not write down anything on the socket once we get
                 * a abort for the current operation
                 */
-                if (ObexHelper.getLocalSrmStatus() == ObexHelper.LOCAL_SRM_ENABLED) {
+                if (((ServerOperation)op).mSrmServerSession.getLocalSrmStatus() == ObexHelper.LOCAL_SRM_ENABLED) {
                    if (((ServerOperation)op).isAborted()) {
                       ((ServerOperation)op).isAborted = true;
                       sIsAborted = false;
@@ -877,7 +881,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
         }
 
-        if(position == fileinfo.length() || (((ServerOperation)op).isAborted == true)) {
+        if((position == filelength) || (((ServerOperation)op).isAborted == true)) {
             Log.i(TAG,"Get Request TP analysis : Transmitted "+ position +
                   " bytes in" + (finishtimestamp - starttimestamp)  + "ms");
             return ResponseCodes.OBEX_HTTP_OK;
