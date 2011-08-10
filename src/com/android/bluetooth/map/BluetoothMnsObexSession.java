@@ -92,27 +92,26 @@ public class BluetoothMnsObexSession {
             if (mCs != null) {
                 mCs.disconnect(null);
             }
-                mCs = null;
-                if (D) Log.d(TAG, "OBEX session disconnected");
-            } catch (IOException e) {
-                Log.w(TAG, "OBEX session disconnect error" + e);
+            mCs = null;
+            if (D) Log.d(TAG, "OBEX session disconnected");
+        } catch (IOException e) {
+            Log.w(TAG, "OBEX session disconnect error" + e);
+        }
+        try {
+            if (mCs != null) {
+                if (D) Log.d(TAG, "OBEX session close mCs");
+                mCs.close();
+                if (D) Log.d(TAG, "OBEX session closed");
             }
-            try {
-                if (mCs != null) {
-                    if (D) Log.d(TAG, "OBEX session close mCs");
-                    mCs.close();
-                    if (D) Log.d(TAG, "OBEX session closed");
-                }
-            } catch (IOException e) {
-                Log.w(TAG, "OBEX session close error" + e);
+        } catch (IOException e) {
+            Log.w(TAG, "OBEX session close error" + e);
         }
         if (mTransport != null) {
             try {
-                    mTransport.close();
+                mTransport.close();
             } catch (IOException e) {
-                    Log.e(TAG, "mTransport.close error");
+                Log.e(TAG, "mTransport.close error");
             }
-
         }
     }
 
@@ -175,7 +174,7 @@ public class BluetoothMnsObexSession {
         InputStream inputStream = null;
         try {
             synchronized (this) {
-            mWaitingForRemote = true;
+                mWaitingForRemote = true;
             }
             // Send the header first and then the body
             try {
@@ -183,32 +182,31 @@ public class BluetoothMnsObexSession {
                 putOperation = (ClientOperation)mCs.put(request);
                 // TODO - Should this be kept or Removed
 
-             } catch (IOException e) {
-                 Log.e(TAG, "Error when put HeaderSet ");
-                 error = true;
-             }
-             synchronized (this) {
-                 mWaitingForRemote = false;
-             }
-             if (!error) {
-                 try {
-                     if (V) Log.v(TAG, "Send headerset Event ");
-                         outputStream = putOperation.openOutputStream();
-                         inputStream = putOperation.openInputStream();
-                     } catch (IOException e) {
-                     Log.e(TAG, "Error when opening OutputStream");
-                     error = true;
-                 }
-             }
+            } catch (IOException e) {
+                Log.e(TAG, "Error when put HeaderSet ");
+                error = true;
+            }
+            synchronized (this) {
+                mWaitingForRemote = false;
+            }
+            if (!error) {
+                try {
+                    if (V) Log.v(TAG, "Send headerset Event ");
+                    outputStream = putOperation.openOutputStream();
+                    inputStream = putOperation.openInputStream();
+                } catch (IOException e) {
+                    Log.e(TAG, "Error when opening OutputStream");
+                    error = true;
+                }
+            }
 
-             if (!error) {
-                 int position = 0;
-                 int readLength = 0;
-                 boolean okToProceed = true;
-                 long timestamp = 0;
-                 int outputBufferSize = putOperation.getMaxPacketSize();
-                 byte[] buffer = new byte[outputBufferSize];
-
+            if (!error) {
+                int position = 0;
+                int readLength = 0;
+                boolean okToProceed = true;
+                long timestamp = 0;
+                int outputBufferSize = putOperation.getMaxPacketSize();
+                byte[] buffer = new byte[outputBufferSize];
 
                 FileInputStream fileInputStream = new FileInputStream(file);
                 BufferedInputStream a = new BufferedInputStream(fileInputStream, 0x4000);
@@ -226,7 +224,7 @@ public class BluetoothMnsObexSession {
                     if (V) Log.v(TAG, "Response code is " + responseCode);
                     if (responseCode != ResponseCodes.OBEX_HTTP_CONTINUE
                         && responseCode != ResponseCodes.OBEX_HTTP_OK) {
-                     /* abort happens */
+                        /* abort happens */
                         okToProceed = false;
                     } else {
                         position += readLength;
@@ -238,9 +236,9 @@ public class BluetoothMnsObexSession {
                     }
                 }
                 if (position == file.length()) {
-                 Log.i(TAG, "SendFile finished send out file " + file.length()
+                    Log.i(TAG, "SendFile finished send out file " + file.length()
                             + " length " + file.length());
-                outputStream.close();
+                    outputStream.close();
                 } else {
                     error = true;
                     // TBD - Is Output stream close needed here
@@ -250,8 +248,6 @@ public class BluetoothMnsObexSession {
                 }
             }
         } catch (IOException e) {
-            handleSendException(e.toString());
-        } catch (NullPointerException e) {
             handleSendException(e.toString());
         } catch (IndexOutOfBoundsException e) {
             handleSendException(e.toString());

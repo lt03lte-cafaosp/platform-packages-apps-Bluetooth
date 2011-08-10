@@ -168,6 +168,8 @@ public class BluetoothMasService extends Service {
 
     private SocketAcceptThread mAcceptThread = null;
 
+    private Object mAuthSync = new Object();
+
     private BluetoothMapAuthenticator mAuth = null;
 
     private BluetoothServerSocket mServerSocket = null;
@@ -245,16 +247,16 @@ public class BluetoothMasService extends Service {
         int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                 BluetoothAdapter.ERROR);
         boolean removeTimeoutMsg = true;
-        if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+        if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
             removeTimeoutMsg = false;
             if (state == BluetoothAdapter.STATE_TURNING_OFF) {
                 // Release all resources
                 closeService();
             }
-        } else if (action.equals(Intent.ACTION_MEDIA_EJECT)
-                || action.equals(Intent.ACTION_MEDIA_MOUNTED)) {
+        } else if (Intent.ACTION_MEDIA_EJECT.equals(action)
+                || Intent.ACTION_MEDIA_MOUNTED.equals(action)) {
             closeService();
-        } else if (action.equals(ACCESS_ALLOWED_ACTION)) {
+        } else if (ACCESS_ALLOWED_ACTION.equals(action)) {
             if (intent.getBooleanExtra(EXTRA_ALWAYS_ALLOWED, false)) {
                 boolean result = mRemoteDevice.setTrust(true);
                 if (VERBOSE)
@@ -269,12 +271,12 @@ public class BluetoothMasService extends Service {
             } catch (IOException ex) {
                 Log.e(TAG, "Caught the error: " + ex.toString());
             }
-        } else if (action.equals(ACCESS_DISALLOWED_ACTION)) {
+        } else if (ACCESS_DISALLOWED_ACTION.equals(action)) {
             stopObexServerSession();
-        } else if (action.equals(AUTH_RESPONSE_ACTION)) {
+        } else if (AUTH_RESPONSE_ACTION.equals(action)) {
             String sessionkey = intent.getStringExtra(EXTRA_SESSION_KEY);
             notifyAuthKeyInput(sessionkey);
-        } else if (action.equals(AUTH_CANCELLED_ACTION)) {
+        } else if (AUTH_CANCELLED_ACTION.equals(action)) {
             notifyAuthCancelled();
         } else {
             removeTimeoutMsg = false;
@@ -322,7 +324,7 @@ public class BluetoothMasService extends Service {
         }
     }
 
-    private final boolean initSocket() {
+    private boolean initSocket() {
         if (VERBOSE)
             Log.v(TAG, "Map Service initSocket");
 
@@ -368,7 +370,7 @@ public class BluetoothMasService extends Service {
         return initSocketOK;
     }
 
-    private final void closeSocket(boolean server, boolean accept)
+    private void closeSocket(boolean server, boolean accept)
             throws IOException {
         if (server == true) {
             // Stop the possible trying to init serverSocket
@@ -386,7 +388,7 @@ public class BluetoothMasService extends Service {
         }
     }
 
-    private final void closeService() {
+    private void closeService() {
         if (VERBOSE)
             Log.v(TAG, "Map Service closeService");
 
@@ -420,7 +422,7 @@ public class BluetoothMasService extends Service {
         }
     }
 
-    private final void startObexServerSession() throws IOException {
+    private void startObexServerSession() throws IOException {
         if (VERBOSE)
             Log.v(TAG, "Map Service startObexServerSession");
 
@@ -439,7 +441,7 @@ public class BluetoothMasService extends Service {
 
         mMapServer = new BluetoothMasObexServer(mSessionStatusHandler,
                 mRemoteDevice, this);
-        synchronized (this) {
+        synchronized (mAuthSync) {
             mAuth = new BluetoothMapAuthenticator(mSessionStatusHandler);
             mAuth.setChallenged(false);
             mAuth.setCancelled(false);
@@ -488,7 +490,7 @@ public class BluetoothMasService extends Service {
     }
 
     private void notifyAuthKeyInput(final String key) {
-        synchronized (mAuth) {
+        synchronized (mAuthSync) {
             if (key != null) {
                 mAuth.setSessionKey(key);
             }
@@ -498,7 +500,7 @@ public class BluetoothMasService extends Service {
     }
 
     private void notifyAuthCancelled() {
-        synchronized (mAuth) {
+        synchronized (mAuthSync) {
             mAuth.setCancelled(true);
             mAuth.notify();
         }
