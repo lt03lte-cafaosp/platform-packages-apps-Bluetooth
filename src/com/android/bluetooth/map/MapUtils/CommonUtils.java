@@ -46,15 +46,14 @@ public class CommonUtils {
         public String getFullPath(String child, Context context, List<String> folderList, String CurrentPath) {
 
         String tempPath = null;
-        List<String> completeFolderList = new ArrayList<String>();
         EmailUtils eu = new EmailUtils();
-        completeFolderList = eu.folderListEmail(folderList, context);
+        List<String> completeFolderList = eu.folderListEmail(folderList, context);
 
         if (child != null) {
             if (CurrentPath == null) {
                 if (child.equals("telecom")) {
                     // Telecom is fine
-                    tempPath = new String("telecom");
+                    tempPath = "telecom";
                 }
             }
             else if (CurrentPath.equals("telecom")) {
@@ -93,7 +92,7 @@ public class CommonUtils {
             Time time = new Time();
             try {
                 time.parse(appParams.FilterPeriodBegin.trim());
-                if (periodStr != "") {
+                if (periodStr.length() != 0) {
                         periodStr += " AND ";
                 }
                 periodStr += "date >= " + time.toMillis(false);
@@ -110,7 +109,7 @@ public class CommonUtils {
             Time time = new Time();
             try {
                 time.parse(appParams.FilterPeriodEnd.trim());
-                if (periodStr != "") {
+                if (periodStr.length() != 0) {
                         periodStr += " AND ";
                 }
                 periodStr += "date < " + time.toMillis(false);

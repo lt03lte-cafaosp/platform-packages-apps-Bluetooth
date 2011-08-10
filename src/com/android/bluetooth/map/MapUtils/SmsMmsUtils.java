@@ -114,19 +114,19 @@ public class SmsMmsUtils {
 
         int folderType = -5 ;
 
-        if (folder.equalsIgnoreCase(Inbox)) {
+        if (Inbox.equalsIgnoreCase(folder)) {
             folderType = 1;
         }
-        else if (folder.equalsIgnoreCase(Outbox)) {
+        else if (Outbox.equalsIgnoreCase(folder)) {
             folderType = 4;
         }
-        else if (folder.equalsIgnoreCase(Sent)) {
+        else if (Sent.equalsIgnoreCase(folder)) {
             folderType = 2;
         }
-        else if (folder.equalsIgnoreCase(Draft) || folder.equalsIgnoreCase(Drafts)) {
+        else if (Draft.equalsIgnoreCase(folder) || Drafts.equalsIgnoreCase(folder)) {
             folderType = 3;
         }
-        else if (folder.equalsIgnoreCase(Deleted)) {
+        else if (Deleted.equalsIgnoreCase(folder)) {
             folderType = -1;
         }
         return folderType;
@@ -136,19 +136,19 @@ public class SmsMmsUtils {
 
         String query = null;
 
-        if (folder.equalsIgnoreCase(Inbox)) {
+        if (Inbox.equalsIgnoreCase(folder)) {
             query = "type = 1 AND thread_id <> " + DELETED_THREAD_ID;
         }
-        else if (folder.equalsIgnoreCase(Outbox)) {
+        else if (Outbox.equalsIgnoreCase(folder)) {
             query = "(type = 4 OR type = 5 OR type = 6) AND thread_id <> " + DELETED_THREAD_ID;
         }
-        else if (folder.equalsIgnoreCase(Sent)) {
+        else if (Sent.equalsIgnoreCase(folder)) {
             query = "type = 2 AND thread_id <> " + DELETED_THREAD_ID;
         }
-        else if (folder.equalsIgnoreCase(Draft)) {
+        else if (Draft.equalsIgnoreCase(folder)) {
             query = "type = 3 AND thread_id <> " + DELETED_THREAD_ID;
         }
-        else if (folder.equalsIgnoreCase(Deleted)) {
+        else if (Deleted.equalsIgnoreCase(folder)) {
             query = "thread_id = " + DELETED_THREAD_ID;
         }
         else{
@@ -163,13 +163,13 @@ public class SmsMmsUtils {
          /* Filter readstatus: 0 no filtering, 0x01 get unread, 0x10 get read */
         if (appParams.FilterReadStatus != 0) {
              if ((appParams.FilterReadStatus & 0x1) != 0) {
-                 if (whereClause != "") {
+                 if (whereClause.length() != 0) {
                      whereClause += " AND ";
                  }
                  whereClause += " read=0 ";
              }
              if ((appParams.FilterReadStatus & 0x02) != 0) {
-                 if (whereClause != "") {
+                 if (whereClause.length() != 0) {
                      whereClause += " AND ";
                  }
                  whereClause += " read=1 ";
@@ -183,7 +183,7 @@ public class SmsMmsUtils {
              Time time = new Time();
              try {
                  time.parse(appParams.FilterPeriodBegin.trim());
-                 if (whereClause != "") {
+                 if (whereClause.length() != 0) {
                      whereClause += " AND ";
                  }
                  whereClause += "date >= " + time.toMillis(false);
@@ -199,7 +199,7 @@ public class SmsMmsUtils {
              Time time = new Time();
              try {
                  time.parse(appParams.FilterPeriodEnd.trim());
-                 if (whereClause != "") {
+                 if (whereClause.length() != 0) {
                      whereClause += " AND ";
                  }
                  whereClause += "date < " + time.toMillis(false);

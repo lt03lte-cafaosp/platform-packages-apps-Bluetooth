@@ -926,7 +926,7 @@ public class MapUtils {
         String vCard = null;
         vCard = fetchRecipientVcard(bmsg);
 
-        if (vCard.indexOf("EMAIL:") > 0) {
+        if (vCard.indexOf("EMAIL:") >= 0) {
             phoneNumber = fetchVcardEmailforMms(vCard);
         } else {
             phoneNumber = fetchVcardTel(vCard);
@@ -1111,9 +1111,7 @@ public class MapUtils {
             return bmsg.substring(beginVcardPos, endVcardPos);
 
         } else {
-
-            return null;
-
+            return "";
         }
     }
 
@@ -1134,9 +1132,7 @@ public class MapUtils {
             return bmsg.substring(beginVcardPos, endVcardPos);
 
         } else {
-
-            return null;
-
+            return "";
         }
     }
     private String fetchSubjectEmail(String body) {
@@ -1147,10 +1143,8 @@ public class MapUtils {
             int beginVersionPos = pos + (("Subject:").length());
             int endVersionPos = body.indexOf("\n", beginVersionPos);
             return body.substring(beginVersionPos, endVersionPos);
-
         } else {
-
-            return null;
+            return "";
         }
     }
 
@@ -1174,9 +1168,7 @@ public class MapUtils {
             return bmsg.substring(beginVersionPos, endVersionPos);
 
         } else {
-
-            return null;
-
+            return "";
         }
     }
 
@@ -1237,7 +1229,7 @@ public class MapUtils {
             return bmsg.substring(beginVcardPos, endVcardPos);
 
         } else {
-            return null;
+            return "";
         }
 
     }
@@ -1261,9 +1253,7 @@ public class MapUtils {
             return bmsg.substring(beginStatusPos, endStatusPos);
 
         } else {
-
-            return null;
-
+            return "";
         }
     }
 
@@ -1722,8 +1712,8 @@ public class MapUtils {
         String str1 = null;
         String str2 = null;
 
-        Integer index = 0;
-        Integer endSubstring = 0;
+        int index = 0;
+        int endSubstring = 0;
 
         index = message.indexOf("< msg handle");
         if (index < 0) {

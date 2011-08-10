@@ -84,7 +84,7 @@ public class EmailUtils {
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
         Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
 
-        if ( cr.moveToFirst()) {
+        if (cr != null && cr.moveToFirst()) {
             do {
                 if (Log.isLoggable(TAG, Log.VERBOSE)){
                     Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
@@ -108,28 +108,31 @@ public class EmailUtils {
         if (Log.isLoggable(TAG, Log.VERBOSE)){
             Log.v(TAG, " Folder Listing of SMS,MMS and EMAIL: "+folderList);
         }
-        cr.close();
+        if (cr != null) {
+            cr.close();
+        }
         return folderList;
     }
     public List<String> folderListMns(Context context) {
         String[] projection = new String[] {"displayName"};
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
-        Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
         List<String> folderList = new ArrayList<String>();
-        if ( cr.moveToFirst()) {
-            do {
-                if (Log.isLoggable(TAG, Log.VERBOSE)){
-                    Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
-                }
-                folderList.add(cr.getString(0));
-            } while ( cr.moveToNext());
+        Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
+        if (cr != null) {
+            if (cr.moveToFirst()) {
+                do {
+                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
+                    }
+                    folderList.add(cr.getString(0));
+                } while (cr.moveToNext());
+            }
+            if (Log.isLoggable(TAG, Log.VERBOSE)){
+                Log.v(TAG, " Folder Listing of EMAIL: "+folderList);
+            }
+            cr.close();
         }
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
-            Log.v(TAG, " Folder Listing of EMAIL: "+folderList);
-        }
-        cr.close();
         return folderList;
-
     }
 
     public String getWhereIsQueryForTypeEmail(String folder, Context context) {
@@ -137,20 +140,24 @@ public class EmailUtils {
         String query = "mailboxKey = -1";
         String folderId;
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
-        if(folder != null && folder.contains("'")){
+        if (folder == null) {
+            return query;
+        }
+        if (folder.contains("'")){
             folder = folder.replace("'", "''");
         }
         Cursor cr = context.getContentResolver().query(
                 uri, null, "(UPPER(displayName) = '"+ folder.toUpperCase()+"')" , null, null);
-
-        if ( cr.moveToFirst()) {
-            do {
-                folderId = cr.getString(cr.getColumnIndex("_id"));
-                query = "mailboxKey = "+ folderId;
-                break;
-            } while ( cr.moveToNext());
+        if (cr != null) {
+            if ( cr.moveToFirst()) {
+                do {
+                    folderId = cr.getString(cr.getColumnIndex("_id"));
+                    query = "mailboxKey = "+ folderId;
+                    break;
+                } while ( cr.moveToNext());
+            }
+            cr.close();
         }
-        cr.close();
         return query;
     }
 
@@ -165,22 +172,24 @@ public class EmailUtils {
         Cursor cr = context.getContentResolver().query(
                 uri, null, "messageKey = "+ messageId , null, null);
 
-        if (cr.moveToFirst()) {
+        if (cr != null && cr.moveToFirst()) {
             do {
                 textContent = cr.getString(cr.getColumnIndex("textContent"));
                 htmlContent = cr.getString(cr.getColumnIndex("htmlContent"));
-                if(textContent != null && !textContent.equalsIgnoreCase("")){
+                if(textContent != null && textContent.length() != 0){
                     msgSize = textContent.length();
                 }
                 else if(textContent == null){
-                    if(htmlContent != null && !htmlContent.equalsIgnoreCase("")){
+                    if(htmlContent != null && htmlContent.length() != 0){
                         msgSize = htmlContent.length();
                     }
                 }
                 break;
             } while (cr.moveToNext());
         }
-        cr.close();
+        if (cr != null) {
+            cr.close();
+        }
         return msgSize;
     }
 
@@ -207,7 +216,7 @@ public class EmailUtils {
         /* Filter readstatus: 0 no filtering, 0x01 get unread, 0x10 get read */
         if (appParams.FilterReadStatus != 0) {
             if ((appParams.FilterReadStatus & 0x1) != 0) {
-                if (whereClauseEmail != "") {
+                if (whereClauseEmail.length() != 0) {
                     whereClauseEmail += " AND ";
                 }
                 whereClauseEmail += " flagRead = 0 ";
@@ -217,7 +226,7 @@ public class EmailUtils {
                 Log.v(TAG, "Filter Read Status Condition Value:"+(appParams.FilterReadStatus & 0x10));
             }
             if ((appParams.FilterReadStatus & 0x10) != 0) {
-                if (whereClauseEmail != "") {
+                if (whereClauseEmail.length() != 0) {
                     whereClauseEmail += " AND ";
                 }
                 whereClauseEmail += " flagRead = 1 ";
@@ -226,16 +235,17 @@ public class EmailUtils {
         if (Log.isLoggable(TAG, Log.VERBOSE)){
             Log.v(TAG, "Filter Recipient Value:"+appParams.FilterRecipient);
             Log.v(TAG, "Filter Recipient Condition 1 :"+(appParams.FilterRecipient != null));
-            Log.v(TAG, "Filter Recipient Condition 2 :"+(appParams.FilterRecipient != ""));
+            if (appParams.FilterRecipient != null) {
+                Log.v(TAG, "Filter Recipient Condition 2 :"+(appParams.FilterRecipient.length() != 0));
+            }
         }
         //Filter Recipient
-        if ((appParams.FilterRecipient != null) && (appParams.FilterRecipient != "")  
-                && (appParams.FilterRecipient.length() > 0)
+        if ((appParams.FilterRecipient != null) && (appParams.FilterRecipient.length() > 0)
                 && !(appParams.FilterRecipient.equalsIgnoreCase("*"))) {
                 if(appParams.FilterRecipient.contains("*")){
                     appParams.FilterRecipient = appParams.FilterRecipient.replace('*', '%');
                 }
-                if (whereClauseEmail != "") {
+                if (whereClauseEmail.length() != 0) {
                     whereClauseEmail += " AND ";
                 }
             whereClauseEmail += " toList LIKE '%"+appParams.FilterRecipient.trim()+"%'";
@@ -250,7 +260,7 @@ public class EmailUtils {
                     appParams.FilterOriginator = appParams.FilterOriginator.replace('*', '%');
                 }
             // For incoming message
-            if (whereClauseEmail != "") {
+            if (whereClauseEmail.length() != 0) {
                 whereClauseEmail += " AND ";
             }
             String str1 = appParams.FilterOriginator;
@@ -262,12 +272,12 @@ public class EmailUtils {
 
         /* Filter Period Begin */
         if ((appParams.FilterPeriodBegin != null)
-                && (appParams.FilterPeriodBegin != "")) {
+                && (appParams.FilterPeriodBegin.length() != 0)) {
             Time time = new Time();
 
             try {
                 time.parse(appParams.FilterPeriodBegin.trim());
-                if (whereClauseEmail != "") {
+                if (whereClauseEmail.length() != 0) {
                     whereClauseEmail += " AND ";
                 }
                 whereClauseEmail += "timeStamp >= " + time.toMillis(false);
@@ -280,11 +290,11 @@ public class EmailUtils {
 
         /* Filter Period End */
         if ((appParams.FilterPeriodEnd != null)
-                && (appParams.FilterPeriodEnd != "")) {
+                && (appParams.FilterPeriodEnd.length() != 0)) {
             Time time = new Time();
             try {
                 time.parse(appParams.FilterPeriodEnd.trim());
-                if (whereClauseEmail != "") {
+                if (whereClauseEmail.length() != 0) {
                     whereClauseEmail += " AND ";
                 }
                 whereClauseEmail += "timeStamp < " + time.toMillis(false);
@@ -416,17 +426,20 @@ public class EmailUtils {
                 if (recipientAddressing.contains("")) {
                     List<String> recipientNameArr = new ArrayList<String>();
                     List<String> recipientEmailArr = new ArrayList<String>();
-                    String[] multiRecipientStr = recipientName.split("");
-                    for (int i=0; i < multiRecipientStr.length ; i++) {
-                        if (multiRecipientStr[i].contains("")) {
-                            String[] recepientStr = multiRecipientStr[i].split("");
-                            recipientNameArr.add(recepientStr[1]);
-                            recipientEmailArr.add(recepientStr[0]);
+                    if  (recipientName != null) {
+                        String[] multiRecipientStr = recipientName.split("");
+                        for (int i=0; i < multiRecipientStr.length ; i++) {
+                            if (multiRecipientStr[i].contains("")) {
+                                String[] recepientStr = multiRecipientStr[i].split("");
+                                recipientNameArr.add(recepientStr[1]);
+                                recipientEmailArr.add(recepientStr[0]);
+                            }
                         }
                     }
-                    if (recipientEmailArr != null && recipientEmailArr.size() > 0) {
-                        for (int i=0; i < recipientEmailArr.size() ; i++) {
-                            if (i < (recipientEmailArr.size()-1)) {
+                    final int recipientEmailArrSize = recipientEmailArr.size();
+                    if (recipientEmailArrSize > 0) {
+                        for (int i=0; i < recipientEmailArrSize ; i++) {
+                            if (i < (recipientEmailArrSize-1)) {
                                 multiRecepientAddrs += recipientEmailArr.get(i)+";";
                             } else {
                                 multiRecepientAddrs += recipientEmailArr.get(i);
@@ -509,7 +522,7 @@ public class EmailUtils {
             if (Log.isLoggable(TAG, Log.VERBOSE)){
                 Log.v(TAG, " ::Reply To addressing:: " + replyToStr);
             }
-            if (replyToStr !=null && !replyToStr.equalsIgnoreCase("")){
+            if (replyToStr !=null && replyToStr.length() != 0){
                 if (replyToStr.contains("")){
                     String replyToStrArr[] = replyToStr.split("");
                     replyToStr = replyToStrArr[0];
@@ -532,18 +545,18 @@ public class EmailUtils {
         String subjectText = null;
         Uri uri1 = Uri.parse("content://com.android.email.provider/message");
         String whereClause = " _id = " + msgHandle;
+
+        // Create a bMessage
+        BmessageConsts bmsg = new BmessageConsts();
+
         cr1 = context.getContentResolver().query(uri1, null, whereClause, null,
                 null);
-
-        if (cr1.getCount() > 0) {
+        if (cr1 != null && cr1.getCount() > 0) {
             cr1.moveToFirst();
             folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
             String containingFolder = getContainingFolderEmail(folderId, context);
             timeStamp = cr1.getString(cr1.getColumnIndex("timeStamp"));
             subjectText = cr1.getString(cr1.getColumnIndex("subject"));
-            BmessageConsts bmsg = new BmessageConsts();
-
-            // Create a bMessage
 
             // TODO Get Current type
             bmsg.setType("EMAIL");
@@ -596,19 +609,25 @@ public class EmailUtils {
                 bmsg.setRecipientVcard_name(recipientName.trim());
                 bmsg.setRecipientVcard_email(recipientName.trim());
             }
+        }
+        if (cr1 != null) {
+            cr1.close();
+        }
+
+        //Query the body table for obtaining the message body
+        Cursor cr2 = null;
+        Uri uri2 = Uri.parse("content://com.android.email.provider/body");
+        String whereStr = " messageKey = " + msgHandle;
+        cr2 = context.getContentResolver().query(uri2, null, whereStr, null,
+                null);
+        if (cr2 != null) {
             StringBuilder sb = new StringBuilder();
-            //Query the body table for obtaining the message body
-            Cursor cr2 = null;
             String emailBody = null;
-            Uri uri2 = Uri.parse("content://com.android.email.provider/body");
-            String whereStr = " messageKey = " + msgHandle;
-            cr2 = context.getContentResolver().query(uri2, null, whereStr, null,
-                    null);
 
             if (cr2.getCount() > 0) {
                 cr2.moveToFirst();
                 emailBody = cr2.getString(cr2.getColumnIndex("textContent"));
-                if (emailBody == null || emailBody.length() == 0 || emailBody.equalsIgnoreCase("")){
+                if (emailBody == null || emailBody.length() == 0){
                     String msgBody = cr2.getString(cr2.getColumnIndex("htmlContent"));
                     if (msgBody != null){
                         CharSequence msgText = Html.fromHtml(msgBody);
@@ -657,9 +676,8 @@ public class EmailUtils {
                 Log.v(TAG, str);
                 Log.v(TAG, "\n\n");
             }
-            cr1.close();
             cr2.close();
-     }
+        }
 
         return str;
     }
@@ -675,13 +693,14 @@ public class EmailUtils {
         cr = context.getContentResolver().query(
                 Uri.parse("content://com.android.email.provider/mailbox"),
                 null, whereClause, null, null);
-        if (cr.getCount() > 0) {
-            cr.moveToFirst();
-            folderName = cr.getString(cr.getColumnIndex("displayName"));
-            return folderName;
+        if (cr != null) {
+            if (cr.getCount() > 0) {
+                cr.moveToFirst();
+                folderName = cr.getString(cr.getColumnIndex("displayName"));
+            }
+            cr.close();
         }
-        cr.close();
-        return null;
+        return folderName;
     }
 
 

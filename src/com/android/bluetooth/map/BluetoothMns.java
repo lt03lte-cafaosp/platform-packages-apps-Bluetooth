@@ -242,7 +242,7 @@ public class BluetoothMns {
             case SDP_RESULT:
                 if (V) Log.v(TAG, "SDP request returned " + msg.arg1
                             + " (" + (System.currentTimeMillis() - mTimestamp + " ms)"));
-                if (!((BluetoothDevice) msg.obj).equals(mDestination)) {
+                if (!mDestination.equals(msg.obj)) {
                     return;
                 }
                 try {
@@ -278,7 +278,12 @@ public class BluetoothMns {
                 if (V) Log.v(TAG, "Transfer receive RFCOMM_CONNECTED msg");
                 mConnectThread = null;
                 mTransport = (ObexTransport) msg.obj;
-                startObexSession();
+                try {
+                    startObexSession();
+                } catch (NullPointerException ne) {
+                    sendEmptyMessage(RFCOMM_ERROR);
+                    return;
+                }
                 registerUpdates();
 
                 break;
@@ -362,9 +367,16 @@ public class BluetoothMns {
         Time currentTime = new Time();
         currentTime.setToNow();
 
+        List<BluetoothMnsMsgHndlMceInitOp> staleOpList = new ArrayList<BluetoothMnsMsgHndlMceInitOp>();
         for (BluetoothMnsMsgHndlMceInitOp op: opList) {
-            // Remove stale entries
             if (currentTime.toMillis(false) - op.time.toMillis(false) > 10000) {
+                // add stale entries
+                staleOpList.add(op);
+            }
+        }
+        if (!staleOpList.isEmpty()) {
+            for (BluetoothMnsMsgHndlMceInitOp op: staleOpList) {
+                // Remove stale entries
                 opList.remove(op);
             }
         }
@@ -485,17 +497,19 @@ public class BluetoothMns {
 
         if (folderListSmsMms != null && folderListSmsMms.size() > 0){
             for (int i=0; i < folderListSmsMms.size(); i++){
-                folderNameSmsMms = folderListSmsMms.get(i);
+                final String folderNameSmsMms = folderListSmsMms.get(i);
+                if (folderNameSmsMms == null) {
+                    continue;
+                }
                 Uri smsFolderUri =  Uri.parse("content://sms/"+folderNameSmsMms.trim()+"/");
                 crSmsFolderA = cr.query(smsFolderUri,
                         new String[] { "_id", "body", "type"}, null, null, "_id asc");
                 crSmsFolderB = cr.query(smsFolderUri,
                         new String[] { "_id", "body", "type"}, null, null, "_id asc");
                 Uri mmsFolderUri;
-                if (folderNameSmsMms != null
-                        && folderNameSmsMms.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
+                if (folderNameSmsMms.equalsIgnoreCase(BluetoothMasAppIf.Draft)){
                     mmsFolderUri = Uri.parse("content://mms/"+BluetoothMasAppIf.Drafts+"/");
-                } else{
+                } else {
                     mmsFolderUri = Uri.parse("content://mms/"+folderNameSmsMms.trim()+"/");
                 }
                 crMmsFolderA = cr.query(mmsFolderUri, new String[] { "_id", "read", "m_type", "m_id"},
@@ -638,8 +652,6 @@ public class BluetoothMns {
     private final int CR_EMAIL_FOLDER_B = 2;
     private int currentCREmailFolder = CR_EMAIL_FOLDER_A;
     public String folderName = "";
-    public String folderNameSmsMms = "";
-
 
     /**
      * Get the folder name (MAP representation) based on the
@@ -703,14 +715,17 @@ public class BluetoothMns {
      * given id
      */
     private int getMessageType(String id) {
+        int type = -1;
         Cursor cr = mContext.getContentResolver().query(
                 Uri.parse("content://sms/" + id),
                 new String[] { "_id", "type"}, null, null, null);
-        if (cr.moveToFirst()) {
-            return cr.getInt(cr.getColumnIndex("type"));
+        if (cr != null) {
+            if (cr.moveToFirst()) {
+                type = cr.getInt(cr.getColumnIndex("type"));
+            }
+            cr.close();
         }
-        cr.close();
-        return -1;
+        return type;
     }
     /**
      * Gets the table type (as in Email Content Provider) for the
@@ -722,23 +737,27 @@ public class BluetoothMns {
                 Uri.parse("content://com.android.email.provider/message/" + id),
                 new String[] { "_id", "mailboxKey"}, null, null, null);
         int folderId = -1;
-        if (cr.moveToFirst()) {
-            folderId = cr.getInt(cr.getColumnIndex("mailboxKey"));
-        }
+        if (cr != null) {
+            if (cr.moveToFirst()) {
+                folderId = cr.getInt(cr.getColumnIndex("mailboxKey"));
+            }
 
-        Cursor cr1 = mContext.getContentResolver().query(
-                Uri.parse("content://com.android.email.provider/mailbox"),
-                new String[] { "_id", "displayName"}, "_id ="+ folderId, null, null);
-        String folderName = null;
-        if (cr1.moveToFirst()) {
-            folderName = cr1.getString(cr1.getColumnIndex("displayName"));
+            Cursor cr1 = mContext.getContentResolver().query(
+                    Uri.parse("content://com.android.email.provider/mailbox"),
+                    new String[] { "_id", "displayName"}, "_id ="+ folderId, null, null);
+            String folderName = null;
+            if (cr1 != null) {
+                if (cr1.moveToFirst()) {
+                    folderName = cr1.getString(cr1.getColumnIndex("displayName"));
+                }
+                if (folderName !=null && (folderName.equalsIgnoreCase("Trash") ||
+                        folderName.toUpperCase().contains("TRASH"))){
+                    deletedFlag = 1;
+                }
+                cr1.close();
+            }
+            cr.close();
         }
-        if (folderName !=null && (folderName.equalsIgnoreCase("Trash") ||
-                folderName.toUpperCase().contains("TRASH"))){
-            deletedFlag = 1;
-        }
-        cr.close();
-        cr1.close();
         return deletedFlag;
     }
 
@@ -752,10 +771,12 @@ public class BluetoothMns {
                 Uri.parse("content://sms/"),
                 new String[] { "_id", "date", "type"}, " _id = " + id, null,
                 null);
-        if (cr.moveToFirst()) {
-            return getFolder(cr.getInt(cr.getColumnIndex("type")));
+        if (cr != null) {
+            if (cr.moveToFirst()) {
+                newFolder = getFolder(cr.getInt(cr.getColumnIndex("type")));
+            }
+            cr.close();
         }
-        cr.close();
         return newFolder;
     }
 
@@ -763,12 +784,15 @@ public class BluetoothMns {
     private BroadcastReceiver mStorageStatusReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(Intent.ACTION_DEVICE_STORAGE_LOW)) {
-                Log.d(TAG, " Memory Full ");
-                sendMnsEvent(MEMORY_FULL, null, null, null, null);
-            } else if (intent.getAction().equals(Intent.ACTION_DEVICE_STORAGE_OK)) {
-                Log.d(TAG, " Memory Available ");
-                sendMnsEvent(MEMORY_AVAILABLE, null, null, null, null);
+            if (intent != null) {
+                final String action = intent.getAction();
+                if (Intent.ACTION_DEVICE_STORAGE_LOW.equals(action)) {
+                    Log.d(TAG, " Memory Full ");
+                    sendMnsEvent(MEMORY_FULL, null, null, null, null);
+                } else if (Intent.ACTION_DEVICE_STORAGE_OK.equals(action)) {
+                    Log.d(TAG, " Memory Available ");
+                    sendMnsEvent(MEMORY_AVAILABLE, null, null, null, null);
+                }
             }
         }
     };
@@ -867,13 +891,13 @@ public class BluetoothMns {
                                     String whereClause = " _id = " + id;
                                     cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                             null);
-
-                                    if (cr1.getCount() > 0) {
-                                        cr1.moveToFirst();
-                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    if (cr1 != null) {
+                                        if (cr1.moveToFirst()) {
+                                            folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                            containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                        }
+                                        cr1.close();
                                     }
-                                    cr1.close();
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
@@ -903,13 +927,13 @@ public class BluetoothMns {
                                     String whereClause = " _id = " + id;
                                     cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                             null);
-
-                                    if (cr1.getCount() > 0) {
-                                        cr1.moveToFirst();
-                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    if (cr1 != null) {
+                                        if (cr1.moveToFirst()) {
+                                            folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                            containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                        }
+                                        cr1.close();
                                     }
-                                    cr1.close();
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
@@ -965,13 +989,13 @@ public class BluetoothMns {
                                     String whereClause = " _id = " + id;
                                     cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                             null);
-
-                                    if (cr1.getCount() > 0) {
-                                        cr1.moveToFirst();
-                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    if (cr1 != null) {
+                                        if (cr1.moveToFirst()) {
+                                            folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                            containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                        }
+                                        cr1.close();
                                     }
-                                    cr1.close();
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
@@ -1002,13 +1026,13 @@ public class BluetoothMns {
                                     String whereClause = " _id = " + id;
                                     cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
                                             null);
-
-                                    if (cr1.getCount() > 0) {
-                                        cr1.moveToFirst();
-                                        folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
-                                        containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                    if (cr1 != null) {
+                                        if (cr1.moveToFirst()) {
+                                            folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
+                                            containingFolder = eu.getContainingFolderEmail(folderId, mContext);
+                                        }
+                                        cr1.close();
                                     }
-                                    cr1.close();
                                     String newFolder = containingFolder;
                                     id = Integer.toString(Integer.valueOf(id)
                                             + EMAIL_HDLR_CONSTANT);
@@ -1164,7 +1188,7 @@ public class BluetoothMns {
                                             + newFolder, BluetoothMasAppIf.Telecom + "/" +
                                             BluetoothMasAppIf.Msg + "/" +
                                             BluetoothMasAppIf.Draft, "SMS_GSM");
-                                    if (newFolder.equalsIgnoreCase("sent")) {
+                                    if (newFolder != null && newFolder.equalsIgnoreCase("sent")) {
                                         sendMnsEvent(SENDING_SUCCESS, id,
                                                 BluetoothMasAppIf.Telecom + "/"+
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
@@ -1285,7 +1309,7 @@ public class BluetoothMns {
                                             + newFolder, BluetoothMasAppIf.Telecom + "/" +
                                             BluetoothMasAppIf.Msg + "/" +
                                             BluetoothMasAppIf.Draft, "SMS_GSM");
-                                    if (newFolder.equalsIgnoreCase("sent")) {
+                                    if (newFolder != null && newFolder.equalsIgnoreCase("sent")) {
                                         sendMnsEvent(SENDING_SUCCESS, id,
                                                 BluetoothMasAppIf.Telecom + "/"+
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
@@ -1583,13 +1607,12 @@ public class BluetoothMns {
                             if (Log.isLoggable(TAG, Log.VERBOSE)){
                                 Log.v(TAG, " ADDED EMAIL ID " + id1);
                             }
-                            Cursor cr1 = null;
                             int folderId;
                             Uri uri1 = Uri.parse("content://com.android.email.provider/message");
                             String whereClause = " _id = " + id1;
-                            cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
-                                    null);
-                            if (cr1.moveToFirst()) {
+                            Cursor cr1 = mContext.getContentResolver().query(uri1, null, whereClause,
+                                    null, null);
+                            if (cr1 != null && cr1.moveToFirst()) {
                                 do {
                                     for (int i=0;i<cr1.getColumnCount();i++){
                                         if (Log.isLoggable(TAG, Log.VERBOSE)){
@@ -1599,12 +1622,13 @@ public class BluetoothMns {
                                 } while (cr1.moveToNext());
                             }
 
-                            if (cr1.getCount() > 0) {
-                                cr1.moveToFirst();
+                            if (cr1 != null && cr1.moveToFirst()) {
                                 folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                 containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                             }
-                            cr1.close();
+                            if (cr1 != null) {
+                                cr1.close();
+                            }
                             if (containingFolder != null
                                     && containingFolder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
                                 if (Log.isLoggable(TAG, Log.VERBOSE)){
@@ -1648,14 +1672,12 @@ public class BluetoothMns {
                             if (Log.isLoggable(TAG, Log.VERBOSE)){
                                 Log.v(TAG, " ADDED EMAIL ID " + id1);
                             }
-                            Cursor cr1 = null;
                             int folderId;
                             Uri uri1 = Uri.parse("content://com.android.email.provider/message");
                             String whereClause = " _id = " + id1;
-                            cr1 = mContext.getContentResolver().query(uri1, null, whereClause, null,
-                                    null);
-
-                            if (cr1.moveToFirst()) {
+                            Cursor cr1 = mContext.getContentResolver().query(uri1, null, whereClause,
+                                    null, null);
+                            if (cr1 != null && cr1.moveToFirst()) {
                                 do {
                                     for (int i=0;i<cr1.getColumnCount();i++){
                                         if (Log.isLoggable(TAG, Log.VERBOSE)){
@@ -1666,12 +1688,13 @@ public class BluetoothMns {
                                 } while (cr1.moveToNext());
                             }
 
-                            if (cr1.getCount() > 0) {
-                                cr1.moveToFirst();
+                            if (cr1 != null && cr1.moveToFirst()) {
                                 folderId = cr1.getInt(cr1.getColumnIndex("mailboxKey"));
                                 containingFolder = eu.getContainingFolderEmail(folderId, mContext);
                             }
-                            cr1.close();
+                            if (cr1 != null) {
+                                cr1.close();
+                            }
                             if (containingFolder != null
                                     && containingFolder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
                                 if (Log.isLoggable(TAG, Log.VERBOSE)){
@@ -1777,7 +1800,7 @@ public class BluetoothMns {
     /**
      * Connect the MNS Obex client to remote server
      */
-    private void startObexSession() {
+    private void startObexSession() throws NullPointerException {
 
         if (V)
             Log.v(TAG, "Create Client session with transport "
@@ -1837,16 +1860,16 @@ public class BluetoothMns {
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-
+            if (intent == null) return;
             Log.d(TAG, " MNS BROADCAST RECV intent: " + intent.getAction());
 
-            if (intent.getAction().equals(
-                    "android.bleutooth.device.action.UUID")) {
+            if ("android.bleutooth.device.action.UUID".equals(
+                    intent.getAction())) {
                 BluetoothDevice device = intent
                         .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (V)
                     Log.v(TAG, "ACTION_UUID for device " + device);
-                if (device.equals(mDestination)) {
+                if (mDestination.equals(device)) {
                     int channel = -1;
                     Parcelable[] uuid = intent
                             .getParcelableArrayExtra("android.bluetooth.device.extra.UUID");
@@ -1937,11 +1960,13 @@ public class BluetoothMns {
                 BluetoothMnsRfcommTransport transport;
                 transport = new BluetoothMnsRfcommTransport(btSocket);
 
-                BluetoothMnsPreference.getInstance(mContext).setChannel(device,
-                        MNS_UUID16, channel);
-                BluetoothMnsPreference.getInstance(mContext).setName(device,
-                        device.getName());
-
+                BluetoothMnsPreference btMnsPref = BluetoothMnsPreference.getInstance(mContext);
+                if (btMnsPref != null) {
+                    btMnsPref.setChannel(device, MNS_UUID16, channel);
+                    if (device != null) {
+                        btMnsPref.setName(device, device.getName());
+                    }
+                }
                 if (V) Log.v(TAG, "Send transport message "
                         + transport.toString());
 
@@ -1949,8 +1974,10 @@ public class BluetoothMns {
                         .sendToTarget();
             } catch (IOException e) {
                 Log.e(TAG, "Rfcomm socket connect exception " + e.getMessage());
-                BluetoothMnsPreference.getInstance(mContext).removeChannel(
-                        device, MNS_UUID16);
+                BluetoothMnsPreference btMnsPref = BluetoothMnsPreference.getInstance(mContext);
+                if (btMnsPref != null) {
+                    btMnsPref.removeChannel(device, MNS_UUID16);
+                }
                 markConnectionFailed(btSocket);
                 return;
             }
@@ -2400,12 +2427,13 @@ public class BluetoothMns {
         Uri uri = Uri.parse("content://mms/");
         ContentResolver cr = mContext.getContentResolver();
         Cursor cursor = cr.query(uri, null, whereClause, null, null);
-        if (cursor.getCount() > 0) {
-            cursor.moveToFirst();
-            int msgboxInd = cursor.getColumnIndex("msg_box");
-            folderNum = cursor.getInt(msgboxInd);
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                int msgboxInd = cursor.getColumnIndex("msg_box");
+                folderNum = cursor.getInt(msgboxInd);
+            }
+            cursor.close();
         }
-        cursor.close();
         return folderNum;
     }
 }
