@@ -155,7 +155,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     public boolean mForceClose = false;
     
-    private volatile boolean mBPPregisterReceiver;
+    private volatile boolean mBPPregisterReceiver = false;
     
     public boolean mTransferCancelled = false;
     
@@ -453,8 +453,23 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     BluetoothOppShareInfo info1 = (BluetoothOppShareInfo)msg.obj;
                     if (V) Log.v(TAG, "receive MSG_SESSION_COMPLETE for batch " + mBatch.mId);
 
-                    mContext.unregisterReceiver(mBluetoothReceiver);
-                    mBPPregisterReceiver = false;
+                    synchronized (this) {
+                        try {
+                            if(mBPPregisterReceiver){
+                                mBPPregisterReceiver = false;
+                                mContext.unregisterReceiver(mBluetoothReceiver);
+                                if (V) Log.v(TAG, "mBluetoothReceiver - " + mBluetoothReceiver );
+                                if (V) Log.v(TAG, "mBluetoothReceiver is unregistered !!");
+                                if (BluetoothOppService.mbStopSelf) {
+                                    BluetoothOppService.mbStopSelf = false;
+                                    mContext.stopService(new Intent(mContext, BluetoothOppService.class));
+                                    if (V) Log.v(TAG, "BluetoothOppService to be stopped !!");
+                                }
+                            }
+                        } catch (IllegalArgumentException e) {
+                            //Ignore
+                        }
+                    }
 
                     BluetoothBppActivity.mOPPstop = false;
                     BluetoothBppPrintPrefActivity.mOPPstop = false;
@@ -688,11 +703,23 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             mHandlerThread = null;
             mSessionHandler = null;
         }
-        if(mBPPregisterReceiver){
-            if (V) Log.v(TAG, "mBluetoothReceiver is unregistered !!");
-            mBPPregisterReceiver = false;
-            mContext.unregisterReceiver(mBluetoothReceiver);
-            if (V) Log.v(TAG, "mBluetoothReceiver - " + mBluetoothReceiver );
+
+        synchronized (this) {
+            try {
+                if(mBPPregisterReceiver){
+                    mBPPregisterReceiver = false;
+                    mContext.unregisterReceiver(mBluetoothReceiver);
+                    if (V) Log.v(TAG, "mBluetoothReceiver - " + mBluetoothReceiver );
+                    if (V) Log.v(TAG, "mBluetoothReceiver is unregistered !!");
+                    if (BluetoothOppService.mbStopSelf) {
+                        BluetoothOppService.mbStopSelf = false;
+                        mContext.stopService(new Intent(mContext, BluetoothOppService.class));
+                        if (V) Log.v(TAG, "BluetoothOppService to be stopped !!");
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                //Ignore
+            }
         }
     }
 
@@ -733,11 +760,18 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         /* OBEX channel need to be monitored for unexpected ACL disconnection
          * such as Printer power off
          */
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        mContext.registerReceiver(mBluetoothReceiver, filter);
-        mBPPregisterReceiver = true;
+        synchronized (this) {
+            try {
+                IntentFilter filter = new IntentFilter();
+                filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+                filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+                mContext.registerReceiver(mBluetoothReceiver, filter);
+                mBPPregisterReceiver = true;
+                if (V) Log.v(TAG, "mBluetoothReceiver is registered !!");
+            } catch (IllegalArgumentException e) {
+                //Ignore
+            }
+        }
     }
 
     static public void notifyAuthKeyInput(final String key) {

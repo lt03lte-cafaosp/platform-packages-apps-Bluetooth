@@ -115,6 +115,8 @@ public class BluetoothOppService extends Service {
 
     public static int mBppTransId;
 
+    public static boolean mbStopSelf;
+
     private int mCurrArrayPos;
 
     private int mBatchId;
@@ -176,6 +178,7 @@ public class BluetoothOppService extends Service {
         mNotifier = new BluetoothOppNotification(this);
         mNotifier.mNotificationMgr.cancelAll();
         mNotifier.updateNotification();
+        mbStopSelf = false;
 
         final ContentResolver contentResolver = getContentResolver();
         new Thread("trimDatabase") {
@@ -379,7 +382,12 @@ public class BluetoothOppService extends Service {
                         mListenStarted = false;
                         synchronized (BluetoothOppService.this) {
                             if (mUpdateThread == null) {
-                                stopSelf();
+                                //Delay Stop of service, until broadcast
+                                //receiver earlier registered using Oppservice
+                                //context is gracefully deregistered in
+                                //BppTransfer.
+                                if (V) Log.v(TAG, "Need to stop self");
+                                mbStopSelf = true;
                             }
                         }
                         break;
@@ -419,7 +427,12 @@ public class BluetoothOppService extends Service {
                     if (!mPendingUpdate) {
                         mUpdateThread = null;
                         if (!keepService && !mListenStarted) {
-                            stopSelf();
+                            //Delay Stop of service, until broadcast
+                            //receiver earlier registered using Oppservice
+                            //context is gracefully deregistered in
+                            //BppTransfer.
+                            if (V) Log.v(TAG, "Need to stop self");
+                            mbStopSelf = true;
                             break;
                         }
                         return;
