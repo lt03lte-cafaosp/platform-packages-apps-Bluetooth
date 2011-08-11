@@ -626,9 +626,12 @@ public class BluetoothOppService extends Service {
             BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
             BluetoothDevice  d = a.getRemoteDevice(info.mDestination);
             BluetoothClass   c = d.getBluetoothClass();
-            if (V) Log.v(TAG, "BT Device Class: 0x" + Integer.toHexString(c.getDeviceClass()));
 
-            if (c.getDeviceClass() == BluetoothClass.Device.IMAGING_PRINTER) {
+            if (c == null) {
+               Log.e(TAG, "BT Device Class is not found");
+            }
+
+            if ((c != null) && (c.getDeviceClass() == BluetoothClass.Device.IMAGING_PRINTER)) {
                 /* BPP Profile*/
                 markBatchOwnership(this, info.mId, BluetoothShare.OWNER_BPP);
                 info.mOwner = BluetoothShare.OWNER_BPP;
