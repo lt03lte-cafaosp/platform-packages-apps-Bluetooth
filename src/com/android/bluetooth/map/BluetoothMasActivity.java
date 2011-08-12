@@ -115,7 +115,7 @@ public class BluetoothMasActivity extends AlertActivity implements
         super.onCreate(savedInstanceState);
         Intent i = getIntent();
         String action = i.getAction();
-        if (action.equals(BluetoothMasService.ACCESS_REQUEST_ACTION)) {
+        if (BluetoothMasService.ACCESS_REQUEST_ACTION.equals(action)) {
             showMapDialog(DIALOG_YES_NO_CONNECT);
             mCurrentDialog = DIALOG_YES_NO_CONNECT;
         }

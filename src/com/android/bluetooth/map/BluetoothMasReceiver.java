@@ -48,7 +48,7 @@ public class BluetoothMasReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         in.putExtra("action", action);
         boolean startService = true;
-        if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+        if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
             int state = in.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                     BluetoothAdapter.ERROR);
             in.putExtra(BluetoothAdapter.EXTRA_STATE, state);
