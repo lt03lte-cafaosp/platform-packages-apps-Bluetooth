@@ -190,7 +190,13 @@ public class BluetoothMns {
             mHandlerThread = new HandlerThread("Bt MNS Transfer Handler",
                     Process.THREAD_PRIORITY_BACKGROUND);
             mHandlerThread.start();
-            mSessionHandler = new EventHandler(mHandlerThread.getLooper());
+            Looper looper = mHandlerThread.getLooper();
+            if (looper != null) {
+                mSessionHandler = new EventHandler(looper);
+            } else {
+                // In case where mHandlerThread is died
+                mSessionHandler = new EventHandler();
+            }
         }
         SmsMmsUtils smu = new SmsMmsUtils();
         folderListSmsMms = new ArrayList<String>();
@@ -217,6 +223,10 @@ public class BluetoothMns {
     private class EventHandler extends Handler {
         public EventHandler(Looper looper) {
             super(looper);
+        }
+
+        public EventHandler() {
+            super();
         }
 
         @Override
@@ -1964,7 +1974,8 @@ public class BluetoothMns {
                 if (btMnsPref != null) {
                     btMnsPref.setChannel(device, MNS_UUID16, channel);
                     if (device != null) {
-                        btMnsPref.setName(device, device.getName());
+                        final String name = device.getName();
+                        btMnsPref.setName(device, (name == null) ? "" : name);
                     }
                 }
                 if (V) Log.v(TAG, "Send transport message "

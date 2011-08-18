@@ -1480,12 +1480,9 @@ public class MapUtils {
                     + (("BEGIN:MSG").length() + CRLF.length());
             int endVersionPos = (body.indexOf("END:MSG", beginVersionPos) - CRLF
                     .length());
-
             return body.substring(beginVersionPos, endVersionPos);
-
         } else {
-
-            return null;
+            return "";
         }
     }
 
