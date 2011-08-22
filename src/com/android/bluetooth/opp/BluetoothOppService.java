@@ -380,13 +380,14 @@ public class BluetoothOppService extends Service {
                         mL2capSocketListener.stop();
                         mListenStarted = false;
                         synchronized (BluetoothOppService.this) {
-                            if (mUpdateThread == null) {
-                                //Delay Stop of service, until broadcast
-                                //receiver earlier registered using Oppservice
-                                //context is gracefully deregistered in
-                                //BppTransfer.
-                                if (V) Log.v(TAG, "Need to stop self");
-                                mbStopSelf = true;
+                           mbStopSelf = true;
+                           if (mUpdateThread == null) {
+                               if(V) Log.v(TAG, "Thread is not running, OPP size:"+mBatchs.size()+"Bpp size"+mBppTransfer.size());
+                               if ((mBatchs.size() == 0) && (mBppTransfer.size() == 0)) {
+                                    /* Batch is empty and BT is turning off, stop service  */
+                                    stopSelf();
+                                    mbStopSelf = false;
+                               }
                             }
                         }
                         break;
@@ -426,12 +427,9 @@ public class BluetoothOppService extends Service {
                     if (!mPendingUpdate) {
                         mUpdateThread = null;
                         if (!keepService && !mListenStarted) {
-                            //Delay Stop of service, until broadcast
-                            //receiver earlier registered using Oppservice
-                            //context is gracefully deregistered in
-                            //BppTransfer.
                             if (V) Log.v(TAG, "Need to stop self");
-                            mbStopSelf = true;
+                            stopSelf();
+                            mbStopSelf = false;
                             break;
                         }
                         return;
@@ -552,6 +550,10 @@ public class BluetoothOppService extends Service {
                 mNotifier.updateNotification();
 
                 cursor.close();
+                if((mBatchs.size()== 0) && (mbStopSelf) && (isAfterLast) && (mBppTransfer.size()== 0)) {
+                    if(V) Log.v(TAG," Nothing to Transfer,Service No Longer Required");
+                    keepService = false;
+                }
             }
         }
 

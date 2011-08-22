@@ -435,6 +435,9 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     if (msg.arg1 > 0) {
                         mSessionEvent.mEnforceClose = true;
                     }
+                    if (mForceClose) {
+                        mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+                    }
                     mSessionEvent.stop();
                     break;
 
@@ -459,12 +462,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                                 mBPPregisterReceiver = false;
                                 mContext.unregisterReceiver(mBluetoothReceiver);
                                 if (V) Log.v(TAG, "mBluetoothReceiver - " + mBluetoothReceiver );
-                                if (V) Log.v(TAG, "mBluetoothReceiver is unregistered !!");
-                                if (BluetoothOppService.mbStopSelf) {
-                                    BluetoothOppService.mbStopSelf = false;
-                                    mContext.stopService(new Intent(mContext, BluetoothOppService.class));
-                                    if (V) Log.v(TAG, "BluetoothOppService to be stopped !!");
-                                }
                             }
                         } catch (IllegalArgumentException e) {
                             //Ignore
@@ -710,12 +707,6 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     mBPPregisterReceiver = false;
                     mContext.unregisterReceiver(mBluetoothReceiver);
                     if (V) Log.v(TAG, "mBluetoothReceiver - " + mBluetoothReceiver );
-                    if (V) Log.v(TAG, "mBluetoothReceiver is unregistered !!");
-                    if (BluetoothOppService.mbStopSelf) {
-                        BluetoothOppService.mbStopSelf = false;
-                        mContext.stopService(new Intent(mContext, BluetoothOppService.class));
-                        if (V) Log.v(TAG, "BluetoothOppService to be stopped !!");
-                    }
                 }
             } catch (IllegalArgumentException e) {
                 //Ignore
