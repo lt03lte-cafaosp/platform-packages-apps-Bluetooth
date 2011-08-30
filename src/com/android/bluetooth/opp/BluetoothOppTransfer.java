@@ -146,6 +146,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         @Override
         public void handleMessage(Message msg) {
+            BluetoothOppPreference INSTANCE = null;
             switch (msg.what) {
                 case SDP_RESULT:
                     if (V) Log.v(TAG, "SDP request returned scn: " + msg.arg1 +
@@ -154,6 +155,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     if (!((BluetoothDevice)msg.obj).equals(mBatch.mDestination)) {
                         return;
                     }
+                    INSTANCE = BluetoothOppPreference.getInstance(mContext);
                     try {
                         mContext.unregisterReceiver(mReceiver);
                     } catch (IllegalArgumentException e) {
@@ -186,16 +188,24 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         }
                     }
                     if (msg.arg2 > 0) { // OBEX-over-L2CAP
-                        BluetoothOppPreference.getInstance(mContext).setObexVariant(
+                        if (INSTANCE != null) {
+                            INSTANCE.setObexVariant(
                                 mBatch.mDestination, OPUSH_UUID16,
                                 BluetoothOppPreference.OBEX_OVER_L2CAP);
-                        mConnectThread =
-                           new SocketConnectThread(mBatch.mDestination, SocketConnectThread.SOCKET_TYPE_L2CAP, msg.arg2);
-                        mConnectThread.start();
+                                mConnectThread =
+                                   new SocketConnectThread(mBatch.mDestination, SocketConnectThread.SOCKET_TYPE_L2CAP, msg.arg2);
+                                mConnectThread.start();
+                        } else {
+                            Log.e(TAG, "Batch failed!");
+                            markBatchFailed(BluetoothShare.STATUS_CONNECTION_ERROR);
+                            mBatch.mStatus = Constants.BATCH_STATUS_FAILED;
+                        }
                     } else if (msg.arg1 > 0) { // OBEX-over-RFCOMM
-                        BluetoothOppPreference.getInstance(mContext).setObexVariant(
+                        if (INSTANCE != null) {
+                            INSTANCE.setObexVariant(
                                 mBatch.mDestination, OPUSH_UUID16,
                                 BluetoothOppPreference.OBEX_OVER_RFCOMM);
+                        }
                         mConnectThread =
                            new SocketConnectThread(mBatch.mDestination, SocketConnectThread.SOCKET_TYPE_RFCOMM, msg.arg1);
                         mConnectThread.start();

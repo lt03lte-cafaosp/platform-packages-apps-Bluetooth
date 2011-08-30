@@ -42,11 +42,17 @@ public class BluetoothThermometerReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        String action = intent.getAction();
+        String action = (intent == null) ? null : intent.getAction();
+        if (action == null) {
+            Log.e(TAG, "action is null");
+            return;
+        }
         Intent in = new Intent();
-        in.putExtras(intent);
-        in.setClass(context, BluetoothThermometerServices.class);
-        in.putExtra("action", action);
+        if (in != null) {
+            in.putExtras(intent);
+            in.setClass(context, BluetoothThermometerServices.class);
+            in.putExtra("action", action);
+        }
 
         if (action
                 .equalsIgnoreCase((BluetoothThermometerServices.THERMOMETER_SERVICE_WAKEUP))) {

@@ -155,7 +155,11 @@ public class BluetoothFtpActivity extends AlertActivity implements
                 p.mNegativeButtonListener = this;
                 setupAlert();
                 mOkButton = mAlert.getButton(DialogInterface.BUTTON_POSITIVE);
-                mOkButton.setEnabled(false);
+                if (mOkButton != null) {
+                    mOkButton.setEnabled(false);
+                } else {
+                    Log.e(TAG, "Error! mOkButton is null");
+                }
                 break;
             default:
                 break;
@@ -298,13 +302,18 @@ public class BluetoothFtpActivity extends AlertActivity implements
 
     private void onTimeout() {
         mTimeout = true;
+        Button mButton =  mAlert.getButton(DialogInterface.BUTTON_NEGATIVE);
         if(V) Log.v(TAG,"onTimeout mCurrentDialog = " + mCurrentDialog);
         if (mCurrentDialog == DIALOG_YES_NO_CONNECT) {
             /*Proceed to clear the view only if one is created*/
             if(mView != null) {
                 messageView.setText(getString(R.string.ftp_acceptance_timeout_message,
                         BluetoothFtpService.getRemoteDeviceName()));
-                mAlert.getButton(DialogInterface.BUTTON_NEGATIVE).setVisibility(View.GONE);
+                if (mButton != null) {
+                    mButton.setVisibility(View.GONE);
+                } else {
+                    Log.e(TAG, "Error! mButton is null, can't setVisibility");
+                }
                 mAlwaysAllowed.setVisibility(View.GONE);
                 mAlwaysAllowed.clearFocus();
             }
@@ -317,7 +326,11 @@ public class BluetoothFtpActivity extends AlertActivity implements
                 mKeyView.clearFocus();
                 mKeyView.removeTextChangedListener(this);
                 mOkButton.setEnabled(true);
-                mAlert.getButton(DialogInterface.BUTTON_NEGATIVE).setVisibility(View.GONE);
+                if (mButton != null) {
+                    mButton.setVisibility(View.GONE);
+                } else {
+                    Log.e(TAG, "Error! mButton is null, can't setVisibility");
+                }
             }
         }
 
