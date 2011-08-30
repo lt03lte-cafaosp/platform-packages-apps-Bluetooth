@@ -465,9 +465,14 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
 
             int positioninfile = 0;
             File fileinfo = new File(mCurrentPath+ "/" + name);
-            if(fileinfo.getParentFile().canWrite() == false) {
-                if (D) Log.d(TAG,"Dir "+ fileinfo.getParent() +"is read-only");
-                return ResponseCodes.OBEX_DATABASE_LOCKED;
+            if (fileinfo.getParentFile() !=  null) {
+                if(fileinfo.getParentFile().canWrite() == false) {
+                    if (D) Log.d(TAG,"Dir "+ fileinfo.getParent() +"is read-only");
+                    return ResponseCodes.OBEX_DATABASE_LOCKED;
+                }
+            } else {
+                Log.e(TAG, "Error! Not able to get parent file name");
+                return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
             }
             /* If File exists we delete and proceed to take the rest of bytes */
             if(fileinfo.exists() == true) {
@@ -741,9 +746,14 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                     if (D) Log.d(TAG,"Not having a name");
                     File rootfolder = new File(mCurrentPath);
                     File [] files = rootfolder.listFiles();
-                    for(int i = 0; i < files.length; i++)
-                        if (D) Log.d(TAG,"Folder listing =" + files[i] );
-                    return sendFolderListingXml(0,op,files);
+                    if (files != null) {
+                        for(int i = 0; i < files.length; i++)
+                            if (D) Log.d(TAG,"Folder listing =" + files[i] );
+                        return sendFolderListingXml(0,op,files);
+                    } else {
+                        Log.e(TAG,"error in listing files");
+                        return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                    }
                 } else {
                     if (D) Log.d(TAG,"Non Root Folder");
                     if(type.equals(TYPE_LISTING)){
@@ -758,7 +768,12 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                             File subFolder = new File(mCurrentPath +"/"+ name);
                             if(subFolder.exists()) {
                                 File [] files = subFolder.listFiles();
-                                return sendFolderListingXml(0,op,files);
+                                if (files != null) {
+                                    return sendFolderListingXml(0,op,files);
+                                } else {
+                                    Log.e(TAG,"error in listing files");
+                                    return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                                }
                             } else {
                                 Log.e(TAG,
                                     "ResponseCodes.OBEX_HTTP_NO_CONTENT");
@@ -767,9 +782,14 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
                         }
 
                         File [] files = currentfolder.listFiles();
-                        for(int i = 0; i < files.length; i++)
-                           if (D) Log.d(TAG,"Non Root Folder listing =" + files[i] );
-                        return sendFolderListingXml(0,op,files);
+                        if (files != null) {
+                            for(int i = 0; i < files.length; i++)
+                               if (D) Log.d(TAG,"Non Root Folder listing =" + files[i] );
+                            return sendFolderListingXml(0,op,files);
+                        } else {
+                            Log.e(TAG,"error in listing files");
+                            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                        }
                     }
                 }
             }
@@ -803,8 +823,8 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         int outputBufferSize = op.getMaxPacketSize();
         long timestamp = 0;
         int responseCode = -1;
-        FileInputStream fileInputStream;
-        OutputStream outputStream;
+        FileInputStream fileInputStream = null;
+        OutputStream outputStream = null;
         BufferedInputStream bis;
         long finishtimestamp;
         long starttimestamp;
@@ -823,6 +843,15 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         } catch(IOException e) {
             Log.e(TAG,"SendFilecontents open stream "+ e.toString());
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } finally {
+            if (fileInputStream != null && outputStream == null) {
+                try {
+                    fileInputStream.close();
+                } catch (IOException ei) {
+                    Log.e(TAG, "Error while closing stream"+ ei.toString());
+                }
+                return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            }
         }
         bis = new BufferedInputStream(fileInputStream, 0x4000);
         starttimestamp = System.currentTimeMillis();

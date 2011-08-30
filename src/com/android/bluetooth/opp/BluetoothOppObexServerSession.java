@@ -402,15 +402,24 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
             if (status == BluetoothShare.STATUS_SUCCESS) {
                 Message msg = Message.obtain(mCallback, BluetoothOppObexSession.MSG_SHARE_COMPLETE);
-                msg.obj = mInfo;
-                msg.sendToTarget();
+                if (msg != null) {
+                    msg.obj = mInfo;
+                    msg.sendToTarget();
+                } else {
+                    Log.e(TAG, "Could not get message!");
+                }
             } else {
                 if (mCallback != null) {
                     Message msg = Message.obtain(mCallback,
                             BluetoothOppObexSession.MSG_SESSION_ERROR);
                     mInfo.mStatus = status;
-                    msg.obj = mInfo;
-                    msg.sendToTarget();
+                    if (msg != null) {
+                        msg.obj = mInfo;
+                        msg.sendToTarget();
+                    } else {
+                        Log.e(TAG, "Could not get message!");
+                        obexResponse = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                    }
                 }
             }
         } else if (mAccepted == BluetoothShare.USER_CONFIRMATION_DENIED
@@ -440,8 +449,12 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             Message msg = Message.obtain(mCallback);
             msg.what = BluetoothOppObexSession.MSG_SHARE_INTERRUPTED;
             mInfo.mStatus = status;
-            msg.obj = mInfo;
-            msg.sendToTarget();
+            if (msg != null) {
+                msg.obj = mInfo;
+                msg.sendToTarget();
+            } else {
+                Log.e(TAG, "Could not get message!");
+            }
         }
         return obexResponse;
     }

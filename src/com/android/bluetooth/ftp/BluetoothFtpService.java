@@ -32,6 +32,7 @@ import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
+import android.content.ContentProviderClient;
 import android.content.Intent;
 import android.os.Message;
 import android.os.PowerManager;
@@ -271,7 +272,11 @@ public class BluetoothFtpService extends Service {
 
     // process the intent from receiver
     private void parseIntent(final Intent intent) {
-        String action = intent.getStringExtra("action");
+        String action = (intent == null) ? null : intent.getStringExtra("action");
+        if (action == null) {
+            Log.e(TAG, "Unexpected error! action is null");
+            return;
+        }
         if (VERBOSE) Log.v(TAG, "action: " + action);
 
         int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
@@ -614,20 +619,29 @@ public class BluetoothFtpService extends Service {
     }
 
     private void notifyMediaScanner(Bundle obj,int op) {
+        String[] mTypes = obj.getStringArray("mimetypes");
         if((op == FTP_MEDIA_ADD) || (op == FTP_MEDIA_DELETE)) {
             new FtpMediaScannerNotifier(this,obj.getString("filepath"),
                   obj.getString("mimetype"),mSessionStatusHandler,op);
-        } else {
+        } else if (mTypes != null) {
             new FtpMediaScannerNotifier(this,obj.getStringArray("filepaths"),
-                  obj.getStringArray("mimetypes"),mSessionStatusHandler,op);
+                  mTypes,mSessionStatusHandler,op);
+        } else {
+             Log.e(TAG, "Unexpected error! mTypes is null");
+            return;
         }
     }
 
     private void notifyContentResolver(Uri uri) {
         if (VERBOSE) Log.v(TAG,"FTP_MEDIA_SCANNED deleting uri "+uri);
+        ContentProviderClient client = getContentResolver()
+                  .acquireContentProviderClient(MediaStore.AUTHORITY);
+        if (client == null) {
+            Log.e(TAG, "Unexpected error! mTypes is null");
+            return;
+        }
         try {
-            getContentResolver()
-                  .acquireContentProviderClient(MediaStore.AUTHORITY).delete(uri, null, null);
+            client.delete(uri, null, null);
         } catch(RemoteException e){
             Log.e(TAG,e.toString());
         }

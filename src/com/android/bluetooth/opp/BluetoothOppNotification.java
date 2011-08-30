@@ -306,8 +306,11 @@ class BluetoothOppNotification {
             intent.setData(Uri.parse(BluetoothShare.CONTENT_URI + "/" + item.id));
 
             n.contentIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
-            mNotificationMgr.notify(item.id, n);
-
+            if (mNotificationMgr != null) {
+                mNotificationMgr.notify(item.id, n);
+            } else {
+                if (V) Log.v(TAG, "mNotificationMgr is NULL!");
+            }
             mActiveNotificationId = item.id;
         }
     }
@@ -382,7 +385,12 @@ class BluetoothOppNotification {
             intent.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             outNoti.deleteIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
             outNoti.when = timeStamp;
-            mNotificationMgr.notify(NOTIFICATION_ID_OUTBOUND, outNoti);
+            if (mNotificationMgr != null) {
+                mNotificationMgr.notify(NOTIFICATION_ID_OUTBOUND, outNoti);
+            } else {
+                if (V) Log.v(TAG, "mNotificationMgr is NULL!");
+            }
+
         } else {
             if (mNotificationMgr != null) {
                 mNotificationMgr.cancel(NOTIFICATION_ID_OUTBOUND);
@@ -429,7 +437,12 @@ class BluetoothOppNotification {
             intent.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             inNoti.deleteIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
             inNoti.when = timeStamp;
-            mNotificationMgr.notify(NOTIFICATION_ID_INBOUND, inNoti);
+            if (mNotificationMgr != null) {
+                mNotificationMgr.notify(NOTIFICATION_ID_INBOUND, inNoti);
+            } else {
+                if (V) Log.v(TAG, "mNotificationMgr is NULL!");
+            }
+
         } else {
             if (mNotificationMgr != null) {
                 mNotificationMgr.cancel(NOTIFICATION_ID_INBOUND);
@@ -477,7 +490,12 @@ class BluetoothOppNotification {
             intent.setData(contentUri);
             n.deleteIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
 
-            mNotificationMgr.notify(id, n);
+            if (mNotificationMgr != null) {
+                mNotificationMgr.notify(id, n);
+            } else {
+                if (V) Log.v(TAG, "mNotificationMgr is NULL!");
+            }
+
         }
         cursor.close();
     }
