@@ -1939,17 +1939,18 @@ public class BluetoothMasAppIf {
      */
 
     private String getMmsMsgDate(int msgID) {
-        String text = null;
+        String text = "0";
         String whereClause = " _id= " + msgID;
         Uri uri = Uri.parse("content://mms/");
         ContentResolver cr = context.getContentResolver();
         Cursor cursor = cr.query(uri, null, whereClause, null, null);
-        if (cursor.getCount() > 0) {
-            cursor.moveToFirst();
-            int dateInd = cursor.getColumnIndex("date");
-            text = cursor.getString(dateInd);
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                int dateInd = cursor.getColumnIndex("date");
+                text = cursor.getString(dateInd);
+            }
+            cursor.close();
         }
-        cursor.close();
         return text;
 
     }
