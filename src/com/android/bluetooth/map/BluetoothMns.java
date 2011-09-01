@@ -57,6 +57,7 @@ import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.Parcelable;
 import android.os.Process;
+import android.telephony.TelephonyManager;
 import android.text.format.Time;
 import android.util.Log;
 
@@ -1074,6 +1075,15 @@ public class BluetoothMns {
         }
     }
 
+    private String getSmsType() {
+        final int phoneType = TelephonyManager.getDefault().getPhoneType();
+        if (phoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+            return "SMS_CDMA";
+        } else {
+            return "SMS_GSM";
+        }
+    }
+
     /**
      * This class listens for changes in Sms MMs Content Provider's folders
      * It acts, only when an entry gets removed from the table
@@ -1152,6 +1162,7 @@ public class BluetoothMns {
             }
 
             if (currentItemCount > newItemCount) {
+                final String smsType = getSmsType();
                 crSmsFolderA.moveToFirst();
                 crSmsFolderB.moveToFirst();
 
@@ -1184,7 +1195,7 @@ public class BluetoothMns {
                                 sendMnsEvent(MESSAGE_DELETED, id,
                                         BluetoothMasAppIf.Telecom + "/" +
                                         BluetoothMasAppIf.Msg + "/" +
-                                        folder, null, "SMS_GSM");
+                                        folder, null, smsType);
                             } else {
                                 /*if (Log.isLoggable(TAG, Log.VERBOSE)){
                                         Log.v(TAG, "Shouldn't reach here as you cannot " +
@@ -1197,12 +1208,12 @@ public class BluetoothMns {
                                             + "/" + BluetoothMasAppIf.Msg + "/"
                                             + newFolder, BluetoothMasAppIf.Telecom + "/" +
                                             BluetoothMasAppIf.Msg + "/" +
-                                            BluetoothMasAppIf.Draft, "SMS_GSM");
+                                            BluetoothMasAppIf.Draft, smsType);
                                     if (newFolder != null && newFolder.equalsIgnoreCase("sent")) {
                                         sendMnsEvent(SENDING_SUCCESS, id,
                                                 BluetoothMasAppIf.Telecom + "/"+
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
-                                                null, "SMS_GSM");
+                                                null, smsType);
                                     }
                                 } else if (folder != null &&
                                         folder.equalsIgnoreCase(BluetoothMasAppIf.Outbox)){
@@ -1217,12 +1228,12 @@ public class BluetoothMns {
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/" +
-                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, smsType);
                                         if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
                                                     BluetoothMasAppIf.Telecom + "/"+
                                                     BluetoothMasAppIf.Msg +"/" + newFolder,
-                                                    null, "SMS_GSM");
+                                                    null, smsType);
                                         }
                                     }
                                     if ((msgType == MSG_CP_QUEUED_TYPE) ||
@@ -1232,7 +1243,7 @@ public class BluetoothMns {
                                         sendMnsEvent(SENDING_FAILURE, id,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/" +
-                                                BluetoothMasAppIf.Outbox, null, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, null, smsType);
                                     }
                                 } else if (folder != null &&
                                         folder.equalsIgnoreCase(BluetoothMasAppIf.Failed)){
@@ -1247,12 +1258,12 @@ public class BluetoothMns {
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
                                                 BluetoothMasAppIf.Telecom + "/"+
                                                 BluetoothMasAppIf.Msg + "/"+
-                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, smsType);
                                         if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
                                                     BluetoothMasAppIf.Telecom + "/" +
                                                     BluetoothMasAppIf.Msg + "/" + newFolder,
-                                                    null, "SMS_GSM");
+                                                    null, smsType);
                                         }
                                     }
                                 } else if (folder != null &&
@@ -1268,12 +1279,12 @@ public class BluetoothMns {
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/" +
-                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, smsType);
                                         if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
                                                     BluetoothMasAppIf.Telecom + "/" +
                                                     BluetoothMasAppIf.Msg + "/" + newFolder,
-                                                    null, "SMS_GSM");
+                                                    null, smsType);
                                         }
                                     }
                                 }
@@ -1305,7 +1316,7 @@ public class BluetoothMns {
                                 sendMnsEvent(MESSAGE_DELETED, id,
                                         BluetoothMasAppIf.Telecom + "/"+
                                         BluetoothMasAppIf.Msg + "/"+
-                                        folder, null, "SMS_GSM");
+                                        folder, null, smsType);
                             } else {
                                 if (Log.isLoggable(TAG, Log.VERBOSE)){
                                     Log.v(TAG,"Shouldn't reach here as you cannot " +
@@ -1318,12 +1329,12 @@ public class BluetoothMns {
                                             + "/" + BluetoothMasAppIf.Msg + "/"
                                             + newFolder, BluetoothMasAppIf.Telecom + "/" +
                                             BluetoothMasAppIf.Msg + "/" +
-                                            BluetoothMasAppIf.Draft, "SMS_GSM");
+                                            BluetoothMasAppIf.Draft, smsType);
                                     if (newFolder != null && newFolder.equalsIgnoreCase("sent")) {
                                         sendMnsEvent(SENDING_SUCCESS, id,
                                                 BluetoothMasAppIf.Telecom + "/"+
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
-                                                null, "SMS_GSM");
+                                                null, smsType);
                                     }
                                 } else if (folder != null &&
                                         folder.equalsIgnoreCase(BluetoothMasAppIf.Outbox)){
@@ -1338,12 +1349,12 @@ public class BluetoothMns {
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/" +
-                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, smsType);
                                         if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
                                                     BluetoothMasAppIf.Telecom + "/"+
                                                     BluetoothMasAppIf.Msg +"/" + newFolder,
-                                                    null, "SMS_GSM");
+                                                    null, smsType);
                                         }
                                     }
                                     if ((msgType == MSG_CP_QUEUED_TYPE) ||
@@ -1353,7 +1364,7 @@ public class BluetoothMns {
                                         sendMnsEvent(SENDING_FAILURE, id,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/" +
-                                                BluetoothMasAppIf.Outbox, null, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, null, smsType);
                                     }
                                 } else if (folder != null &&
                                         folder.equalsIgnoreCase(BluetoothMasAppIf.Failed)){
@@ -1368,12 +1379,12 @@ public class BluetoothMns {
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/" +
-                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, smsType);
                                         if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
                                                     BluetoothMasAppIf.Telecom + "/" +
                                                     BluetoothMasAppIf.Msg + "/" + newFolder,
-                                                    null, "SMS_GSM");
+                                                    null, smsType);
                                         }
                                     }
                                 } else if (folder != null &&
@@ -1389,12 +1400,12 @@ public class BluetoothMns {
                                                 BluetoothMasAppIf.Msg + "/" + newFolder,
                                                 BluetoothMasAppIf.Telecom + "/" +
                                                 BluetoothMasAppIf.Msg + "/"+
-                                                BluetoothMasAppIf.Outbox, "SMS_GSM");
+                                                BluetoothMasAppIf.Outbox, smsType);
                                         if (newFolder.equalsIgnoreCase(BluetoothMasAppIf.Sent)) {
                                             sendMnsEvent(SENDING_SUCCESS, id,
                                                     BluetoothMasAppIf.Telecom + "/" +
                                                     BluetoothMasAppIf.Msg + "/" + newFolder,
-                                                    null, "SMS_GSM");
+                                                    null, smsType);
                                         }
                                     }
                                 }
@@ -1454,6 +1465,7 @@ public class BluetoothMns {
                         + newItemCount);
             }
             if (newItemCount > currentItemCount) {
+                final String smsType = getSmsType();
                 crSmsA.moveToFirst();
                 crSmsB.moveToFirst();
 
@@ -1489,12 +1501,12 @@ public class BluetoothMns {
                                     folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
                                 sendMnsEvent(NEW_MESSAGE, id1, BluetoothMasAppIf.Telecom +
                                         "/" + BluetoothMasAppIf.Msg + "/"
-                                        + folder, null, "SMS_GSM");
+                                        + folder, null, smsType);
                             } else if (folder != null &&
                                     !folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)){
                                 sendMnsEvent(MESSAGE_SHIFT, id1, BluetoothMasAppIf.Telecom +
                                         "/" + BluetoothMasAppIf.Msg + "/"
-                                        + folder, null, "SMS_GSM");
+                                        + folder, null, smsType);
                             } else {
                                 if (Log.isLoggable(TAG, Log.VERBOSE)){
                                     Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
@@ -1527,12 +1539,12 @@ public class BluetoothMns {
                                     folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)) {
                                 sendMnsEvent(NEW_MESSAGE, id1, BluetoothMasAppIf.Telecom + "/"+
                                         BluetoothMasAppIf.Msg + "/"
-                                        + folder, null, "SMS_GSM");
+                                        + folder, null, smsType);
                             } else if (folder != null &&
                                     !folder.equalsIgnoreCase(BluetoothMasAppIf.Inbox)){
                                 sendMnsEvent(MESSAGE_SHIFT, id1, BluetoothMasAppIf.Telecom +
                                         "/" + BluetoothMasAppIf.Msg + "/"
-                                        + folder, null, "SMS_GSM");
+                                        + folder, null, smsType);
                             } else {
                                 if (Log.isLoggable(TAG, Log.VERBOSE)){
                                     Log.v(TAG, " ADDED TO UNKNOWN FOLDER");
