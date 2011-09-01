@@ -669,8 +669,8 @@ public class BluetoothMasAppIf {
         // TODO: Take care of subfolders
         // TODO: Check only for SMS_GSM
         // Look for messages only if both SMS/MMS are not filtered out
-        if ((tempPath != null) && (tempPath.split("/").length == 3
-                || tempPath.split("/").length == 4) && ((appParams.FilterMessageType & 0x13) != 0x13)){
+        if ((tempPath != null) && (tempPath.split("/").length == 3 ||
+                tempPath.split("/").length == 4)) {
 
             String splitStrings[] = tempPath.split("/");
 
@@ -700,12 +700,18 @@ public class BluetoothMasAppIf {
              */
             if (appParams.FilterPriority == 0
                     || appParams.FilterPriority == 0x02) {
-                if(mode !=null && (mode.equalsIgnoreCase("SMS") || mode.equalsIgnoreCase("SMS_MMS") || mode.equalsIgnoreCase("SMS_MMS_EMAIL"))){
-                    if ((appParams.FilterMessageType & 0x01) == 0) {
+                if (mode != null && (mode.equalsIgnoreCase("SMS") ||
+                        mode.equalsIgnoreCase("SMS_MMS") ||
+                        mode.equalsIgnoreCase("SMS_MMS_EMAIL"))){
+                    final int phoneType = TelephonyManager.getDefault().getPhoneType();
+                    if ((appParams.FilterMessageType & 0x03) == 0 ||
+                            ((appParams.FilterMessageType & 0x01) == 0 &&
+                                    phoneType == TelephonyManager.PHONE_TYPE_GSM) ||
+                            ((appParams.FilterMessageType & 0x02) == 0 &&
+                                    phoneType == TelephonyManager.PHONE_TYPE_CDMA)) {
                         this.list = new ArrayList<VcardContent>();
-                        BluetoothMsgListRsp bmlrSms = msgListSms(msgList, messageListingSize, 
-                                processCount, writeCount, splitStrings[2], rsp, 
-                                appParams);
+                        BluetoothMsgListRsp bmlrSms = msgListSms(msgList, messageListingSize,
+                                processCount, writeCount, splitStrings[2], rsp, appParams);
                         msgList = bmlrSms.msgList;
                         messageListingSize = bmlrSms.messageListingSize;
                         processCount = bmlrSms.processCount;
@@ -1352,12 +1358,12 @@ public class BluetoothMasAppIf {
         String readStr = new String(readBytes);
         MapUtils mu = new MapUtils();
         String type = mu.fetchType(readStr);
-        if (type!=null && (type.equalsIgnoreCase("SMS_GSM") 
-                || type.equalsIgnoreCase("MMS"))){
+        if (type != null && (type.equalsIgnoreCase("SMS_GSM") || type.equalsIgnoreCase("SMS_CDMA")
+                || type.equalsIgnoreCase("MMS"))) {
             String tmpPath = "";
             tmpPath = (name == null) ? CurrentPath : CurrentPath + "/" + name;
 
-            if (type.equalsIgnoreCase("SMS_GSM")){
+            if (type.equalsIgnoreCase("SMS_GSM") || type.equalsIgnoreCase("SMS_CDMA")) {
                 BmessageConsts bMsg = mu.fromBmessageSMS(readStr);
                 PhoneAddress = bMsg.getRecipientVcard_phone_number();
                 SmsText = bMsg.getBody_msg();
@@ -2801,8 +2807,11 @@ public class BluetoothMasAppIf {
 
             // Create a bMessage
 
-            // TODO Get Current type
-            bmsg.setType("SMS_GSM");
+            if (TelephonyManager.getDefault().getPhoneType() == TelephonyManager.PHONE_TYPE_CDMA) {
+                bmsg.setType("SMS_CDMA");
+            } else {
+                bmsg.setType("SMS_GSM");
+            }
 
             bmsg.setBmsg_version("1.0");
             if (cr.getString(cr.getColumnIndex("read")).equalsIgnoreCase("1")) {
@@ -2944,8 +2953,12 @@ public class BluetoothMasAppIf {
         }
 
         if ((appParams.ParameterMask & BIT_TYPE) != 0) {
-            // TODO GSM or CDMA SMS?
-            ml.setType("SMS_GSM");
+            final int phoneType = TelephonyManager.getDefault().getPhoneType();
+            if (phoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+                ml.setType("SMS_CDMA");
+            } else {
+                ml.setType("SMS_GSM");
+            }
         }
 
         if ((appParams.ParameterMask & BIT_SIZE) != 0) {
