@@ -125,7 +125,7 @@ public class BluetoothMnsObexSession {
         } catch (IOException e1) {
             Log.e(TAG, "OBEX session create error");
         }
-        if (mConnected) {
+        if (mConnected && mCs != null) {
             mConnected = false;
             HeaderSet hs = new HeaderSet();
             // bb582b41-420c-11db-b0de-0800200c9a66
