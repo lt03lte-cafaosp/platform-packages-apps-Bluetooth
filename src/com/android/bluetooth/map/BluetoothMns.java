@@ -81,8 +81,6 @@ public class BluetoothMns {
 
     public static final int RFCOMM_CONNECTED = 11;
 
-    public static final int SDP_RESULT = 12;
-
     public static final int MNS_CONNECT = 13;
 
     public static final int MNS_DISCONNECT = 14;
@@ -244,34 +242,13 @@ public class BluetoothMns {
                     mSession.disconnect();
                     mSession = null;
                 }
-                start((BluetoothDevice) msg.obj);
+                mConnectThread = new SocketConnectThread(mDestination);
+                mConnectThread.start();
                 break;
             case MNS_DISCONNECT:
                 deregisterUpdates();
                 stop();
                 break;
-            case SDP_RESULT:
-                if (V) Log.v(TAG, "SDP request returned " + msg.arg1
-                            + " (" + (System.currentTimeMillis() - mTimestamp + " ms)"));
-                if (!mDestination.equals(msg.obj)) {
-                    return;
-                }
-                try {
-                    mContext.unregisterReceiver(mReceiver);
-                } catch (IllegalArgumentException e) {
-                    // ignore
-                }
-                if (msg.arg1 > 0) {
-                    mConnectThread = new SocketConnectThread(mDestination,
-                            msg.arg1);
-                    mConnectThread.start();
-                } else {
-                    /* SDP query fail case */
-                    Log.e(TAG, "SDP query failed!");
-                }
-
-                break;
-
             /*
              * RFCOMM connect fail is for outbound share only! Mark batch
              * failed, and all shares in batch failed
@@ -1760,37 +1737,6 @@ public class BluetoothMns {
     }
 
     /**
-     * Start MNS connection
-     */
-    public void start(BluetoothDevice mRemoteDevice) {
-        /* check Bluetooth enable status */
-        /*
-         * normally it's impossible to reach here if BT is disabled. Just check
-         * for safety
-         */
-        if (!mAdapter.isEnabled()) {
-            Log.e(TAG, "Can't send event when Bluetooth is disabled ");
-            return;
-        }
-
-        mDestination = mRemoteDevice;
-        int channel = -1;
-        // TODO Fix this below
-
-        if (channel != -1) {
-            if (D) {
-                Log.d(TAG, "Get MNS channel " + channel + " from cache for "
-                        + mDestination);
-            }
-            mTimestamp = System.currentTimeMillis();
-            mSessionHandler.obtainMessage(SDP_RESULT, channel, -1, mDestination)
-                    .sendToTarget();
-        } else {
-            sendMnsSdp();
-        }
-    }
-
-    /**
      * Stop the transfer
      */
     public void stop() {
@@ -1831,104 +1777,6 @@ public class BluetoothMns {
         mSession.connect();
     }
 
-    /**
-     * Check if local database contains remote device's info
-     * Else start sdp query
-     */
-    private void sendMnsSdp() {
-        if (V)
-            Log.v(TAG, "Do Opush SDP request for address " + mDestination);
-
-        mTimestamp = System.currentTimeMillis();
-
-        int channel = mDestination.getServiceChannel(BluetoothUuid_ObexMns);
-
-        if (channel != -1) {
-            if (D)
-                Log.d(TAG, "Get MNS channel " + channel + " from SDP for "
-                        + mDestination);
-
-            mSessionHandler
-                    .obtainMessage(SDP_RESULT, channel, -1, mDestination)
-                    .sendToTarget();
-            return;
-
-        } else {
-            if (V)
-                Log.v(TAG, "Remote Service channel not in cache");
-
-            boolean result = mDestination.fetchUuidsWithSdp();
-            if (result == false) {
-                Log.e(TAG, "Start SDP query failed");
-            } else {
-                // we expect framework send us Intent ACTION_UUID. otherwise we
-                // will fail
-                if (V)
-                    Log.v(TAG, "Start new SDP, wait for result");
-                IntentFilter intentFilter = new IntentFilter(
-                        "android.bleutooth.device.action.UUID");
-                mContext.registerReceiver(mReceiver, intentFilter);
-                return;
-            }
-        }
-        Message msg = mSessionHandler.obtainMessage(SDP_RESULT, channel, -1,
-                mDestination);
-        mSessionHandler.sendMessageDelayed(msg, 2000);
-    }
-
-    /**
-     * Receives the response of SDP query
-     */
-    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent == null) return;
-            Log.d(TAG, " MNS BROADCAST RECV intent: " + intent.getAction());
-
-            if ("android.bleutooth.device.action.UUID".equals(
-                    intent.getAction())) {
-                BluetoothDevice device = intent
-                        .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (V)
-                    Log.v(TAG, "ACTION_UUID for device " + device);
-                if (mDestination.equals(device)) {
-                    int channel = -1;
-                    Parcelable[] uuid = intent
-                            .getParcelableArrayExtra("android.bluetooth.device.extra.UUID");
-                    if (uuid != null) {
-                        ParcelUuid[] uuids = new ParcelUuid[uuid.length];
-                        for (int i = 0; i < uuid.length; i++) {
-                            uuids[i] = (ParcelUuid) uuid[i];
-                        }
-
-                        boolean result = false;
-
-                        // TODO Fix this error
-                        result = true;
-
-                        result = android.bluetooth.BluetoothUuid.isUuidPresent(uuids, BluetoothUuid_ObexMns);
-
-                        if (result) {
-                            if (V)
-                                Log.v(TAG, "SDP get MNS result for device "
-                                        + device);
-
-                            channel = device.getServiceChannel(BluetoothUuid_ObexMns);
-                            Log.d(TAG, " MNS SERVER Channel no " + channel);
-                            if (channel == -1) {
-                                channel = 2;
-                                Log.d(TAG, " MNS SERVER USE TEMP CHANNEL "
-                                        + channel);
-                            }
-                        }
-                    }
-                    mSessionHandler.obtainMessage(SDP_RESULT, channel, -1,
-                            mDestination).sendToTarget();
-                }
-            }
-        }
-    };
-
     private SocketConnectThread mConnectThread;
 
     /**
@@ -1940,8 +1788,6 @@ public class BluetoothMns {
 
         private final BluetoothDevice device;
 
-        private final int channel;
-
         private boolean isConnected;
 
         private long timestamp;
@@ -1949,11 +1795,10 @@ public class BluetoothMns {
         private BluetoothSocket btSocket = null;
 
         /* create a Rfcomm Socket */
-        public SocketConnectThread(BluetoothDevice device, int channel) {
+        public SocketConnectThread(BluetoothDevice device) {
             super("Socket Connect Thread");
             this.device = device;
             this.host = null;
-            this.channel = channel;
             isConnected = false;
         }
 
@@ -1967,7 +1812,8 @@ public class BluetoothMns {
 
             /* Use BluetoothSocket to connect */
             try {
-                btSocket = device.createInsecureRfcommSocket(channel);
+                btSocket = device.createInsecureRfcommSocketToServiceRecord(
+                        BluetoothUuid_ObexMns.getUuid());
             } catch (Exception e1) {
                 // TODO Auto-generated catch block
                 Log.e(TAG, "Rfcomm socket create error");
@@ -1981,26 +1827,11 @@ public class BluetoothMns {
                         + (System.currentTimeMillis() - timestamp) + " ms");
                 BluetoothMnsRfcommTransport transport;
                 transport = new BluetoothMnsRfcommTransport(btSocket);
+                if (V) Log.v(TAG, "Send transport message " + transport.toString());
 
-                BluetoothMnsPreference btMnsPref = BluetoothMnsPreference.getInstance(mContext);
-                if (btMnsPref != null) {
-                    btMnsPref.setChannel(device, MNS_UUID16, channel);
-                    if (device != null) {
-                        final String name = device.getName();
-                        btMnsPref.setName(device, (name == null) ? "" : name);
-                    }
-                }
-                if (V) Log.v(TAG, "Send transport message "
-                        + transport.toString());
-
-                mSessionHandler.obtainMessage(RFCOMM_CONNECTED, transport)
-                        .sendToTarget();
+                mSessionHandler.obtainMessage(RFCOMM_CONNECTED, transport).sendToTarget();
             } catch (IOException e) {
                 Log.e(TAG, "Rfcomm socket connect exception " + e.getMessage());
-                BluetoothMnsPreference btMnsPref = BluetoothMnsPreference.getInstance(mContext);
-                if (btMnsPref != null) {
-                    btMnsPref.removeChannel(device, MNS_UUID16);
-                }
                 markConnectionFailed(btSocket);
                 return;
             }
