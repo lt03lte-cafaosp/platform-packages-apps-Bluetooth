@@ -36,6 +36,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.Process;
 import android.util.Log;
+import android.util.Pair;
 
 import javax.obex.*;
 
@@ -68,8 +69,6 @@ public class BluetoothMnsObexSession {
 
 
     private volatile boolean mWaitingForRemote;
-
-    private Handler mCallback;
 
     private static final String TYPE_EVENT = "x-bt/MAP-event-report";
 
@@ -171,7 +170,6 @@ public class BluetoothMnsObexSession {
 
         ClientOperation putOperation = null;
         OutputStream outputStream = null;
-        InputStream inputStream = null;
         try {
             synchronized (this) {
                 mWaitingForRemote = true;
@@ -193,7 +191,6 @@ public class BluetoothMnsObexSession {
                 try {
                     if (V) Log.v(TAG, "Send headerset Event ");
                     outputStream = putOperation.openOutputStream();
-                    inputStream = putOperation.openInputStream();
                 } catch (IOException e) {
                     Log.e(TAG, "Error when opening OutputStream");
                     error = true;
@@ -219,7 +216,6 @@ public class BluetoothMnsObexSession {
 
                     /* check remote abort */
                     responseCode = putOperation.getResponseCode();
-                    responseCode = ResponseCodes.OBEX_HTTP_OK;
 
                     if (V) Log.v(TAG, "Response code is " + responseCode);
                     if (responseCode != ResponseCodes.OBEX_HTTP_CONTINUE
@@ -249,8 +245,10 @@ public class BluetoothMnsObexSession {
             }
         } catch (IOException e) {
             handleSendException(e.toString());
+            error = true;
         } catch (IndexOutOfBoundsException e) {
             handleSendException(e.toString());
+            error = true;
         } finally {
             try {
                 if (!error) {
@@ -261,9 +259,6 @@ public class BluetoothMnsObexSession {
                             Log.i(TAG, "Response error code is " + responseCode);
                         }
                     }
-                }
-                if (inputStream != null) {
-                    inputStream.close();
                 }
                 if (putOperation != null) {
                    putOperation.close();
