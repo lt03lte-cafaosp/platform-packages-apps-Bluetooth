@@ -37,6 +37,8 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -60,6 +62,7 @@ import android.os.Process;
 import android.telephony.TelephonyManager;
 import android.text.format.Time;
 import android.util.Log;
+import android.util.Pair;
 
 import com.android.bluetooth.map.MapUtils.MapUtils;
 import com.android.bluetooth.map.MapUtils.EmailUtils;
@@ -87,9 +90,11 @@ public class BluetoothMns {
 
     public static final int MNS_SEND_EVENT = 15;
 
-    private static final int CONNECT_WAIT_TIMEOUT = 45000;
+    public static final int MNS_SEND_EVENT_DONE = 16;
 
-    private static final int CONNECT_RETRY_TIME = 100;
+    public static final int MNS_SEND_TIMEOUT = 17;
+
+    public static final int MNS_SEND_TIMEOUT_DURATION = 30000; // 30 secs
 
     private static final short MNS_UUID16 = 0x1133;
 
@@ -141,8 +146,6 @@ public class BluetoothMns {
 
     private ObexTransport mTransport;
 
-    private HandlerThread mHandlerThread;
-
     private EventHandler mSessionHandler;
 
     private Handler mSessionStatusHandler;
@@ -163,6 +166,10 @@ public class BluetoothMns {
 
     List<String> folderList;
     List<String> folderListSmsMms;
+
+    private final Queue<String> mEventQueue = new ConcurrentLinkedQueue<String>();
+    private boolean mSendingEvent = false;
+
     public BluetoothMns(Context context, Handler sessionStatusHandler) {
         /* check Bluetooth enable status */
         /*
@@ -184,19 +191,7 @@ public class BluetoothMns {
             return;
         }
 
-        if (mHandlerThread == null) {
-            if (V) Log.v(TAG, "Create handler thread for batch ");
-            mHandlerThread = new HandlerThread("Bt MNS Transfer Handler",
-                    Process.THREAD_PRIORITY_BACKGROUND);
-            mHandlerThread.start();
-            Looper looper = mHandlerThread.getLooper();
-            if (looper != null) {
-                mSessionHandler = new EventHandler(looper);
-            } else {
-                // In case where mHandlerThread is died
-                mSessionHandler = new EventHandler();
-            }
-        }
+        mSessionHandler = new EventHandler();
         SmsMmsUtils smu = new SmsMmsUtils();
         folderListSmsMms = new ArrayList<String>();
         folderListSmsMms = smu.folderListSmsMmsMns(folderListSmsMms);
@@ -220,10 +215,6 @@ public class BluetoothMns {
      * Receives events from mConnectThread & mSession back in the main thread.
      */
     private class EventHandler extends Handler {
-        public EventHandler(Looper looper) {
-            super(looper);
-        }
-
         public EventHandler() {
             super();
         }
@@ -306,8 +297,62 @@ public class BluetoothMns {
                 break;
 
             case MNS_SEND_EVENT:
-                sendEvent((String) msg.obj);
+                {
+                    final String xml = (String)msg.obj;
+                    if (mSendingEvent) {
+                        mEventQueue.add(xml);
+                    } else {
+                        mSendingEvent = true;
+                        new Thread(new SendEventTask(xml)).start();
+                    }
+                    break;
+                }
+            case MNS_SEND_EVENT_DONE:
+                if (mEventQueue.isEmpty()) {
+                    mSendingEvent = false;
+                } else {
+                    final String xml = mEventQueue.remove();
+                    new Thread(new SendEventTask(xml)).start();
+                }
                 break;
+            case MNS_SEND_TIMEOUT:
+                if (V) Log.v(TAG, "MNS_SEND_TIMEOUT disconnecting.");
+                deregisterUpdates();
+                mSession.disconnect();
+                mSession = null;
+                break;
+            }
+        }
+
+        private void setTimeout() {
+            if (V) Log.v(TAG, "setTimeout MNS_SEND_TIMEOUT");
+            sendEmptyMessageDelayed(MNS_SEND_TIMEOUT, MNS_SEND_TIMEOUT_DURATION);
+        }
+
+        private void removeTimeout() {
+            if (hasMessages(MNS_SEND_TIMEOUT)) {
+                removeMessages(MNS_SEND_TIMEOUT);
+                sendEventDone();
+            }
+        }
+
+        private void sendEventDone() {
+            if (V) Log.v(TAG, "post MNS_SEND_EVENT_DONE");
+            obtainMessage(MNS_SEND_EVENT_DONE).sendToTarget();
+        }
+
+        class SendEventTask implements Runnable {
+            final String mXml;
+            SendEventTask (String xml) {
+                mXml = xml;
+            }
+
+            public void run() {
+                if (V) Log.v(TAG, "MNS_SEND_EVENT started");
+                setTimeout();
+                sendEvent(mXml);
+                removeTimeout();
+                if (V) Log.v(TAG, "MNS_SEND_EVENT finished");
             }
         }
     }
@@ -1759,10 +1804,6 @@ public class BluetoothMns {
             mSession.disconnect();
             mSession = null;
         }
-        if (mSessionStatusHandler != null) {
-            mSessionStatusHandler.obtainMessage(BluetoothMasService.MSG_INTERNAL_KILL_THREAD,
-                    mHandlerThread).sendToTarget();
-        }
     }
 
     /**
@@ -1825,7 +1866,7 @@ public class BluetoothMns {
                 btSocket.connect();
                 if (V) Log.v(TAG, "Rfcomm socket connection attempt took "
                         + (System.currentTimeMillis() - timestamp) + " ms");
-                BluetoothMnsRfcommTransport transport;
+                ObexTransport transport;
                 transport = new BluetoothMnsRfcommTransport(btSocket);
                 if (V) Log.v(TAG, "Send transport message " + transport.toString());
 

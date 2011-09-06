@@ -148,9 +148,6 @@ public class BluetoothMasService extends Service {
     /* package private */
     static final int MSG_INTERNAL_CONNECTION_FAILED = 4;
 
-    /* package private */
-    static final int MSG_INTERNAL_KILL_THREAD = 5;
-
     private static final int PORT_NUM = 16;
 
     private static final int USER_CONFIRM_TIMEOUT_VALUE = 30000;
@@ -606,13 +603,6 @@ public class BluetoothMasService extends Service {
                 case MSG_INTERNAL_CONNECTION_FAILED:
                     alertConnectionFailure();
                     stopObexServerSession();
-                    break;
-                case MSG_INTERNAL_KILL_THREAD:
-                    if (msg.obj instanceof HandlerThread) {
-                        final HandlerThread ht = (HandlerThread)msg.obj;
-                        if (VERBOSE) Log.v(TAG, "Quiting " + ht.getName());
-                        ht.quit();
-                    }
                     break;
                 default:
                     break;
