@@ -106,6 +106,8 @@ public class BluetoothOppService extends Service {
 
     private BluetoothOppTransfer mTransfer;
 
+    public static boolean mbStopSelf;
+
     private BluetoothOppTransfer mServerTransfer;
 
     private int mBatchId;
@@ -164,6 +166,7 @@ public class BluetoothOppService extends Service {
         mNotifier = new BluetoothOppNotification(this);
         mNotifier.mNotificationMgr.cancelAll();
         mNotifier.updateNotification();
+        mbStopSelf = false;
 
         final ContentResolver contentResolver = getContentResolver();
         new Thread("trimDatabase") {
@@ -359,8 +362,14 @@ public class BluetoothOppService extends Service {
                         mL2capSocketListener.stop();
                         mListenStarted = false;
                         synchronized (BluetoothOppService.this) {
+                            mbStopSelf = true;
                             if (mUpdateThread == null) {
+                                if(V) Log.v(TAG, "Thread is not running, OPP size:"+mBatchs.size());
+                                if (mBatchs.size() == 0){
+                                    /* Batch is empty and BT is turning off, stop service  */
                                 stopSelf();
+                                    mbStopSelf = false;
+                                }
                             }
                         }
                         break;
@@ -400,7 +409,9 @@ public class BluetoothOppService extends Service {
                     if (!mPendingUpdate) {
                         mUpdateThread = null;
                         if (!keepService && !mListenStarted) {
+                            if (V) Log.v(TAG, "Need to stop self");
                             stopSelf();
+                            mbStopSelf = false;
                             break;
                         }
                         return;
@@ -521,6 +532,10 @@ public class BluetoothOppService extends Service {
                 mNotifier.updateNotification();
 
                 cursor.close();
+                if((mBatchs.size()==0)&&(mbStopSelf)&&(isAfterLast)){
+                    if(V) Log.v(TAG," Nothing to Transfer,Service No Longer Required");
+                    keepService = false;
+                }
             }
         }
 
