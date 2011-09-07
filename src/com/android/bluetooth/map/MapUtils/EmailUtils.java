@@ -28,17 +28,6 @@
 
 package com.android.bluetooth.map.MapUtils;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-
-import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
@@ -47,14 +36,19 @@ import android.text.format.Time;
 import android.util.Log;
 import android.util.TimeFormatException;
 
-import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasMessageRsp;
 import com.android.bluetooth.map.BluetoothMasAppParams;
-import com.android.bluetooth.map.BluetoothMasAppIf;
+import com.android.bluetooth.map.BluetoothMasService;
+import com.android.bluetooth.map.MapUtils.CommonUtils.BluetoothMasMessageRsp;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Random;
 
 public class EmailUtils {
+    public static final String TAG = "EmailUtils";
+    public static final boolean V = BluetoothMasService.VERBOSE;
 
-    public final String TAG = "EmailUtils";
     public static final int BIT_SUBJECT = 0x1;
     public static final int BIT_DATETIME = 0x2;
     public static final int BIT_SENDER_NAME = 0x4;
@@ -77,16 +71,14 @@ public class EmailUtils {
 
     public static final int EMAIL_HDLR_CONSTANT = 200000;
 
-    // TODO: Is this needed? public static int deletedEmailFolderId = -1;
-
-    public List<String> folderListEmail(List<String> folderList, Context context) {
+    public static List<String> folderListEmail(List<String> folderList, Context context) {
         String[] projection = new String[] {"displayName"};
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
         Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
 
         if (cr != null && cr.moveToFirst()) {
             do {
-                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                if (V){
                     Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
                 }
                 int folderFlag = 0;
@@ -105,7 +97,7 @@ public class EmailUtils {
 
             } while ( cr.moveToNext());
         }
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, " Folder Listing of SMS,MMS and EMAIL: "+folderList);
         }
         if (cr != null) {
@@ -113,30 +105,8 @@ public class EmailUtils {
         }
         return folderList;
     }
-    public List<String> folderListMns(Context context) {
-        String[] projection = new String[] {"displayName"};
-        Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
-        List<String> folderList = new ArrayList<String>();
-        Cursor cr = context.getContentResolver().query(uri, projection, null, null, null);
-        if (cr != null) {
-            if (cr.moveToFirst()) {
-                do {
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
-                        Log.v(TAG, " Column Name: "+ cr.getColumnName(0) + " Value: " + cr.getString(0));
-                    }
-                    folderList.add(cr.getString(0));
-                } while (cr.moveToNext());
-            }
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
-                Log.v(TAG, " Folder Listing of EMAIL: "+folderList);
-            }
-            cr.close();
-        }
-        return folderList;
-    }
 
-    public String getWhereIsQueryForTypeEmail(String folder, Context context) {
-
+    public static String getWhereIsQueryForTypeEmail(String folder, Context context) {
         String query = "mailboxKey = -1";
         String folderId;
         Uri uri = Uri.parse("content://com.android.email.provider/mailbox");
@@ -161,8 +131,8 @@ public class EmailUtils {
         return query;
     }
 
-    public int getMessageSizeEmail(int messageId, Context context) {
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+    public static int getMessageSizeEmail(int messageId, Context context) {
+        if (V){
             Log.v(TAG, ":: Message Id in getMessageSizeEmail ::"+ messageId);
         }
         int msgSize = 0;
@@ -193,9 +163,9 @@ public class EmailUtils {
         return msgSize;
     }
 
-    public String getFolderName(String[] splitStringsEmail) {
+    public static String getFolderName(String[] splitStringsEmail) {
         String folderName;
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, ":: Split Strings Array in getFolderName ::"+ splitStringsEmail);
         }
         if(splitStringsEmail[2].trim().equalsIgnoreCase("[Gmail]") || splitStringsEmail[2].trim().contains("Gmail")){
@@ -204,13 +174,13 @@ public class EmailUtils {
         else{
             folderName = splitStringsEmail[2];
         }
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "folderName :: " + folderName);
         }
         return folderName;
     }
 
-    public String getConditionString(String folderName, Context context, BluetoothMasAppParams appParams) {
+    public static String getConditionString(String folderName, Context context, BluetoothMasAppParams appParams) {
         String whereClauseEmail = getWhereIsQueryForTypeEmail(folderName, context);
 
         /* Filter readstatus: 0 no filtering, 0x01 get unread, 0x10 get read */
@@ -221,7 +191,7 @@ public class EmailUtils {
                 }
                 whereClauseEmail += " flagRead = 0 ";
             }
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
                 Log.v(TAG, "Filter Read Status Value:"+appParams.FilterReadStatus);
                 Log.v(TAG, "Filter Read Status Condition Value:"+(appParams.FilterReadStatus & 0x10));
             }
@@ -232,7 +202,7 @@ public class EmailUtils {
                 whereClauseEmail += " flagRead = 1 ";
             }
         }
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Filter Recipient Value:"+appParams.FilterRecipient);
             Log.v(TAG, "Filter Recipient Condition 1 :"+(appParams.FilterRecipient != null));
             if (appParams.FilterRecipient != null) {
@@ -266,7 +236,7 @@ public class EmailUtils {
             String str1 = appParams.FilterOriginator;
             whereClauseEmail += "fromList LIKE '%"+appParams.FilterOriginator.trim()+"%'";
         }
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "whereClauseEmail :" + whereClauseEmail);
         }// TODO Filter priority?
 
@@ -307,7 +277,7 @@ public class EmailUtils {
         return whereClauseEmail;
     }
 
-    public MsgListingConsts bldEmailMsgLstItem(Context context, String folderName,
+    public static MsgListingConsts bldEmailMsgLstItem(Context context, String folderName,
                 BluetoothMasAppParams appParams, String subject, String timestamp,
                 String senderName, String senderAddressing, String recipientName,
                 String recipientAddressing, String msgId, String readStatus, String replyToStr) {
@@ -324,7 +294,7 @@ public class EmailUtils {
 
         if ((appParams.ParameterMask & BIT_SUBJECT) != 0) {
 
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
                 Log.v(TAG, "Fileter Subject Length ::"+appParams.SubjectLength);
             }
             if ((subject != null && appParams.SubjectLength > 0)
@@ -348,7 +318,7 @@ public class EmailUtils {
             if(senderName.contains("")){
                 String[] senderStr = senderName.split("");
                 if(senderStr !=null && senderStr.length > 0){
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " ::Sender name split String 0:: " + senderStr[0]
                                 + "::Sender name split String 1:: " + senderStr[1]);
                     }
@@ -364,7 +334,7 @@ public class EmailUtils {
             if(senderAddressing.contains("")){
                 String[] senderAddrStr = senderAddressing.split("");
                 if(senderAddrStr !=null && senderAddrStr.length > 0){
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
                                 + "::Sender Addressing split String 1:: " + senderAddrStr[1]);
                     }
@@ -406,7 +376,7 @@ public class EmailUtils {
                 else if(recipientName.contains("")){
                     String[] recepientStr = recipientName.split("");
                     if(recepientStr !=null && recepientStr.length > 0){
-                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        if (V){
                             Log.v(TAG, " ::Recepient name split String 0:: " + recepientStr[0]
                                     + "::Recepient name split String 1:: " + recepientStr[1]);
                         }
@@ -451,7 +421,7 @@ public class EmailUtils {
                 } else if (recipientAddressing.contains("")) {
                     String[] recepientAddrStr = recipientAddressing.split("");
                     if (recepientAddrStr !=null && recepientAddrStr.length > 0) {
-                        if (Log.isLoggable(TAG, Log.VERBOSE)){
+                        if (V){
                             Log.v(TAG, " ::Recepient addressing split String 0:: " + recepientAddrStr[0]
                                     + "::Recepient addressing split String 1:: " + recepientAddrStr[1]);
                         }
@@ -494,7 +464,7 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_READ) != 0) {
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
                 Log.v(TAG, " ::Read Status:: " + readStatus);
             }
             if (readStatus.equalsIgnoreCase("1")) {
@@ -519,7 +489,7 @@ public class EmailUtils {
 
         if ((appParams.ParameterMask & BIT_REPLYTO_ADDRESSING) != 0) {
             //TODO need to test
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
                 Log.v(TAG, " ::Reply To addressing:: " + replyToStr);
             }
             if (replyToStr !=null && replyToStr.length() != 0){
@@ -535,9 +505,9 @@ public class EmailUtils {
 
         return emailMsg;
     }
-    public String bldEmailBmsg(int msgHandle, BluetoothMasMessageRsp rsp, Context context, MapUtils mu) {
-        String str = null;
 
+    public static String bldEmailBmsg(int msgHandle, BluetoothMasMessageRsp rsp, Context context) {
+        String str = null;
         //Query the message table for obtaining the message related details
         Cursor cr1 = null;
         int folderId;
@@ -568,7 +538,7 @@ public class EmailUtils {
                 bmsg.setStatus("UNREAD");
             }
 
-            bmsg.setFolder(BluetoothMasAppIf.Telecom + "/" + BluetoothMasAppIf.Msg +
+            bmsg.setFolder(MapUtilsConsts.Telecom + "/" + MapUtilsConsts.Msg +
                         "/" + containingFolder);
 
             bmsg.setVcard_version("2.1");
@@ -599,7 +569,7 @@ public class EmailUtils {
             }
             else if(recipientName.contains("")){
                 multiRecepients = recipientName.replace('', ';');
-                if (Log.isLoggable(TAG, Log.VERBOSE)){
+                if (V){
                     Log.v(TAG, " ::Recepient name :: " + multiRecepients);
                 }
                 bmsg.setRecipientVcard_name(multiRecepients.trim());
@@ -667,18 +637,17 @@ public class EmailUtils {
             bmsg.setBody_msg(sb.toString());
             bmsg.setBody_length(sb.length() + 22);
             // Send a bMessage
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
                 Log.v(TAG, "bMessageEmail test\n");
                 Log.v(TAG, "=======================\n\n");
             }
-            str = mu.toBmessageEmail(bmsg);
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            str = MapUtils.toBmessageEmail(bmsg);
+            if (V){
                 Log.v(TAG, str);
                 Log.v(TAG, "\n\n");
             }
             cr2.close();
         }
-
         return str;
     }
 
@@ -686,7 +655,7 @@ public class EmailUtils {
      * Get the folder name (MAP representation) for Email based on the
      * mailboxKey value in message table
      */
-    public String getContainingFolderEmail(int folderId, Context context) {
+    public static String getContainingFolderEmail(int folderId, Context context) {
         Cursor cr;
         String folderName = null;
         String whereClause = "_id = " + folderId;
@@ -703,5 +672,117 @@ public class EmailUtils {
         return folderName;
     }
 
+    public static final String AUTHORITY = "com.android.email.provider";
+    public static final Uri EMAIL_URI = Uri.parse("content://" + AUTHORITY);
+    public static final Uri EMAIL_ACCOUNT_URI = Uri.withAppendedPath(EMAIL_URI, "account");
+    public static final Uri EMAIL_BOX_URI = Uri.withAppendedPath(EMAIL_URI, "mailbox");
+    public static final String RECORD_ID = "_id";
+    public static final String DISPLAY_NAME = "displayName";
+    public static final String ACCOUNT_KEY = "accountKey";
+    public static final String EMAIL_ADDRESS = "emailAddress";
+    public static final String IS_DEFAULT = "isDefault";
+    public static final String TYPE = "type";
+    private static final String[] ACCOUNT_ID_PROJECTION = new String[] {
+        RECORD_ID, EMAIL_ADDRESS, IS_DEFAULT
+    };
+    // Types of mailboxes. From EmailContent.java
+    // inbox
+    public static final int TYPE_INBOX = 0;
+    // draft
+    public static final int TYPE_DRAFT = 3;
+    // outbox
+    public static final int TYPE_OUTBOX = 4;
+    // sent
+    public static final int TYPE_SENT = 5;
+    // deleted
+    public static final int TYPE_DELETED = 6;
 
+    /**
+     * Returns whether Email account exists
+     * @param context the calling Context
+     * @return true if any Email account exists; false otherwise
+     */
+    public static boolean hasEmailAccount(Context context) {
+        int numAccounts = SqlHelper.count(context, EMAIL_ACCOUNT_URI, null, null);
+        if (numAccounts > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Returns the first Email account id that satisfies where condition
+     * @param context the calling Context
+     * @param where the condition respect to {@link #RECORD_ID}, {@link #EMAIL_ADDRESS}, {@link #IS_DEFAULT}
+     * @return Email account id
+     */
+    public static long getEmailAccountId(Context context, String where) {
+        if (V) Log.v(TAG, "getEmailAccountId(" + where + ")");
+        long id = -1;
+        Cursor cursor = context.getContentResolver().query(EMAIL_ACCOUNT_URI,
+                ACCOUNT_ID_PROJECTION, where, null, null);
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                id = cursor.getLong(0);
+            }
+            cursor.close();
+        }
+        if (V) Log.v(TAG, "id = " + id);
+        return id;
+    }
+
+    /**
+     * Returns the default Email account id; the first account id if no default account
+     * @param context the calling Context
+     * @return the default Email account id
+     */
+    public static long getDefaultEmailAccountId(Context context) {
+        if (V) Log.v(TAG, "getDefaultEmailAccountId()");
+        long id = getEmailAccountId(context, IS_DEFAULT + "=1");
+        if (id == -1) {
+            id = getEmailAccountId(context, null);
+        }
+        if (V) Log.v(TAG, "id = " + id);
+        return id;
+    }
+
+    /**
+     * Return Email folder list for the id
+     * @param context the calling Context
+     * @param id the email account id; id = -1 all email account
+     * @return the list of Email folder
+     */
+    public static List<String> getEmailFolderList(Context context, long id) {
+        if (V) Log.v(TAG, "getEmailFolderList: id = " + id);
+        StringBuilder sb = new StringBuilder();
+        if (id > 0) {
+            sb.append(ACCOUNT_KEY);
+            sb.append("=");
+            sb.append(id);
+        }
+        return SqlHelper.getListForColumn(context, EMAIL_BOX_URI, DISPLAY_NAME, sb.toString(), null);
+    }
+
+    /**
+     * Return folder name for the type of mailbox
+     * @param context the calling Context
+     * @param id the email account id; id = -1 all email account
+     * @param type
+     * @return
+     */
+    public static String getFolderForType(Context context, long id, int type) {
+        if (V) Log.v(TAG, "getFolderForType: id = " + id + ", type = " + type);
+        StringBuilder sb = new StringBuilder();
+        if (id > 0) {
+            sb.append(ACCOUNT_KEY);
+            sb.append("=");
+            sb.append(id);
+            sb.append(" AND ");
+        }
+        sb.append(TYPE);
+        sb.append("=");
+        sb.append(type);
+        return SqlHelper.getFirstValueForColumn(context, EMAIL_BOX_URI, DISPLAY_NAME, sb.toString(), null);
+    }
 }

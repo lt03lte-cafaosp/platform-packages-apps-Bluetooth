@@ -28,9 +28,6 @@
 
 package com.android.bluetooth.map;
 
-import com.android.bluetooth.R;
-
-import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -40,9 +37,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.preference.Preference;
-import android.text.InputFilter;
 import android.text.TextWatcher;
-import android.text.InputFilter.LengthFilter;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -51,15 +46,10 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.CompoundButton.OnCheckedChangeListener;
-import android.widget.Toast;
 
-import android.text.InputFilter;
-import android.text.TextWatcher;
-import android.text.InputFilter.LengthFilter;
-
+import com.android.bluetooth.R;
 import com.android.internal.app.AlertActivity;
 import com.android.internal.app.AlertController;
-
 
 /**
  * MapActivity shows two dialogues: One for accepting incoming ftp request and
@@ -256,7 +246,7 @@ public class BluetoothMasActivity extends AlertActivity implements
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         mTimeout = savedInstanceState.getBoolean(KEY_USER_TIMEOUT);
-        if (V) Log.e(TAG, "onRestoreInstanceState() mTimeout: " + mTimeout);
+        if (V) Log.v(TAG, "onRestoreInstanceState() mTimeout: " + mTimeout);
 
         if (mTimeout) {
             onTimeout();
@@ -297,7 +287,7 @@ public class BluetoothMasActivity extends AlertActivity implements
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case DISMISS_TIMEOUT_DIALOG:
-                    if (V) Log.e(TAG, "Received DISMISS_TIMEOUT_DIALOG msg.");
+                    if (V) Log.v(TAG, "Received DISMISS_TIMEOUT_DIALOG msg.");
                     finish();
                     break;
                 default:

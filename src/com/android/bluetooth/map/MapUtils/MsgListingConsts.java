@@ -30,7 +30,7 @@ package com.android.bluetooth.map.MapUtils;
 
 public class MsgListingConsts {
 
-	public class MsgInfo {
+    public class MsgInfo {
         public String dateTime = null;
 
         public String getDateTime() {

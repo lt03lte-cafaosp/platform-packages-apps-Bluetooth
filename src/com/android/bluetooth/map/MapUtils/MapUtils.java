@@ -26,17 +26,18 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 package com.android.bluetooth.map.MapUtils;
+
+import android.util.Log;
+import android.util.Xml;
+
+import com.android.bluetooth.map.BluetoothMasService;
+
+import org.xmlpull.v1.XmlSerializer;
 
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.List;
-import android.util.Log;
-
-import org.xmlpull.v1.XmlSerializer;
-
-import android.util.Xml;
 
 /**
  * MapUtils is a class of utility methods that provide routines for converting
@@ -50,11 +51,10 @@ import android.util.Xml;
  * @version 0.1
  *
  */
-
 public class MapUtils {
-
-    public final String TAG = "MapUtils";
-    private final String CRLF = "\r\n";
+    public static final String TAG = "MapUtils";
+    public static final boolean V = BluetoothMasService.VERBOSE;
+    private static final String CRLF = "\r\n";
 
     /**
      * folderListingXML
@@ -67,9 +67,7 @@ public class MapUtils {
      *            name
      * @return This method returns either null or a String
      */
-
-    public String folderListingXML(List<String> list) {
-
+    public static String folderListingXML(List<String> list) {
         String str = "<?xml version=\"1.0\"?><!DOCTYPE folder-listing SYSTEM \"obex-folder-listing.dtd\"><folder-listing version=\"1.0\">";
 
         for (String s : list) {
@@ -94,8 +92,7 @@ public class MapUtils {
      *            message
      * @return This method returns either null or a String
      */
-
-    public String messageListingXML(List<MsgListingConsts> list) {
+    public static String messageListingXML(List<MsgListingConsts> list) {
         XmlSerializer serializer = Xml.newSerializer();
         StringWriter writer = new StringWriter();
         try {
@@ -223,8 +220,7 @@ public class MapUtils {
      *
      * @return This method returns a String
      */
-
-    public String msgListingGetHdrXML() {
+    public static String msgListingGetHdrXML() {
         String str1 = "<MAP-msg-listing version = \"1.0\">\n";
         return str1;
     }
@@ -236,8 +232,7 @@ public class MapUtils {
      *
      * @return This method returns a String
      */
-
-    public String msgListingGetFooterXML() {
+    public static String msgListingGetFooterXML() {
         String str1 = "</MAP-msg-listing>\n";
         return str1;
     }
@@ -253,8 +248,7 @@ public class MapUtils {
      *            message
      * @return This method returns either null or a String
      */
-
-    public String msgListingGetMsgsXML(List<MsgListingConsts> list) {
+    public static String msgListingGetMsgsXML(List<MsgListingConsts> list) {
         XmlSerializer serializer = Xml.newSerializer();
         StringWriter writer = new StringWriter();
         try {
@@ -387,8 +381,7 @@ public class MapUtils {
      *
      * @return This method returns either null or a String
      */
-
-    public String mapEventReportXML(String type, String handle, String folder,
+    public static String mapEventReportXML(String type, String handle, String folder,
             String oldFolder, String msgType) {
         XmlSerializer serializer = Xml.newSerializer();
         StringWriter writer = new StringWriter();
@@ -467,9 +460,7 @@ public class MapUtils {
      *            message
      * @return This method returns either null or a String
      */
-
-    public String toBmessageSMS(BmessageConsts bmsg) {
-
+    public static String toBmessageSMS(BmessageConsts bmsg) {
         StringBuilder sb = new StringBuilder();
 
         try {
@@ -598,9 +589,7 @@ public class MapUtils {
      *            message
      * @return This method returns either null or a String
      */
-
-    public String toBmessageMMS(BmessageConsts bmsg) {
-
+    public static String toBmessageMMS(BmessageConsts bmsg) {
         StringBuilder sb = new StringBuilder();
 
         try {
@@ -713,7 +702,6 @@ public class MapUtils {
         }
 
         return sb.toString();
-
     }
 
     /**
@@ -727,9 +715,7 @@ public class MapUtils {
      *            message
      * @return This method returns either null or a String
      */
-
-    public String toBmessageEmail(BmessageConsts bmsg) {
-
+    public static String toBmessageEmail(BmessageConsts bmsg) {
         StringBuilder sb = new StringBuilder();
 
         try {
@@ -863,9 +849,7 @@ public class MapUtils {
      *            - which is a bMessage formatted SMS message
      * @return This method returns a BmessageConsts object
      */
-
-    public BmessageConsts fromBmessageSMS(String bmsg) {
-
+    public static BmessageConsts fromBmessageSMS(String bmsg) {
         BmessageConsts bMsgObj = new BmessageConsts();
 
         // Extract Telephone number of sender
@@ -903,7 +887,6 @@ public class MapUtils {
         bMsgObj.setBody_encoding(fetchBodyEncoding(bmsg));
 
         return bMsgObj;
-
     }
 
     /**
@@ -916,9 +899,7 @@ public class MapUtils {
      *            - which is a bMessage formatted SMS message
      * @return This method returns a BmessageConsts object
      */
-
-    public BmessageConsts fromBmessageMMS(String bmsg) {
-
+    public static BmessageConsts fromBmessageMMS(String bmsg) {
         BmessageConsts bMsgObj = new BmessageConsts();
 
         // Extract Telephone number of sender
@@ -962,7 +943,6 @@ public class MapUtils {
         bMsgObj.setBody_encoding(fetchBodyEncoding(bmsg));
 
         return bMsgObj;
-
     }
 
     /**
@@ -976,36 +956,35 @@ public class MapUtils {
      * @return This method returns a BmessageConsts object
      */
 
-    public BmessageConsts fromBmessageEmail(String bmsg) throws BadRequestException {
-
+    public static BmessageConsts fromBmessageEmail(String bmsg) throws BadRequestException {
         BmessageConsts bMsgObj = new BmessageConsts();
         // Extract Telephone number of sender
         String email = null;
         String vCard = null;
         vCard = fetchRecepientVcardEmail(bmsg);
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "vCard Info:: "+vCard);
         }
         email = fetchRecipientEmail(bmsg);
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "email Info:: "+email);
         }
         bMsgObj.setRecipientVcard_email(email);
 
         String vcardOrig = fetchOriginatorVcardEmail(bmsg);
         String emailOrig = fetchOriginatorEmail(bmsg);
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Vcard Originator Email:: "+emailOrig);
         }
         bMsgObj.setOriginatorVcard_email(emailOrig);
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Vcard Originatore Name:: "+fetchVcardName(vcardOrig));
         }
         String nameOrig = fetchVcardName(vcardOrig);
         bMsgObj.setOriginatorVcard_name(nameOrig);
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Vcard version:: "+fetchVcardVersion(vCard));
         }
         // Extract vCard Version
@@ -1013,31 +992,31 @@ public class MapUtils {
 
         // Extract vCard Name
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Bmsg version:: "+fetchVersion(bmsg));
         }
         // Extract bMessage Version
         bMsgObj.setBmsg_version(fetchVersion(bmsg));
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Read status:: "+fetchReadStatus(bmsg));
         }
         // Extract Message Status
         bMsgObj.setStatus(fetchReadStatus(bmsg));
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Message Type:: "+fetchType(bmsg));
         }
         // Extract Message Type
         bMsgObj.setType(fetchType(bmsg));
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Folder:: "+fetchFolder(bmsg));
         }
         // Extract Message Folder
         bMsgObj.setFolder(fetchFolder(bmsg));
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "body length:: "+fetchBodyLength(bmsg));
         }
         // Fetch Message Length
@@ -1045,7 +1024,7 @@ public class MapUtils {
         // Extract Message
         bMsgObj.setBody_msg(fetchBodyEmail(bmsg));
 
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "Message encoding:: "+fetchBodyEncoding(bmsg));
         }
         // Extract Message encoding
@@ -1055,8 +1034,8 @@ public class MapUtils {
         bMsgObj.setSubject(fetchSubjectEmail(bmsg));
 
         return bMsgObj;
-
     }
+
     /**
      * fetchVcardEmail
      *
@@ -1066,43 +1045,41 @@ public class MapUtils {
      * @param
      * @return String This method returns a vCard Email String
      */
-
-    private String fetchVcardEmail(String vCard) {
-
+    private static String fetchVcardEmail(String vCard) {
         int pos = vCard.indexOf(("EMAIL:"));
         int beginVersionPos = pos + (("EMAIL:").length());
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG,"Begin Version Position Email:: "+beginVersionPos);
         }
         int endVersionPos = vCard.indexOf("\n", beginVersionPos);
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG,"End version Pos Email:: "+endVersionPos);
         }
         return vCard.substring(beginVersionPos, endVersionPos);
     }
-    private String fetchOriginatorEmail(String vCard) {
 
+    private static String fetchOriginatorEmail(String vCard) {
         int pos = vCard.indexOf(("From:"));
         int beginVersionPos = pos + (("From:").length());
         int endVersionPos = vCard.indexOf(CRLF, beginVersionPos);
         return vCard.substring(beginVersionPos, endVersionPos);
     }
-    private String fetchRecipientEmail(String vCard) {
 
+    private static String fetchRecipientEmail(String vCard) {
         int pos = vCard.indexOf(("To:"));
         int beginVersionPos = pos + (("To:").length());
         int endVersionPos = vCard.indexOf(CRLF, beginVersionPos);
         return vCard.substring(beginVersionPos, endVersionPos);
     }
-    private String fetchRecepientVcardEmail(String bmsg) {
 
+    private static String fetchRecepientVcardEmail(String bmsg) {
         // Find the position of the first vCard in the string
         int pos = bmsg.indexOf("BEGIN:BENV");
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "vCard start position:: "+pos);
         }
         if (pos > 0) {
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
             	Log.v(TAG, "vCard start position greater than 0::");
             }
             int beginVcardPos = pos + ("\r\n".length());
@@ -1115,15 +1092,14 @@ public class MapUtils {
         }
     }
 
-    private String fetchOriginatorVcardEmail(String bmsg) {
-
+    private static String fetchOriginatorVcardEmail(String bmsg) {
         // Find the position of the first vCard in the string
         int pos = bmsg.indexOf("BEGIN:VCARD");
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "vCard start position:: "+pos);
         }
         if (pos > 0) {
-            if (Log.isLoggable(TAG, Log.VERBOSE)){
+            if (V){
             	Log.v(TAG, "vCard start position greater than 0::");
             }
             int beginVcardPos = pos + ("\r\n".length());
@@ -1135,8 +1111,8 @@ public class MapUtils {
             return "";
         }
     }
-    private String fetchSubjectEmail(String body) {
 
+    private static String fetchSubjectEmail(String body) {
         int pos = body.indexOf("Subject:");
 
         if (pos > 0) {
@@ -1148,7 +1124,6 @@ public class MapUtils {
         }
     }
 
-
     /**
      * fetchVersion
      *
@@ -1158,8 +1133,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a Version String
      */
-
-    private String fetchVersion(String bmsg) {
+    private static String fetchVersion(String bmsg) {
         int pos = bmsg.indexOf("VERSION:");
         if (pos > 0) {
 
@@ -1181,9 +1155,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a vCard String
      */
-
-    private String fetchOriginatorVcard(String bmsg) {
-
+    private static String fetchOriginatorVcard(String bmsg) {
         // Find the position of the first vCard in the string
         int pos = bmsg.indexOf("\r\nBEGIN:VCARD");
         if (pos > 0) {
@@ -1209,10 +1181,8 @@ public class MapUtils {
      * @param
      * @return String This method returns a Vcard String
      */
-
     @SuppressWarnings("unused")
-    private String fetchRecipientVcard(String bmsg) {
-
+    private static String fetchRecipientVcard(String bmsg) {
         // Locate BENV
         int locBENV = 0;
         int pos = 0;
@@ -1231,7 +1201,6 @@ public class MapUtils {
         } else {
             return "";
         }
-
     }
 
     /**
@@ -1243,8 +1212,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a Read Status String
      */
-
-    private String fetchReadStatus(String bmsg) {
+    private static String fetchReadStatus(String bmsg) {
         int pos = bmsg.indexOf("STATUS:");
         if (pos > 0) {
 
@@ -1266,8 +1234,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a message type String
      */
-
-    public String fetchType(String bmsg) {
+    public static String fetchType(String bmsg) {
         int pos = bmsg.indexOf("TYPE:");
         if (pos > 0) {
             int beginTypePos = pos + (("TYPE:").length());
@@ -1278,7 +1245,6 @@ public class MapUtils {
         } else {
             return null;
         }
-
     }
 
     /**
@@ -1290,8 +1256,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a Folder path String
      */
-
-    private String fetchFolder(String bmsg) {
+    private static String fetchFolder(String bmsg) {
         int pos = bmsg.indexOf("FOLDER:");
         if (pos > 0) {
             int beginVersionPos = pos + (("FOLDER:").length());
@@ -1302,7 +1267,6 @@ public class MapUtils {
         } else {
             return null;
         }
-
     }
 
     /**
@@ -1314,9 +1278,8 @@ public class MapUtils {
      * @param
      * @return String This method returns a Body String
      */
-
     @SuppressWarnings("unused")
-    private String fetchBody(String bmsg) {
+    private static String fetchBody(String bmsg) {
         int pos = bmsg.indexOf("BEGIN:BBODY");
         if (pos > 0) {
             int beginVersionPos = pos + (("BEGIN:BBODY").length());
@@ -1340,9 +1303,8 @@ public class MapUtils {
      * @param
      * @return String This method returns a Body Part ID String
      */
-
     @SuppressWarnings("unused")
-    private String fetchBodyPartID(String body) {
+    private static String fetchBodyPartID(String body) {
         int pos = body.indexOf("PARTID:");
         if (pos > 0) {
             int beginVersionPos = pos + (("PARTID:").length());
@@ -1364,10 +1326,8 @@ public class MapUtils {
      * @param
      * @return String This method returns a Charset String
      */
-
     @SuppressWarnings("unused")
-    private String fetchCharset(String body) {
-
+    private static String fetchCharset(String body) {
         int pos = body.indexOf("CHARSET:");
         if (pos > 0) {
 
@@ -1380,7 +1340,6 @@ public class MapUtils {
 
             return null;
         }
-
     }
 
     /**
@@ -1393,8 +1352,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a Body Encoding String
      */
-
-    private String fetchBodyEncoding(String body) {
+    private static String fetchBodyEncoding(String body) {
         int pos = body.indexOf("ENCODING:");
         if (pos > 0) {
             int beginVersionPos = pos + (("ENCODING:").length());
@@ -1417,9 +1375,8 @@ public class MapUtils {
      * @param
      * @return String This method returns a Body Language String
      */
-
     @SuppressWarnings("unused")
-    private String fetchBodyLanguage(String body) {
+    private static String fetchBodyLanguage(String body) {
         int pos = body.indexOf("LANGUAGE:");
         if (pos > 0) {
             int beginVersionPos = pos + (("LANGUAGE:").length());
@@ -1430,7 +1387,6 @@ public class MapUtils {
 
             return null;
         }
-
     }
 
     /**
@@ -1443,9 +1399,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a Body Length Integer
      */
-
-    private Integer fetchBodyLength(String body) {
-
+    private static Integer fetchBodyLength(String body) {
         int pos = body.indexOf("LENGTH:");
         if (pos > 0) {
             int beginVersionPos = pos + (("LENGTH:").length());
@@ -1459,7 +1413,6 @@ public class MapUtils {
 
             return null;
         }
-
     }
 
     /**
@@ -1472,8 +1425,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a Body Message String
      */
-
-    private String fetchBodyMsg(String body) {
+    private static String fetchBodyMsg(String body) {
         int pos = body.indexOf("BEGIN:MSG");
         if (pos > 0) {
             int beginVersionPos = pos
@@ -1486,8 +1438,8 @@ public class MapUtils {
         }
     }
 
-    private String fetchBodyMsgEmail(String body) {
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+    private static String fetchBodyMsgEmail(String body) {
+        if (V){
             Log.v(TAG, "bMessageEmail inside fetch body ::"+body);
         }
         int pos = body.indexOf("Content-Disposition:inline");
@@ -1504,7 +1456,8 @@ public class MapUtils {
             return null;
         }
     }
-    private String fetchBoundary(String body) {
+
+    private static String fetchBoundary(String body) {
         int pos = body.indexOf("boundary=\"");
         if (pos > 0) {
             int beginVersionPos = pos + (("boundary=\"").length());
@@ -1517,10 +1470,9 @@ public class MapUtils {
         }
     }
 
-    public String fetchBodyEmail(String body) throws BadRequestException {
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
-            Log.v(TAG, "inside fetch body Email ::"+body);
-        }
+    public static String fetchBodyEmail(String body) throws BadRequestException {
+        if (V) Log.v(TAG, "inside fetch body Email :"+body);
+
         int beginVersionPos = -1;
         int rfc822Flag = 0;
         int mimeFlag = 0;
@@ -1599,7 +1551,8 @@ public class MapUtils {
         }
         return null;
     }
-    private String fetchContentType(String bmsg, String boundary) {
+
+    private static String fetchContentType(String bmsg, String boundary) {
         int pos1 = bmsg.indexOf("--"+boundary);
         int pos = bmsg.indexOf("Content-Type:", pos1);
         if (pos > 0) {
@@ -1614,6 +1567,7 @@ public class MapUtils {
 
         }
     }
+
     /**
      * fetchNumEnv
      *
@@ -1625,9 +1579,8 @@ public class MapUtils {
      * @return String This method returns the number of Envelope headers as an
      *         Integer
      */
-
     @SuppressWarnings("unused")
-    private Integer fetchNumEnv(String bmsg) {
+    private static Integer fetchNumEnv(String bmsg) {
         int envCnt = 0;
         int pos = 0;
         int loopCnt = 0;
@@ -1658,9 +1611,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a vCard version String
      */
-
-    private String fetchVcardVersion(String vCard) {
-
+    private static String fetchVcardVersion(String vCard) {
         int pos = vCard.indexOf(CRLF + "VERSION:");
         int beginVersionPos = pos + (("VERSION:").length() + CRLF.length());
         int endVersionPos = vCard.indexOf(CRLF, beginVersionPos);
@@ -1677,9 +1628,8 @@ public class MapUtils {
      * @param
      * @return String This method returns a vCard name String
      */
-
     @SuppressWarnings("unused")
-    private String fetchVcardName(String vCard) {
+    private static String fetchVcardName(String vCard) {
 
         int pos = vCard.indexOf((CRLF + "N:"));
         int beginNPos = pos + "N:".length() + CRLF.length();
@@ -1696,8 +1646,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a vCard phone number String
      */
-
-    private String fetchVcardTel(String vCard) {
+    private static String fetchVcardTel(String vCard) {
 
         int pos = vCard.indexOf((CRLF + "TEL:"));
         int beginVersionPos = pos + (("TEL:").length() + CRLF.length());
@@ -1717,8 +1666,7 @@ public class MapUtils {
      *            Message to be parsed
      * @return String This method returns the message String
      */
-
-    private String removeMsgHdrSpace(String message) {
+    private static String removeMsgHdrSpace(String message) {
         String str1 = null;
         String str2 = null;
 
@@ -1743,8 +1691,8 @@ public class MapUtils {
         }
 
         return str2 + "</MAP-msg-listing>";
-
     }
+
     /**
      * fetchVcardEmail
      *
@@ -1754,9 +1702,7 @@ public class MapUtils {
      * @param
      * @return String This method returns a vCard phone number String
      */
-
-    private String fetchVcardEmailforMms(String vCard) {
-
+    private static String fetchVcardEmailforMms(String vCard) {
         int pos = vCard.indexOf((CRLF + "EMAIL:"));
         int beginVersionPos = pos + (("EMAIL:").length() + CRLF.length());
         int endVersionPos = vCard.indexOf(CRLF, beginVersionPos);

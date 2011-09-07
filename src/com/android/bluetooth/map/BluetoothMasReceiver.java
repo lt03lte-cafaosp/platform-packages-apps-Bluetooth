@@ -25,23 +25,23 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.android.bluetooth.map;
+
 import android.bluetooth.BluetoothAdapter;
-import android.content.Intent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 public class BluetoothMasReceiver extends BroadcastReceiver {
-
     private static final String TAG = "BluetoothMasReceiver";
-
     private static final boolean V = BluetoothMasService.VERBOSE;
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (V) Log.v(TAG, "BluetoothMasReceiver onReceive :" + intent.getAction());
-        Log.e(TAG, "BluetoothMasReceiver onReceive :" + intent.getAction());
+
         Intent in = new Intent();
         in.putExtras(intent);
         in.setClass(context, BluetoothMasService.class);
@@ -56,7 +56,6 @@ public class BluetoothMasReceiver extends BroadcastReceiver {
              * Other than Tranistioning state, start the MAP service whenever BT
              * transitioned to OFF/ON, or Adapter returns error
              */
-
             Log.d(TAG, "Bluetooth STATE CHANGED to " + state);
 
             if ((state == BluetoothAdapter.STATE_TURNING_ON)

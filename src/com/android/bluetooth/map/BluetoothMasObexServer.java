@@ -28,6 +28,17 @@
 
 package com.android.bluetooth.map;
 
+import android.bluetooth.BluetoothDevice;
+import android.content.Context;
+import android.os.Handler;
+import android.os.Message;
+import android.text.format.Time;
+import android.util.Log;
+
+import com.android.bluetooth.map.MapUtils.CommonUtils.BluetoothMasMessageListingRsp;
+import com.android.bluetooth.map.MapUtils.CommonUtils.BluetoothMasMessageRsp;
+import com.android.bluetooth.map.MapUtils.CommonUtils.BluetoothMasPushMsgRsp;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -39,22 +50,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 
-import android.bluetooth.BluetoothDevice;
-import android.content.Context;
-import android.content.Intent;
-import android.os.Handler;
-import android.os.Message;
-import android.text.format.Time;
-import android.util.Log;
+import javax.obex.ApplicationParameter;
+import javax.obex.HeaderSet;
+import javax.obex.Operation;
+import javax.obex.ResponseCodes;
+import javax.obex.ServerOperation;
+import javax.obex.ServerRequestHandler;
 
-import javax.obex.*;
-
-
-import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasMessageListingRsp;
-import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasMessageRsp;
-import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasPushMsgRsp;
 import com.android.bluetooth.map.MapUtils.MapUtils.BadRequestException;
-
 
 public class BluetoothMasObexServer extends ServerRequestHandler {
 
@@ -100,7 +103,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         MAS_SERVER_UPDATE_INBOX,
         MAS_SERVER_PUSH_MESSAGE
     };
-    private static  MasState state = MasState.MAS_SERVER_DISCONNECTED;
+    private static  MasState mState = MasState.MAS_SERVER_DISCONNECTED;
 
      // 128 bit UUID for MAS
     private static final byte[] MAS_TARGET = new byte[] {
@@ -108,7 +111,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         (byte)0xb0, (byte)0xde, (byte)0x08, (byte)0x00, (byte)0x20, (byte)0x0c, (byte)0x9a, (byte)0x66
     };
 
-    private BluetoothMasAppIf appIf;
+    private IBluetoothMasApp mAppIf;
 
     private BluetoothDevice mRemoteDevice;
 
@@ -221,7 +224,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_MAX_LIST_COUNT:
                     i += 2;
                     appParams.MaxListCount = getUint16BigEndian(params[i], params[i + 1]);
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " params i+1"
                                 + params[i + 1] + " maxlistcount "
                                 + appParams.MaxListCount);
@@ -239,7 +242,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     i += 2;
                     appParams.ListStartOffset = getUint16BigEndian(params[i],
                             params[i + 1]);
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " params i+1"
                                 + params[i + 1] + " maxlistcount "
                                 + appParams.ListStartOffset);
@@ -259,7 +262,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterPeriodBegin += (char) params[i + j];
                     }
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, "FilterPeriodBegin "
                                 + appParams.FilterPeriodBegin);
                     }
@@ -273,7 +276,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterPeriodEnd += (char) params[i + j];
                     }
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, "FilterPeriodEnd " + appParams.FilterPeriodEnd);
                     }
                     i += params[i];
@@ -287,7 +290,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                         appParams.FilterRecipient += (char)params[i + j];
 
                     }
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, "FilterPeriodRecipient "
                                 + appParams.FilterRecipient);
                     }
@@ -301,7 +304,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     for (int j = 1; j <= params[i]; j++) {
                         appParams.FilterOriginator += (char) params[i+ j];
                     }
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, "FilterPeriodOriginator "
                                 + appParams.FilterOriginator);
                     }
@@ -312,7 +315,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_MESSAGE_TYPE:
                     i += 2;
                     appParams.FilterMessageType = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " FilterMessageType "
                                 + appParams.FilterMessageType);
                     }
@@ -328,7 +331,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_READ_STATUS:
                     i += 2;
                     appParams.FilterReadStatus = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " FilterReadStatus "
                                 + appParams.FilterReadStatus);
                     }
@@ -344,7 +347,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FILTER_PRIORITY:
                     i += 2;
                     appParams.FilterPriority = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " FilterPriority "
                                 + appParams.FilterPriority);
                     }
@@ -360,7 +363,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_STATUS_INDICATOR:
                     i += 2;
                     appParams.StatusIndicator = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " StatusIndicator "
                                 + appParams.StatusIndicator);
                     }
@@ -376,7 +379,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_STATUS_VALUE:
                     i += 2;
                     appParams.StatusValue = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " StatusValue "
                                 + appParams.StatusValue);
                     }
@@ -392,7 +395,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_SUBJECT_LENGTH:
                     i += 2;
                     appParams.SubjectLength = (short)(params[i] & 0x00FF);
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " SubjectLen "
                                 + appParams.SubjectLength);
                     }
@@ -413,7 +416,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                         // If it is 0, send all parameters
                         appParams.ParameterMask = BluetoothMasSpecParams.MAS_DEFAULT_PARAMETER_MASK;
                     }
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " params i+1"
                                 + params[i + 1] + "params[i+2]" + params[i + 2]
                                 + "params[i+3" + params[i + 3] + " ParameterMask "
@@ -431,7 +434,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_CHARSET:
                     i += 2;
                     appParams.Charset = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " Charset "
                                 + appParams.Charset);
                     }
@@ -447,7 +450,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_TRANSPARENT:
                     i += 2;
                     appParams.Transparent = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " Transparent "
                                 + appParams.Transparent);
                     }
@@ -463,7 +466,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_RETRY:
                     i += 2;
                     appParams.Retry = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " Retry "
                                 + appParams.Retry);
                     }
@@ -479,7 +482,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_ATTACHMENT:
                     i += 2;
                     appParams.Attachment = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " Attachment "
                                 + appParams.Attachment);
                     }
@@ -495,7 +498,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 case BluetoothMasSpecParams.MAS_TAG_FRACTION_REQUEST:
                     i += 2;
                     appParams.FractionRequest = params[i];
-                    if (Log.isLoggable(TAG, Log.VERBOSE)){
+                    if (V){
                         Log.v(TAG, " params i " + params[i] + " Fraction Request "
                                 + appParams.FractionRequest);
                     }
@@ -531,16 +534,16 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     private MasAppParamsStore masAppParams = new MasAppParamsStore();
 
-    public BluetoothMasObexServer(Handler callback,
-            BluetoothDevice remoteDevice, Context context) {
+    public BluetoothMasObexServer(Handler callback, BluetoothDevice remoteDevice,
+            Context context, IBluetoothMasApp appIf) {
         super();
-        appIf = new BluetoothMasAppIf(context, callback, "SMS_MMS_EMAIL");
+        mAppIf = appIf;
+
         mConnectionId = -1;
         mCallback = callback;
         mContext = context;
         mRemoteDevice = remoteDevice;
-
-        if (Log.isLoggable(TAG, Log.VERBOSE)){
+        if (V){
             Log.v(TAG, "BlueoothMasObexServer const called");
         }
         // set initial value when ObexServer created
@@ -596,7 +599,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         msg.what = BluetoothMasService.MSG_SESSION_ESTABLISHED;
         msg.sendToTarget();
 
-        state = MasState.MAS_SERVER_CONNECTED;
+        mState = MasState.MAS_SERVER_CONNECTED;
         if (D) Log.d(TAG, "Connect(): Success");
         return ResponseCodes.OBEX_HTTP_OK;
     }
@@ -604,7 +607,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
     @Override
     public void onDisconnect(final HeaderSet req, final HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnect(): enter");
-        appIf.disconnect();
+        mAppIf.disconnect();
 
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
         if (mCallback != null) {
@@ -615,9 +618,8 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         }
 
         // MNS Service
-        appIf.stopMnsSession(mRemoteDevice);
-
-        state = MasState.MAS_SERVER_DISCONNECTED;
+        mAppIf.stopMnsSession(mRemoteDevice);
+        mState = MasState.MAS_SERVER_DISCONNECTED;
     }
 
     @Override
@@ -634,7 +636,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         if (D) Log.e(TAG, "onSetPath(): supports SetPath request.");
 
         String tmpPath = null;
-        boolean retVal;
+        boolean retVal = false;
         boolean tmpBackup = backup;
 
         if (tmpBackup && create) {
@@ -642,12 +644,12 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         } else {
             tmpBackup = false;
         }
-        if (state != MasState.MAS_SERVER_CONNECTED) {
+        if (mState != MasState.MAS_SERVER_CONNECTED) {
             if (D)
                 Log.e(TAG, "onSetPath() Failed: Mas Server not connected");
             return ResponseCodes.OBEX_HTTP_UNAVAILABLE;
         }
-        state = MasState.MAS_SERVER_SET_FOLDER;
+        mState = MasState.MAS_SERVER_SET_FOLDER;
 
         try {
             tmpPath = (String) request.getHeader(HeaderSet.NAME);
@@ -662,8 +664,8 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             Log.e(TAG, "backup=" + backup + " create=" + create + " name="
                     + tmpPath);
 
-        retVal = appIf.setPath(backup, tmpPath);
-        state = MasState.MAS_SERVER_CONNECTED;
+        retVal = mAppIf.setPath(backup, tmpPath);
+        mState = MasState.MAS_SERVER_CONNECTED;
         if (retVal == true) {
             if (V)
                 Log.e(TAG, "SetPath to" + tmpPath + "SUCCESS");
@@ -676,12 +678,16 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     @Override
     public void onClose() {
-
-        appIf.stopMnsSession(mRemoteDevice);
+        mAppIf.stopMnsSession(mRemoteDevice);
 
         if (mCallback != null) {
             Message msg = Message.obtain(mCallback);
             msg.what = BluetoothMasService.MSG_SERVERSESSION_CLOSE;
+            if (mAppIf.supportSmsMms(true)) {
+                msg.arg1 = 0;
+            } else if (mAppIf.supportEmail(true)) {
+                msg.arg1 = 1;
+            }
             msg.sendToTarget();
             if (D) Log.e(TAG, "onClose(): msg MSG_SERVERSESSION_CLOSE sent out.");
         }
@@ -750,7 +756,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         InputStream is = null;
         boolean error = false;
         File file = null;
-        BluetoothMasPushMsgRsp pMsg;
+        BluetoothMasPushMsgRsp pMsg = new BluetoothMasPushMsgRsp();;
 
         file = new File(mContext.getFilesDir() + "/" + DEFAULT_FILE);
 
@@ -813,7 +819,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
         if (error != true) {
             try {
-                pMsg = appIf.pushMsg(name, file, masAppParams.get());
+                pMsg = mAppIf.pushMsg(name, file, masAppParams.get());
             } catch (BadRequestException e) {
                 return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             }
@@ -835,16 +841,16 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     private final int msgStatus(Operation op, String name) {
         if (D) Log.d(TAG, "msgStatus: Enter");
-        return appIf.msgStatus(name, masAppParams.get());
+        return mAppIf.msgStatus(name, masAppParams.get());
     }
 
     private final int msgUpdate(Operation op, String name) {
         if (D) Log.d(TAG, "msgUpdate: Enter");
-        return appIf.msgUpdate(name, masAppParams.get());
+        return mAppIf.msgUpdate(name, masAppParams.get());
     }
 
     private final int notification(Operation op) {
-        return appIf.notification(mRemoteDevice, masAppParams.get());
+        return mAppIf.notification(mRemoteDevice, masAppParams.get());
     }
 
     @Override
@@ -1034,12 +1040,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     /** Send a bMessage to client */
     private final int sendMsg(Operation op, String name) {
-
-        BluetoothMasMessageRsp msg;
+        BluetoothMasMessageRsp msg = new BluetoothMasMessageRsp();
         byte[] val = new byte[1];
 
         if (D) Log.d(TAG, "SendMsg : Enter");
-        msg = appIf.msg(name, masAppParams.get());
+        msg = mAppIf.msg(name, masAppParams.get());
         if(msg == null || msg.rsp != ResponseCodes.OBEX_HTTP_OK) {
             return msg.rsp;
         }
@@ -1069,10 +1074,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     /** Send an XML format String to client for Folder listing */
     private final int sendFolderListing(Operation op) {
-        int folderListSize;
-
+        int folderListSize = 0;
         if (D) Log.d(TAG, "SendFolderListing : Enter");
-        folderListSize = appIf.folderListingSize();
+        folderListSize = mAppIf.folderListingSize();
         byte[] size = new byte[2];
         size[0] = (byte) ((folderListSize / 0x100) & 0xff);
         size[1] = (byte) ((folderListSize % 0x100) & 0xff);
@@ -1093,7 +1097,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 if (D) Log.d(TAG, "SendFolderListing : FAILED : RetVal" + retVal);
                 return retVal;
             }
-            return sendFolderListingBody(op, appIf.folderListing(masAppParams.get()));
+            return sendFolderListingBody(op, mAppIf.folderListing(masAppParams.get()));
         } else {
             op.noEndofBody();
             return pushHeader(op, reply);
@@ -1104,9 +1108,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
     private final int sendMsgListing(Operation op, String name) {
 
         byte[] val = new byte[2];
+        BluetoothMasMessageListingRsp appIfMsgListRsp = new BluetoothMasMessageListingRsp();
 
-        BluetoothMasMessageListingRsp appIfMsgListRsp = appIf.msgListing(name,
-                masAppParams.get());
+        appIfMsgListRsp = mAppIf.msgListing(name, masAppParams.get());
 
         if(appIfMsgListRsp == null || appIfMsgListRsp.rsp != ResponseCodes.OBEX_HTTP_OK) {
             return appIfMsgListRsp.rsp;

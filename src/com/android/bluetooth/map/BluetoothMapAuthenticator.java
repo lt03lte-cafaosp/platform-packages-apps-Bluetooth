@@ -32,7 +32,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
-import javax.obex.*;
+import javax.obex.Authenticator;
+import javax.obex.PasswordAuthentication;
 
 /**
  * BluetoothMapAuthenticator is a used by BluetoothObexServer for obex
