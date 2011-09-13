@@ -976,7 +976,7 @@ public class MapUtils {
      * @return This method returns a BmessageConsts object
      */
 
-    public BmessageConsts fromBmessageEmail(String bmsg) {
+    public BmessageConsts fromBmessageEmail(String bmsg) throws BadRequestException {
 
         BmessageConsts bMsgObj = new BmessageConsts();
         // Extract Telephone number of sender
@@ -1517,7 +1517,7 @@ public class MapUtils {
         }
     }
 
-    public String fetchBodyEmail(String body) {
+    public String fetchBodyEmail(String body) throws BadRequestException {
         if (Log.isLoggable(TAG, Log.VERBOSE)){
             Log.v(TAG, "inside fetch body Email ::"+body);
         }
@@ -1545,42 +1545,55 @@ public class MapUtils {
         }
         int pos = body.indexOf(CRLF, pos1) + CRLF.length();
         while (pos > 0) {
-            if(body.startsWith(CRLF, pos) == true){
+            if(body.startsWith(CRLF, pos)) {
                 beginVersionPos = pos + CRLF.length();
                 break;
+            } else {
+                final int next = body.indexOf(CRLF, pos);
+                if (next == -1) {
+                    throw new BadRequestException("Ill-formatted bMessage, no empty line");
+                } else {
+                    pos = next + CRLF.length();
                 }
-            else{
-                pos = body.indexOf(CRLF, pos)+ CRLF.length();
             }
         }
         if(beginVersionPos > 0){
             int endVersionPos;
             if(rfc822Flag == 0){
-                if(mimeFlag == 0){
-                    endVersionPos = (body.indexOf("END:MSG", beginVersionPos)
-                            - CRLF.length());
-                }
-                else{
+                if(mimeFlag == 0) {
+                    return body.substring(beginVersionPos);
+                } else {
                     endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos) - CRLF.length());
                 }
-                return body.substring(beginVersionPos, endVersionPos);
+                try {
+                    return body.substring(beginVersionPos, endVersionPos);
+                } catch (IndexOutOfBoundsException e) {
+                    throw new BadRequestException("Ill-formatted bMessage, no end boundary");
+                }
             }
             else if(rfc822Flag == 1){
                 endVersionPos = (body.indexOf("--"+boundary+"--", beginVersionPos));
-                body = body.substring(beginVersionPos, endVersionPos);
+                try {
+                    body = body.substring(beginVersionPos, endVersionPos);
+                } catch (IndexOutOfBoundsException e) {
+                    throw new BadRequestException("Ill-formatted bMessage, no end boundary");
+                }
                 int pos2 = body.indexOf(CRLF) + CRLF.length();
                 while (pos2 > 0) {
-                    if(body.startsWith(CRLF, pos2) == true){
+                    if(body.startsWith(CRLF, pos2)) {
                         beginVersionPos1 = pos2 + CRLF.length();
                         break;
-                    }
-                    else{
-                        pos2 = body.indexOf(CRLF, pos2)+ CRLF.length();
+                    } else {
+                        final int next = body.indexOf(CRLF, pos2);
+                        if (next == -1) {
+                            throw new BadRequestException("Ill-formatted bMessage, no empty line");
+                        } else {
+                            pos2 = next + CRLF.length();
+                        }
                     }
                 }
                 if(beginVersionPos1 > 0){
-                    int endVersionPos1 = (body.lastIndexOf(CRLF));
-                    return body.substring(beginVersionPos1, endVersionPos1);
+                    return body.substring(beginVersionPos1);
                 }
             }
         }
@@ -1750,4 +1763,9 @@ public class MapUtils {
         return vCard.substring(beginVersionPos, endVersionPos);
     }
 
+    public static class BadRequestException extends Exception {
+        public BadRequestException(String reason) {
+            super("BadRequestException: " + reason);
+        }
+    }
 }

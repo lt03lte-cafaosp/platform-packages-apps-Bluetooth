@@ -74,6 +74,7 @@ import com.android.bluetooth.map.MapUtils.SmsMmsUtils;
 import com.android.bluetooth.map.MapUtils.SortMsgListByDate;
 import com.android.bluetooth.map.MapUtils.EmailUtils;
 import com.android.bluetooth.map.MapUtils.CommonUtils;
+import com.android.bluetooth.map.MapUtils.MapUtils.BadRequestException;
 
 
 import javax.obex.*;
@@ -1316,11 +1317,9 @@ public class BluetoothMasAppIf {
      * @return Response to push command
      */
     public BluetoothMasPushMsgRsp pushMsg(String name, File file,
-            BluetoothMasAppParams bluetoothMasAppParams) {
-        // TODO Auto-generated method stub
-
+            BluetoothMasAppParams bluetoothMasAppParams) throws BadRequestException {
         BluetoothMasPushMsgRsp rsp = new BluetoothMasPushMsgRsp();
-        rsp.response = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        rsp.response = ResponseCodes.OBEX_HTTP_UNAVAILABLE;
         rsp.msgHandle = null;
 
         if(!checkPath(false, name, false) ||
@@ -1345,19 +1344,25 @@ public class BluetoothMasAppIf {
             }
             fis.close();
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage());
             return rsp;
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage());
             return rsp;
         } catch (SecurityException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage());
             return rsp;
         }
 
-        String readStr = new String(readBytes);
+        String readStr = "";
         MapUtils mu = new MapUtils();
-        String type = mu.fetchType(readStr);
+        String type = "";
+        try {
+            readStr = new String(readBytes);
+            type = mu.fetchType(readStr);
+        } catch (Exception e) {
+            throw new BadRequestException(e.getMessage());
+        }
         if (type != null && (type.equalsIgnoreCase("SMS_GSM") || type.equalsIgnoreCase("SMS_CDMA")
                 || type.equalsIgnoreCase("MMS"))) {
             String tmpPath = "";
@@ -1584,12 +1589,12 @@ public class BluetoothMasAppIf {
 
         if ((bluetoothMasAppParams.StatusIndicator != 0)
                 && (bluetoothMasAppParams.StatusIndicator != 1)) {
-            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            return ResponseCodes.OBEX_HTTP_PRECON_FAILED;
         }
 
         if ((bluetoothMasAppParams.StatusValue != 0)
                 && (bluetoothMasAppParams.StatusValue != 1)) {
-            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            return ResponseCodes.OBEX_HTTP_PRECON_FAILED;
         }
         if(name != null && (Integer.valueOf(name) > 0 && 
                 Integer.valueOf(name) < 100000)){
@@ -1603,7 +1608,7 @@ public class BluetoothMasAppIf {
         else if (name != null && (Integer.valueOf(name) > 200000)) {
             return setMsgStatusEmail(name, bluetoothMasAppParams);
         }
-        return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        return ResponseCodes.OBEX_HTTP_NOT_FOUND;
     }
     public long getAccountId() {
         long accountId = -1;
@@ -1663,7 +1668,7 @@ public class BluetoothMasAppIf {
             return ResponseCodes.OBEX_HTTP_OK;
         }
 
-        return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        return ResponseCodes.OBEX_HTTP_PRECON_FAILED;
 
     }
 
@@ -2181,7 +2186,7 @@ public class BluetoothMasAppIf {
         cr = context.getContentResolver().query(uri, null, whereClause, null,
                 null);
         if (cr == null) {
-            rsp.rsp = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            rsp.rsp = ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
             return rsp;
         }
         if (cr.getCount() > 0) {
@@ -2469,7 +2474,7 @@ public class BluetoothMasAppIf {
      * This method is used to take a Bmessage that was pushed and move it to the
      * folder
      */
-    private String moveMMStoDrafts(String mmsMsg) {
+    private String moveMMStoDrafts(String mmsMsg) throws BadRequestException {
 
         String folder = "drafts";
         BmessageConsts bMsg = mu.fromBmessageMMS(mmsMsg);
@@ -2586,7 +2591,7 @@ public class BluetoothMasAppIf {
      * This method is used to take a Bmessage that was pushed and move it to the
      * folder
      */
-    private String addToMmsFolder(String folderName, String mmsMsg) {
+    private String addToMmsFolder(String folderName, String mmsMsg) throws BadRequestException {
         if (folderName == null) {
             return null;
         }
@@ -2641,7 +2646,8 @@ public class BluetoothMasAppIf {
 
         if (uri == null) {
             // unable to insert MMS
-            return null;
+            Log.e(TAG, "Unabled to insert MMS " + values);
+            return INTERNAL_ERROR;
         }
         String msgNum = uri.getLastPathSegment();
         int msgID = Integer.parseInt(msgNum);
@@ -3440,11 +3446,11 @@ public class BluetoothMasAppIf {
         return rsp;
     }
     private BluetoothMasPushMsgRsp pushMessageMms(BluetoothMasPushMsgRsp rsp,
-                String tmpPath, String readStr, String name){
+                String tmpPath, String readStr, String name) throws BadRequestException {
         if (tmpPath.equalsIgnoreCase("telecom/msg/outbox")) {
             MmsHandle = moveMMStoDrafts(readStr);
             if (MmsHandle == null) {
-                rsp.response = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
                 return rsp;
             }
             moveMMSfromDraftstoOutbox();
@@ -3477,8 +3483,9 @@ public class BluetoothMasAppIf {
                 return rsp;
             }
             MmsHandle = addToMmsFolder(folderName, readStr);
-            if (MmsHandle == null) {
-                rsp.response = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            if (INTERNAL_ERROR == MmsHandle) {  // == comparison valid here
+                rsp.msgHandle = null;
+                rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
                 return rsp;
             }
             rsp.msgHandle = MmsHandle;
@@ -3510,7 +3517,7 @@ public class BluetoothMasAppIf {
             SmsHandle = addToSmsFolder(folderName, PhoneAddress, SmsText);
             if (INTERNAL_ERROR == SmsHandle) {  // == comparison valid here
                 rsp.msgHandle = null;
-                rsp.response = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
                 return rsp;
             }
             rsp.msgHandle = SmsHandle;
@@ -3557,7 +3564,7 @@ public class BluetoothMasAppIf {
     }
 
     private BluetoothMasPushMsgRsp pushMessageEmail(BluetoothMasPushMsgRsp rsp,
-                String readStr, String name){
+                String readStr, String name) throws BadRequestException {
         if (Log.isLoggable(TAG, Log.VERBOSE)){
                 Log.v(TAG, " Before fromBmessageemail method:: "+readStr);
         }
@@ -3588,7 +3595,7 @@ public class BluetoothMasAppIf {
                 EmailOriginator, EmailOrigName);
         if (INTERNAL_ERROR == EmailHandle) { // == comparison valid here
             rsp.msgHandle = null;
-            rsp.response = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
             return rsp;
         }
         rsp.msgHandle = EmailHandle;
