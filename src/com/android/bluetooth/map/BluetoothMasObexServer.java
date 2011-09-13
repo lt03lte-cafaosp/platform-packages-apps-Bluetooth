@@ -53,6 +53,7 @@ import javax.obex.*;
 import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasMessageListingRsp;
 import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasMessageRsp;
 import com.android.bluetooth.map.BluetoothMasAppIf.BluetoothMasPushMsgRsp;
+import com.android.bluetooth.map.MapUtils.MapUtils.BadRequestException;
 
 
 public class BluetoothMasObexServer extends ServerRequestHandler {
@@ -572,6 +573,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         } catch (IOException e) {
             Log.e(TAG, e.toString());
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, e.toString());
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
 
         try {
@@ -648,8 +652,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         try {
             tmpPath = (String) request.getHeader(HeaderSet.NAME);
         } catch (IOException e) {
-            Log.e(TAG, "Get name header fail");
+            Log.e(TAG, "Get name header fail: " + e);
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Get name header fail: " + e);
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
         if (D)
             Log.e(TAG, "backup=" + backup + " create=" + create + " name="
@@ -700,8 +707,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             name = (String) request.getHeader(HeaderSet.NAME);
             appParams = (byte[])request.getHeader(HeaderSet.APPLICATION_PARAMETER);
         } catch (IOException e) {
-            Log.e(TAG, "request headers error");
+            Log.e(TAG, "request headers error: " + e);
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "request headers error: " + e);
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
 
         masAppParams.clear();
@@ -802,7 +812,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         }
 
         if (error != true) {
-            pMsg = appIf.pushMsg(name, file, masAppParams.get());
+            try {
+                pMsg = appIf.pushMsg(name, file, masAppParams.get());
+            } catch (BadRequestException e) {
+                return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+            }
 
             if ((pMsg.msgHandle != null)
                     && (pMsg.response == ResponseCodes.OBEX_HTTP_OK)) {
@@ -854,8 +868,11 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             name = (String) request.getHeader(HeaderSet.NAME);
             appParams = (byte[])request.getHeader(HeaderSet.APPLICATION_PARAMETER);
         } catch (IOException e) {
-            Log.e(TAG, "request headers error");
+            Log.e(TAG, "request headers error: " + e);
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "request headers error: " + e);
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
         masAppParams.clear();
         if ( appParams != null ){
@@ -902,6 +919,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         } catch (IOException e) {
             Log.e(TAG, e.toString());
             pushResult = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, e.toString());
+            pushResult = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
         if (D) Log.d(TAG, "Push Header: Exit : RetVal " + pushResult);
         return pushResult;
@@ -925,7 +945,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             outputStream = op.openOutputStream();
         } catch (IOException e) {
             Log.e(TAG, "open outputstrem failed" + e.toString());
-            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            return ResponseCodes.OBEX_HTTP_UNAVAILABLE;
         }
 
         int position = 0;
@@ -948,7 +968,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 outputStream.write(subStr.getBytes(), 0, readLength);
             } catch (IOException e) {
                 Log.e(TAG, "write outputstream failed" + e.toString());
-                pushResult = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+                pushResult = ResponseCodes.OBEX_HTTP_UNAVAILABLE;
                 break;
             }
             if (V) {
@@ -963,7 +983,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
         if (!closeStream(outputStream, op)) {
             Log.e(TAG,"Send Folder Listing Body - Close output stream error! ");
-            pushResult = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            pushResult = ResponseCodes.OBEX_HTTP_UNAVAILABLE;
         }
         if (V) Log.e(TAG, "Send Folder Listing Body complete! result = " + pushResult);
         return pushResult;
