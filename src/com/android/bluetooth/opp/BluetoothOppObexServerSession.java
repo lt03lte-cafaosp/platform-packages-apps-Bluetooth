@@ -587,6 +587,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         long fileLength = 0;
         long fileReadPos = 0;
         int readLength;
+        Byte srm;
 
         File myCard = getMyBusinessCard ( );
         int outputBufferSize = op.getMaxPacketSize();
@@ -621,18 +622,73 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
         }
 
+        try {
+            if (((ServerOperation)op).mSrmServerSession.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                if (V) Log.v(TAG, "Local Device SRM: Capable");
+
+                srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                    if (V) Log.v(TAG, "SRM status: Enabled");
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                    Byte srmp = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+                    Log.v(TAG, "SRMP header (CONTINUE or OK): " + srmp);
+                    if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                        Log.v(TAG, "SRMP status: WAIT");
+                        ((ServerOperation)op).mSrmServerSession.setLocalSrmpWait(true);
+                    } else {
+                        Log.v(TAG, "SRMP status: NONE");
+                        ((ServerOperation)op).mSrmServerSession.setLocalSrmpWait(false);
+                    }
+
+                } else {
+                    if (V) Log.v(TAG, "SRM status: Disabled");
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                    ((ServerOperation)op).mSrmServerSession.setLocalSrmpWait(false);
+                }
+            } else {
+                if (V) Log.v(TAG, "Local Device SRM: Incapable");
+                ((ServerOperation)op).mSrmServerSession.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                ((ServerOperation)op).mSrmServerSession.setLocalSrmpWait(false);
+            }
+        } catch (IOException e) {
+                Log.e(TAG, "get getReceivedHeaders for SRM error " + e);
+                return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+        }
+
         byte[] buffer = new byte[outputBufferSize];
 
         /* Read the file and send */
         fileLength = myCard.length ( );
+        HeaderSet reply = new HeaderSet();
+        reply.setHeader(HeaderSet.NAME, OPP_DEFAULT_vCARD_NAME);
+        reply.setHeader(HeaderSet.TYPE, type);
+        reply.setHeader(HeaderSet.LENGTH, fileLength);
+
         bis = new BufferedInputStream(fis, OPP_LOCAL_BUF_SIZE);
         try {
+            op.sendHeaders (reply);
             while (fileReadPos != fileLength) {
                 readLength = bis.read(buffer, 0, outputBufferSize);
                 fileReadPos += readLength;
 
                 if(((ServerOperation)op).isAborted != true) {
                     outputStream.write(buffer, 0, readLength);
+                    if (((ServerOperation)op).mSrmServerSession.getLocalSrmpWait( ) == true) {
+                        try {
+                            request = op.getReceivedHeader();
+                            Byte srmp = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+                            Log.v(TAG, "SRMP header (CONTINUE or OK): " + srmp);
+                            if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                                Log.v(TAG, "SRMP status: WAIT");
+                                ((ServerOperation)op).mSrmServerSession.setLocalSrmpWait(true);
+                            } else {
+                                Log.v(TAG, "SRMP status: NONE");
+                                ((ServerOperation)op).mSrmServerSession.setLocalSrmpWait(false);
+                            }
+                        } catch (IOException e) {
+                            Log.e(TAG, "Failed to read SRMP Header " + e);
+                        }
+                    }
                 } else {
                     break;
                 }
