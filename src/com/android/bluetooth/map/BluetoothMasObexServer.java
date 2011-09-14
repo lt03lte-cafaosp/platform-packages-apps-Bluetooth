@@ -103,7 +103,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         MAS_SERVER_UPDATE_INBOX,
         MAS_SERVER_PUSH_MESSAGE
     };
-    private static  MasState mState = MasState.MAS_SERVER_DISCONNECTED;
+    private MasState mState = MasState.MAS_SERVER_DISCONNECTED;
 
      // 128 bit UUID for MAS
     private static final byte[] MAS_TARGET = new byte[] {
