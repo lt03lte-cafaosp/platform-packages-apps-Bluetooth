@@ -37,7 +37,7 @@ import com.android.bluetooth.map.MapUtils.MapUtils.BadRequestException;
 
 import java.io.File;
 
-interface IBluetoothMasApp {
+public interface IBluetoothMasApp {
     public static final int BIT_SUBJECT = 0x1;
     public static final int BIT_DATETIME = 0x2;
     public static final int BIT_SENDER_NAME = 0x4;

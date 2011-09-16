@@ -45,6 +45,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
+import static com.android.bluetooth.map.IBluetoothMasApp.EMAIL_HDLR_CONSTANT;
+
 public class EmailUtils {
     public static final String TAG = "EmailUtils";
     public static final boolean V = BluetoothMasService.VERBOSE;
@@ -68,8 +70,6 @@ public class EmailUtils {
     public static final int BIT_SENT = 0x2000;
     public static final int BIT_PROTECTED = 0x4000;
     public static final int BIT_REPLYTO_ADDRESSING = 0x8000;
-
-    public static final int EMAIL_HDLR_CONSTANT = 200000;
 
     public static List<String> folderListEmail(List<String> folderList, Context context) {
         String[] projection = new String[] {"displayName"};

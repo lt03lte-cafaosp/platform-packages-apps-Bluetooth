@@ -41,6 +41,8 @@ import com.android.bluetooth.map.MapUtils.SmsMmsUtils;
 
 import java.util.List;
 
+import static com.android.bluetooth.map.IBluetoothMasApp.MMS_HDLR_CONSTANT;
+
 /**
  * This class run an MNS session.
  */
@@ -66,10 +68,6 @@ public class BluetoothMnsZero {
     public static final String MESSAGE_DELETED = "MessageDeleted";
 
     public static final String MESSAGE_SHIFT = "MessageShift";
-
-    public static final int MMS_HDLR_CONSTANT = 100000;
-
-    public static final int EMAIL_HDLR_CONSTANT = 200000;
 
     private static final int MSG_CP_FAILED_TYPE = 5;
 
@@ -174,7 +172,7 @@ public class BluetoothMnsZero {
     /**
      * Stop listening to changes in cursor
      */
-    public synchronized void deregister() {
+    public void deregister() {
         Log.d(TAG, "DEREGISTER MNS SMS UPDATES");
         if (mIsRegistered) {
             mIsRegistered = false;

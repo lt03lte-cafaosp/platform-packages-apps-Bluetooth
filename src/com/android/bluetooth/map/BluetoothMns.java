@@ -100,10 +100,6 @@ public class BluetoothMns {
 
     public static final String MESSAGE_SHIFT = "MessageShift";
 
-    public static final int MMS_HDLR_CONSTANT = 100000;
-
-    public static final int EMAIL_HDLR_CONSTANT = 200000;
-
     private Context mContext;
 
     private BluetoothAdapter mAdapter;
@@ -163,16 +159,16 @@ public class BluetoothMns {
         }).start();
     }
 
+    private synchronized boolean canDisconnect() {
+        return !bmz.isRegistered() && !bmo.isRegistered();
+    }
+
     private void deregister(final int masId) {
-        new Thread(new Runnable() {
-            public void run() {
-                if (masId == 0) {
-                    bmz.deregister();
-                } else if (masId == 1) {
-                    bmo.deregister();
-                }
-            }
-        }).start();
+        if (masId == 0) {
+            bmz.deregister();
+        } else if (masId == 1) {
+            bmo.deregister();
+        }
     }
 
     private void deregisterAll() {
@@ -217,10 +213,14 @@ public class BluetoothMns {
                 case MNS_DISCONNECT:
                 {
                     final int masId = msg.arg1;
-                    deregister(masId);
-                    if (!bmz.isRegistered() && !bmo.isRegistered()) {
-                        stop();
-                    }
+                    new Thread(new Runnable() {
+                        public void run() {
+                            deregister(masId);
+                            if (canDisconnect()) {
+                                stop();
+                            }
+                        }
+                    }).start();
                     break;
                 }
                 /*
@@ -230,6 +230,7 @@ public class BluetoothMns {
                 case RFCOMM_ERROR:
                     if (V) Log.v(TAG, "receive RFCOMM_ERROR msg");
                     deregisterAll();
+                    stop();
                     break;
                 /*
                  * RFCOMM connected. Do an OBEX connect by starting the session
@@ -254,10 +255,7 @@ public class BluetoothMns {
                 case BluetoothMnsObexSession.MSG_SESSION_ERROR:
                     if (V) Log.v(TAG, "receive MSG_SESSION_ERROR");
                     deregisterAll();
-                    if (mSession != null) {
-                        mSession.disconnect();
-                        mSession = null;
-                    }
+                    stop();
                     break;
                 case MNS_SEND_EVENT:
                 {
@@ -283,17 +281,9 @@ public class BluetoothMns {
                     break;
                 case MNS_SEND_TIMEOUT:
                 {
-                    final int masId = msg.arg1;
                     if (V) Log.v(TAG, "MNS_SEND_TIMEOUT disconnecting.");
-                    if (masId == 0) {
-                        bmz.deregister();
-                    } else if (masId == 1){
-                        bmo.deregister();
-                    }
-                    deregister(masId);
-                    if (!bmz.isRegistered() && !bmo.isRegistered()) {
-                        stop();
-                    }
+                    deregisterAll();
+                    stop();
                     break;
                 }
             }

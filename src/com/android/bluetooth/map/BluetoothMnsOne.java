@@ -42,6 +42,8 @@ import com.android.bluetooth.map.MapUtils.MapUtilsConsts;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.android.bluetooth.map.IBluetoothMasApp.EMAIL_HDLR_CONSTANT;
+
 /**
  * This class run an MNS session.
  */
@@ -69,10 +71,6 @@ public class BluetoothMnsOne {
     public static final String MESSAGE_DELETED = "MessageDeleted";
 
     public static final String MESSAGE_SHIFT = "MessageShift";
-
-    public static final int MMS_HDLR_CONSTANT = 100000;
-
-    public static final int EMAIL_HDLR_CONSTANT = 200000;
 
     private Context mContext;
     private ArrayList<EmailFolderContentObserverClass> mFolderObserverList
@@ -139,9 +137,10 @@ public class BluetoothMnsOne {
     /**
      * Stop listening to changes in cursor
      */
-    public synchronized void deregister() {
+    public void deregister() {
         if (V) Log.v(TAG, "DEREGISTER EMAIL UPDATES");
         if (mIsRegistered) {
+            mIsRegistered = false;
             final ContentResolver resolver = mContext.getContentResolver();
             resolver.unregisterContentObserver(emailContentObserver);
             crEmailA.close();
@@ -155,7 +154,6 @@ public class BluetoothMnsOne {
                 resolver.unregisterContentObserver(observer);
             }
             mFolderObserverList.clear();
-            mIsRegistered = false;
         }
     }
 
