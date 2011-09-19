@@ -996,7 +996,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         int readLength = 0;
         int outputBufferSize = op.getMaxPacketSize();
         long timestamp = 0;
-        FileInputStream fileInputStream;
+        FileInputStream fileInputStream = null;
         OutputStream outputStream;
         BufferedInputStream bis;
 
@@ -1021,6 +1021,14 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             }
         } catch (IOException e) {
             return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+        } finally {
+            if (fileInputStream != null) {
+                try {
+                    fileInputStream.close();
+                } catch (IOException e) {
+                    Log.w(TAG, e.getMessage(), e);
+                }
+            }
         }
         if (position == fileinfo.length()) {
             if (D) Log.d(TAG, "SendBody : Exit: OK");
@@ -1040,7 +1048,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
         if (D) Log.d(TAG, "SendMsg : Enter");
         msg = appIf.msg(name, masAppParams.get());
-        if(msg == null || msg.rsp != ResponseCodes.OBEX_HTTP_OK) {
+        if(msg.rsp != ResponseCodes.OBEX_HTTP_OK || msg.file == null) {
             return msg.rsp;
         }
 
@@ -1108,7 +1116,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         BluetoothMasMessageListingRsp appIfMsgListRsp = appIf.msgListing(name,
                 masAppParams.get());
 
-        if(appIfMsgListRsp == null || appIfMsgListRsp.rsp != ResponseCodes.OBEX_HTTP_OK) {
+        if(appIfMsgListRsp.rsp != ResponseCodes.OBEX_HTTP_OK || appIfMsgListRsp.file == null) {
             return appIfMsgListRsp.rsp;
         }
 

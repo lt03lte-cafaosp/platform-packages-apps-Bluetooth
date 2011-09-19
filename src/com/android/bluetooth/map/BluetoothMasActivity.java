@@ -288,7 +288,7 @@ public class BluetoothMasActivity extends AlertActivity implements
     }
 
     public void afterTextChanged(android.text.Editable s) {
-        if (s.length() > 0) {
+        if (s.length() > 0 && mOkButton != null) {
             mOkButton.setEnabled(true);
         }
     }
