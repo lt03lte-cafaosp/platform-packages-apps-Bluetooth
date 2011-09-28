@@ -750,7 +750,7 @@ public class EmailUtils {
     /**
      * Return Email folder list for the id
      * @param context the calling Context
-     * @param id the email account id; id = -1 all email account
+     * @param id the email account id
      * @return the list of Email folder
      */
     public static List<String> getEmailFolderList(Context context, long id) {
@@ -767,7 +767,7 @@ public class EmailUtils {
     /**
      * Return folder name for the type of mailbox
      * @param context the calling Context
-     * @param id the email account id; id = -1 all email account
+     * @param id the email account id
      * @param type
      * @return
      */
@@ -784,5 +784,42 @@ public class EmailUtils {
         sb.append("=");
         sb.append(type);
         return SqlHelper.getFirstValueForColumn(context, EMAIL_BOX_URI, DISPLAY_NAME, sb.toString(), null);
+    }
+
+    /**
+     * Return list of folder names for the type of mailbox
+     * @param context the calling Context
+     * @param id the email account id
+     * @param type
+     * @return
+     */
+    public static List<String> getFoldersForType(Context context, long id, int type) {
+        if (V) Log.v(TAG, "getFolderForType: id = " + id + ", type = " + type);
+        StringBuilder sb = new StringBuilder();
+        if (id > 0) {
+            sb.append(ACCOUNT_KEY);
+            sb.append("=");
+            sb.append(id);
+            sb.append(" AND ");
+        }
+        sb.append(TYPE);
+        sb.append("=");
+        sb.append(type);
+        return SqlHelper.getListForColumn(context, EMAIL_BOX_URI, DISPLAY_NAME, sb.toString(), null);
+    }
+
+    public static int getTypeForFolder(Context context, long id, String folderName) {
+        if (V) Log.v(TAG, "getTypeForFolder: id = " + id + ", folderName = " + folderName);
+        StringBuilder sb = new StringBuilder();
+        if (id > 0) {
+            sb.append(ACCOUNT_KEY);
+            sb.append("=");
+            sb.append(id);
+            sb.append(" AND ");
+        }
+        sb.append(DISPLAY_NAME);
+        sb.append("=");
+        sb.append("'"+folderName+"'");
+        return SqlHelper.getFirstIntForColumn(context, EMAIL_BOX_URI, TYPE, sb.toString(), null);
     }
 }

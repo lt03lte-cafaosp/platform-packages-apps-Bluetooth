@@ -92,6 +92,31 @@ public class SqlHelper {
     }
 
     /**
+     * Generic method to retrieve the first value for the column
+     * @param resolver the calling Context
+     * @param uri the Uri for the provider query
+     * @param columnName the column name to be retrieved
+     * @param selection as with a query call
+     * @param selectionArgs as with a query call
+     * @return the value first of that column
+     */
+    public static int getFirstIntForColumn(Context context, Uri uri,
+            String columnName, String selection, String[] selectionArgs) {
+        if (V) Log.v(TAG, "getFirstIntForColumn(" + uri + ", " + columnName +
+                ", " + selection + ", " + selectionArgs + ")");
+        int value = -1;
+        Cursor cr = context.getContentResolver().query(uri, null, selection, selectionArgs, null);
+        if (cr != null) {
+            if (cr.moveToFirst()) {
+                value = cr.getInt(cr.getColumnIndex(columnName));
+                if (V) Log.v(TAG, "value = " + value);
+            }
+            cr.close();
+        }
+        return value;
+    }
+
+    /**
      * Generic method to retrieve the list for the column
      * @param resolver the calling Context's ContentResolver
      * @param uri the Uri for the provider query

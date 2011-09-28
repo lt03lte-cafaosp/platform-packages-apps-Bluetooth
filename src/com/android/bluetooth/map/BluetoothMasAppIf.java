@@ -488,10 +488,6 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         // TODO Do this based on the MasInstance
         final String FILENAME = "msglist";
 
-        int writeCount = 0;
-        int processCount = 0;
-        int messageListingSize = 0;
-
         List<MsgListingConsts> msgList = new ArrayList<MsgListingConsts>();
 
         if (appParams == null) {
@@ -558,12 +554,9 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                             ((appParams.FilterMessageType & 0x02) == 0 &&
                                     phoneType == TelephonyManager.PHONE_TYPE_CDMA)) {
                         this.list = new ArrayList<VcardContent>();
-                        BluetoothMsgListRsp bmlrSms = msgListSms(msgList, messageListingSize,
-                                processCount, writeCount, splitStrings[2], rsp, appParams);
+                        BluetoothMsgListRsp bmlrSms = msgListSms(msgList, splitStrings[2],
+                                rsp, appParams);
                         msgList = bmlrSms.msgList;
-                        messageListingSize = bmlrSms.messageListingSize;
-                        processCount = bmlrSms.processCount;
-                        writeCount = bmlrSms.writeCount;
                         rsp = bmlrSms.rsp;
                     }
                 }
@@ -583,23 +576,17 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                         if(this.list == null){
                             this.list = new ArrayList<VcardContent>();
                         }
-                        BluetoothMsgListRsp bmlrMms = msgListMms(msgList,
-                                messageListingSize, name, rsp, appParams);
+                        BluetoothMsgListRsp bmlrMms = msgListMms(msgList, name, rsp, appParams);
                         msgList = bmlrMms.msgList;
-                        messageListingSize = bmlrMms.messageListingSize;
                         rsp = bmlrMms.rsp;
                     }
                 }
                 if (supportEmail(false)) {
                     //Email messages
                     if((appParams.FilterMessageType & 0x04) == 0){
-                        BluetoothMsgListRsp bmlrEmail = msgListEmail(msgList, 
-                                messageListingSize, processCount, writeCount, 
-                                tempPath, rsp, appParams);
+                        BluetoothMsgListRsp bmlrEmail = msgListEmail(msgList, tempPath,
+                                rsp, appParams);
                         msgList = bmlrEmail.msgList;
-                        messageListingSize = bmlrEmail.messageListingSize;
-                        processCount = bmlrEmail.processCount;
-                        writeCount = bmlrEmail.writeCount;
                         rsp = bmlrEmail.rsp;
                     }//end email Messages if
                 }
@@ -684,7 +671,6 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
             File file = new File(mContext.getFilesDir() + "/" + FILENAME);
             rsp.file = file;
         }
-        rsp.msgListingSize = messageListingSize;
         rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
         return rsp;
     }
@@ -913,14 +899,8 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
      * Adds a SMS to the Sms ContentProvider
      */
     public String addToSmsFolder(String folder, String address, String text) {
-        int threadId = SmsMmsUtils.getSmsThreadId(mContext, address);
-        if (V){
-            Log.v(TAG, "-------------");
-            Log.v(TAG, "address " + address + " TEXT " + text + " Thread ID "
-                    + threadId);
-        }
         ContentValues values = new ContentValues();
-        values.put("thread_id", threadId);
+        // thread_id is handled by SmsProvider
         values.put("body", text);
         values.put("address", address);
         values.put("read", 0);
@@ -965,23 +945,11 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         }
         //TODO need to insert a row in the body table and update the mailbox table with the no of messages unread
         Cursor cr;
-        int folderId = 0;
-        int accountId = 0;
+        int folderId = -1;
+        long accountId = -1;
         int virtualMsgId;
         Time timeObj = new Time();
         timeObj.setToNow();
-
-        String whereClause = "UPPER(displayName) LIKE  '%"+folder.toUpperCase().trim()+"%'";
-        cr = mContext.getContentResolver().query(
-                Uri.parse("content://com.android.email.provider/mailbox"),
-                null, whereClause, null, null);
-        if (cr != null) {
-            if (cr.getCount() > 0) {
-                cr.moveToFirst();
-                folderId = cr.getInt(cr.getColumnIndex("_id"));
-            }
-            cr.close();
-        }
 
         Cursor cr1;
         String whereClause1 = "UPPER(emailAddress) LIKE  '"+OrigEmail.toUpperCase().trim()+"'";
@@ -994,6 +962,38 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                 accountId = cr1.getInt(cr1.getColumnIndex("_id"));
             }
             cr1.close();
+        }
+        if (accountId == -1) {
+            accountId = EmailUtils.getDefaultEmailAccountId(mContext);
+        }
+        if (DRAFT.equalsIgnoreCase(folder)) {
+            List<String> folders = EmailUtils.getFoldersForType(mContext, accountId,
+                    EmailUtils.TYPE_DRAFT);
+            if (V) Log.v(TAG, "DRAFT folders: " + folders.toString());
+            if (folders.size() == 0) {
+                // no draft folder
+                return INTERNAL_ERROR;
+            }
+            if (folders.contains(DRAFTS)) {
+                folder = DRAFTS;
+            } else {
+                folder = folders.get(0);
+            }
+        }
+
+        String whereClause = "UPPER(displayName) = '"+folder.toUpperCase().trim()+"'";
+        cr = mContext.getContentResolver().query(
+                Uri.parse("content://com.android.email.provider/mailbox"),
+                null, whereClause, null, null);
+        if (cr != null) {
+            if (cr.getCount() > 0) {
+                cr.moveToFirst();
+                folderId = cr.getInt(cr.getColumnIndex("_id"));
+            }
+            cr.close();
+        }
+        if (folderId == -1) {
+            return INTERNAL_ERROR;
         }
 
         if (V){
@@ -1149,11 +1149,10 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         }
 
         String readStr = "";
-        MapUtils mu = new MapUtils();
         String type = "";
         try {
             readStr = new String(readBytes);
-            type = mu.fetchType(readStr);
+            type = MapUtils.fetchType(readStr);
         } catch (Exception e) {
             throw new BadRequestException(e.getMessage());
         }
@@ -1167,6 +1166,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                 PhoneAddress = bMsg.getRecipientVcard_phone_number();
                 SmsText = bMsg.getBody_msg();
                 rsp = pushMessageSms(rsp, tmpPath, name, bluetoothMasAppParams);
+                return rsp;
             }
 
             // If the message to be pushed is an MMS message, extract any text,
@@ -1183,11 +1183,13 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                  * scheduled to run
                  */
                 rsp = pushMessageMms(rsp, tmpPath, readStr, name);
+                return rsp;
             }
         } else if (type!=null && type.equalsIgnoreCase("EMAIL")) {
             rsp = pushMessageEmail(rsp, readStr, name);
+            return rsp;
         }
-        rsp.response = ResponseCodes.OBEX_HTTP_OK;
+        rsp.response = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         return rsp;
     }
 
@@ -1401,21 +1403,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         }
         return ResponseCodes.OBEX_HTTP_NOT_FOUND;
     }
-    public long getAccountId() {
-        long accountId = -1;
-        Cursor cr = mContext.getContentResolver().query(
-                Uri.parse("content://com.android.email.provider/account"),
-                null, null, null, null);
-        if (cr != null) {
-            if (cr.getCount() > 0) {
-                cr.moveToFirst();
-                accountId = cr.getInt(cr.getColumnIndex("_id"));
-            }
-            cr.close();
-        }
-        return accountId;
 
-    }
     /**
      * Sets the message update
      *
@@ -1427,7 +1415,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
             Log.v(TAG, "Message Update");
         }
 
-        long accountId = getAccountId();
+        long accountId = EmailUtils.getDefaultEmailAccountId(mContext);
         if (V){
             Log.v(TAG, " Account id for Inbox Update:: "+accountId);
         }
@@ -2764,8 +2752,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         return ml;
     }
     private BluetoothMsgListRsp msgListSms(List<MsgListingConsts> msgList,
-                int messageListingSize, int processCount, int writeCount, String folder,
-                BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
+                String folder, BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
         BluetoothMsgListRsp bmlr = new BluetoothMsgListRsp();
         String url = "content://sms/";
         Uri uri = Uri.parse(url);
@@ -2877,12 +2864,8 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                         continue;
                     }
                 }
-                if (V){
-                        Log.v(TAG, " msgListSize " + messageListingSize
-                            + "write count " + writeCount);
-                }
-
-                messageListingSize++;
+                if (V) Log.v(TAG, " msgListSize " + rsp.msgListingSize);
+                rsp.msgListingSize++;
 
                 /*
                  * Don't want the listing; just send the listing size
@@ -2891,7 +2874,6 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                 if (appParams.MaxListCount == 0) {
                     continue;
                 }
-                processCount++;
                 String msgIdSms = cursor.getString(idInd);
                 String subjectSms = cursor.getString(bodyInd);
                 String timestampSms = cursor.getString(dateInd);
@@ -2909,24 +2891,20 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                 }
 
                 msgList.add(ml);
-                writeCount++;
             } while (cursor.moveToNext());
         }
         if (cursor != null) {
             cursor.close();
         }
         rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
-        bmlr.messageListingSize = messageListingSize;
-        bmlr.processCount = processCount;
-        bmlr.writeCount = writeCount;
+        bmlr.messageListingSize = rsp.msgListingSize;
         bmlr.rsp = rsp;
         bmlr.msgList = msgList;
         return bmlr;
     }
 
     private BluetoothMsgListRsp msgListMms(List<MsgListingConsts> msgList,
-                int messageListingSize, String name, BluetoothMasMessageListingRsp rsp,
-                BluetoothMasAppParams appParams){
+                String name, BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
         BluetoothMsgListRsp bmlr = new BluetoothMsgListRsp();
 
         if (getNumMmsMsgs(name) != 0) {
@@ -2958,19 +2936,18 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                 }
 
                 msgList.add(mmsl);
-                messageListingSize++;
+                rsp.msgListingSize++;
             }
         }
         rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
-        bmlr.messageListingSize = messageListingSize;
+        bmlr.messageListingSize = rsp.msgListingSize;
         bmlr.rsp = rsp;
         bmlr.msgList = msgList;
         return bmlr;
     }
 
     private BluetoothMsgListRsp msgListEmail(List<MsgListingConsts> msgList,
-                int messageListingSize, int processCount, int writeCount, String tempPath, 
-                BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
+            String tempPath, BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams){
         BluetoothMsgListRsp bmlr = new BluetoothMsgListRsp();
         String folderName;
 
@@ -2993,10 +2970,32 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
             bmlr.rsp = rsp;
             return bmlr;
         }
-        if(folderName.equalsIgnoreCase("draft")){
-            folderName = "Drafts";
+
+        if (DRAFT.equalsIgnoreCase(folderName)) {
+            long accountId = EmailUtils.getDefaultEmailAccountId(mContext);
+            List<String> draftFolders = EmailUtils.getFoldersForType(mContext, accountId
+                    , EmailUtils.TYPE_DRAFT);
+            List<MsgListingConsts> list = null;
+            for (String draft : draftFolders) {
+                list = getListEmailFromFolder(draft, rsp, appParams);
+                if (list.size() > 0) {
+                    msgList.addAll(list);
+                }
+            }
+        } else {
+            msgList = getListEmailFromFolder(folderName, rsp, appParams);
         }
 
+        rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
+        bmlr.messageListingSize = rsp.msgListingSize;
+        bmlr.rsp = rsp;
+        bmlr.msgList = msgList;
+        return bmlr;
+    }
+
+    private List<MsgListingConsts> getListEmailFromFolder(String folderName,
+            BluetoothMasMessageListingRsp rsp, BluetoothMasAppParams appParams) {
+        List<MsgListingConsts> msgList = new ArrayList<MsgListingConsts>();
         String urlEmail = "content://com.android.email.provider/message";
         Uri uriEmail = Uri.parse(urlEmail);
         ContentResolver crEmail = mContext.getContentResolver();
@@ -3029,12 +3028,8 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                  * Apply remaining filters
                  */
 
-                if (V){
-                        Log.v(TAG, " msgListSize " + messageListingSize
-                            + "write count " + writeCount);
-                }
-
-                messageListingSize++;
+                if (V) Log.v(TAG, " msgListSize " + rsp.msgListingSize);
+                rsp.msgListingSize++;
 
                 String subject = cursor.getString(subjectInd);
                 String timestamp = cursor.getString(dateInd);
@@ -3051,7 +3046,6 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                  * applying all the filters.
                  */
 
-                processCount++;
                 /*
                  * TODO Skip the first ListStartOffset record(s). Don't write
                  * more than MaxListCount record(s).
@@ -3068,19 +3062,12 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                     rsp.newMessage = 1;
                 }
                 msgList.add(emailMsg);
-                writeCount++;
             } while (cursor.moveToNext());
         }
         if (cursor != null) {
             cursor.close();
         }
-        rsp.rsp = ResponseCodes.OBEX_HTTP_OK;
-        bmlr.messageListingSize = messageListingSize;
-        bmlr.processCount = processCount;
-        bmlr.writeCount = writeCount;
-        bmlr.rsp = rsp;
-        bmlr.msgList = msgList;
-        return bmlr;
+        return msgList;
     }
 
     private BluetoothMasMessageRsp getMessageSms(String msgHandle, Context context,
@@ -3228,20 +3215,21 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
             } else {
                 folderName = splitStrings[tmp - 1];
             }
-            if(folderName != null && folderName.equalsIgnoreCase(DELETED)){
+            if (folderName != null && folderName.equalsIgnoreCase(DRAFTS)){
+                MmsHandle = addToMmsFolder(folderName, readStr);
+                if (INTERNAL_ERROR == MmsHandle) {  // == comparison valid here
+                    rsp.msgHandle = null;
+                    rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
+                    return rsp;
+                }
+                rsp.msgHandle = MmsHandle;
+                rsp.response = ResponseCodes.OBEX_HTTP_OK;
+                return rsp;
+            } else {
                 rsp.msgHandle = null;
                 rsp.response = ResponseCodes.OBEX_HTTP_FORBIDDEN;
                 return rsp;
             }
-            MmsHandle = addToMmsFolder(folderName, readStr);
-            if (INTERNAL_ERROR == MmsHandle) {  // == comparison valid here
-                rsp.msgHandle = null;
-                rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
-                return rsp;
-            }
-            rsp.msgHandle = MmsHandle;
-            rsp.response = ResponseCodes.OBEX_HTTP_OK;
-            return rsp;
         }
     }
 
@@ -3261,20 +3249,21 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
             } else {
                 folderName = splitStrings[tmp - 1];
             }
-            if(folderName != null && folderName.equalsIgnoreCase(DELETED)){
+            if (folderName != null && folderName.equalsIgnoreCase(DRAFT)) {
+                SmsHandle = addToSmsFolder(folderName, PhoneAddress, SmsText);
+                if (INTERNAL_ERROR == SmsHandle) {  // == comparison valid here
+                    rsp.msgHandle = null;
+                    rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
+                    return rsp;
+                }
+                rsp.msgHandle = SmsHandle;
+                rsp.response = ResponseCodes.OBEX_HTTP_OK;
+                return rsp;
+            } else {
                 rsp.msgHandle = null;
                 rsp.response = ResponseCodes.OBEX_HTTP_FORBIDDEN;
                 return rsp;
             }
-            SmsHandle = addToSmsFolder(folderName, PhoneAddress, SmsText);
-            if (INTERNAL_ERROR == SmsHandle) {  // == comparison valid here
-                rsp.msgHandle = null;
-                rsp.response = ResponseCodes.OBEX_HTTP_NOT_FOUND;
-                return rsp;
-            }
-            rsp.msgHandle = SmsHandle;
-            rsp.response = ResponseCodes.OBEX_HTTP_OK;
-            return rsp;
         }
 
         SmsHandle = null;
@@ -3313,6 +3302,19 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         return rsp;
     }
 
+    private boolean isAllowedEmailFolderForPush(String folderName) {
+        if (DRAFT.equalsIgnoreCase(folderName) || OUTBOX.equalsIgnoreCase(folderName)) {
+            return true;
+        }
+        long id = EmailUtils.getDefaultEmailAccountId(mContext);
+        int type = EmailUtils.getTypeForFolder(mContext, id, folderName);
+        if (type == EmailUtils.TYPE_DRAFT || type == EmailUtils.TYPE_OUTBOX) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private BluetoothMasPushMsgRsp pushMessageEmail(BluetoothMasPushMsgRsp rsp,
                 String readStr, String name) throws BadRequestException {
         if (V) Log.v(TAG, " Before fromBmessageemail method:: "+readStr);
@@ -3340,6 +3342,11 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         } else {
             folderName = splitStrings[tmp - 1];
         }
+        if (!isAllowedEmailFolderForPush(folderName)) {
+            rsp.msgHandle = null;
+            rsp.response = ResponseCodes.OBEX_HTTP_FORBIDDEN;
+            return rsp;
+        }
         EmailHandle = addToEmailFolder(folderName, EmailAddress, EmailText, EmailSubject,
                 EmailOriginator, EmailOrigName);
         if (INTERNAL_ERROR == EmailHandle) { // == comparison valid here
@@ -3350,7 +3357,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         rsp.msgHandle = EmailHandle;
         rsp.response = ResponseCodes.OBEX_HTTP_OK;
 
-        long accountId = getAccountId();
+        long accountId = EmailUtils.getDefaultEmailAccountId(mContext);
         if (V){
                 Log.v(TAG, " Account id before Mail service:: "+accountId);
         }
