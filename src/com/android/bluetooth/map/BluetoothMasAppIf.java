@@ -98,13 +98,15 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
 
     protected Context mContext;
     protected int mSupportedMessageTypes;
+    protected int mMasId;
 
     protected String mCurrentPath = null;
     protected BluetoothMns mnsClient;
 
-    public BluetoothMasAppIf(Context context, Handler sessionStatusHandler, int supportedMessageTypes) {
+    public BluetoothMasAppIf(Context context, int supportedMessageTypes, int masId) {
         mContext = context;
         mSupportedMessageTypes = supportedMessageTypes;
+        mMasId = masId;
 
         if (V) Log.v(TAG, "Constructor called");
     }
@@ -3558,5 +3560,9 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         } else {
             return (mSupportedMessageTypes & MESSAGE_TYPE_SMS_MMS) != 0x00;
         }
+    }
+
+    public int getMasId() {
+        return mMasId;
     }
 }

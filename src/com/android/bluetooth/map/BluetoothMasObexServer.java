@@ -624,7 +624,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     @Override
     public int onAbort(HeaderSet request, HeaderSet reply) {
-        if (D) Log.e(TAG, "onAbort(): enter.");
+        if (D) Log.d(TAG, "onAbort(): enter.");
         sIsAborted = true;
         return ResponseCodes.OBEX_HTTP_OK;
     }
@@ -633,7 +633,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
     public int onSetPath(final HeaderSet request, final HeaderSet reply,
             final boolean backup, final boolean create) {
 
-        if (D) Log.e(TAG, "onSetPath(): supports SetPath request.");
+        if (D) Log.d(TAG, "onSetPath(): supports SetPath request.");
 
         String tmpPath = null;
         boolean retVal = false;
@@ -661,14 +661,14 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
         if (D)
-            Log.e(TAG, "backup=" + backup + " create=" + create + " name="
+            Log.d(TAG, "backup=" + backup + " create=" + create + " name="
                     + tmpPath);
 
         retVal = mAppIf.setPath(backup, tmpPath);
         mState = MasState.MAS_SERVER_CONNECTED;
         if (retVal == true) {
             if (V)
-                Log.e(TAG, "SetPath to" + tmpPath + "SUCCESS");
+                Log.v(TAG, "SetPath to" + tmpPath + "SUCCESS");
             return ResponseCodes.OBEX_HTTP_OK;
         } else {
             Log.e(TAG, "Path not found");
@@ -683,13 +683,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         if (mCallback != null) {
             Message msg = Message.obtain(mCallback);
             msg.what = BluetoothMasService.MSG_SERVERSESSION_CLOSE;
-            if (mAppIf.supportSmsMms(true)) {
-                msg.arg1 = 0;
-            } else if (mAppIf.supportEmail(true)) {
-                msg.arg1 = 1;
-            }
+            msg.arg1 = mAppIf.getMasId();
             msg.sendToTarget();
-            if (D) Log.e(TAG, "onClose(): msg MSG_SERVERSESSION_CLOSE sent out.");
+            if (D) Log.d(TAG, "onClose(): msg MSG_SERVERSESSION_CLOSE sent out.");
         }
     }
 
@@ -699,7 +695,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         byte[] appParams = null;
         boolean retVal = true;
 
-        if (D) Log.e(TAG, "onGet(): support GET request.");
+        if (D) Log.d(TAG, "onGet(): support GET request.");
 
         sIsAborted = false;
         HeaderSet request = null;
@@ -727,7 +723,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
 
-        Log.e(TAG, "type = " + type);
+        if (V) Log.v(TAG, "type = " + type);
 
         if (type.equals(TYPE_LISTING)) {
             return sendFolderListing(op);
@@ -739,7 +735,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             return sendMsg(op, name);
         }
 
-        Log.e(TAG, "get returns HTTP_BAD_REQUEST");
+        if (V) Log.v(TAG, "get returns HTTP_BAD_REQUEST");
         return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
 
     }
@@ -893,7 +889,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         if (tmp.Charset == 0x00) {
             return ResponseCodes.OBEX_HTTP_NOT_IMPLEMENTED;
         }
-        Log.e(TAG, "type = " + type);
+        if (V) Log.v(TAG, "type = " + type);
 
         if (type.equals(TYPE_MESSAGE)) {
             return pushMsg(op, name);
@@ -907,7 +903,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         if (type.equals(TYPE_MESSAGE_NOTIFICATION)) {
             return notification(op);
         }
-        Log.e(TAG, "put returns HTTP_BAD_REQUEST");
+        if (V) Log.v(TAG, "put returns HTTP_BAD_REQUEST");
         return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
 
     }
@@ -957,7 +953,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         int position = 0;
         long timestamp = 0;
         int outputBufferSize = op.getMaxPacketSize();
-        if (V) Log.d(TAG, "outputBufferSize = " + outputBufferSize);
+        if (V) Log.v(TAG, "outputBufferSize = " + outputBufferSize);
         while (position != folderlistStringLen) {
             if (sIsAborted) {
                 ((ServerOperation) op).isAborted = true;
@@ -985,19 +981,18 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             position += readLength;
         }
 
-        if (V) Log.e(TAG, "Send Data complete!");
+        if (V) Log.v(TAG, "Send Data complete!");
 
         if (!closeStream(outputStream, op)) {
             Log.e(TAG,"Send Folder Listing Body - Close output stream error! ");
             pushResult = ResponseCodes.OBEX_HTTP_UNAVAILABLE;
         }
-        if (V) Log.e(TAG, "Send Folder Listing Body complete! result = " + pushResult);
+        if (V) Log.v(TAG, "Send Folder Listing Body complete! result = " + pushResult);
         return pushResult;
     }
 
     private final int sendBody(Operation op, File fileinfo) {
-
-        Log.e(TAG, "sendFile = " + fileinfo.getName());
+        if (V) Log.v(TAG, "sendFile = " + fileinfo.getName());
         int position = 0;
         int readLength = 0;
         int outputBufferSize = op.getMaxPacketSize();
@@ -1020,7 +1015,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 outputStream.write(buffer, 0, readLength);
                 position += readLength;
                 if (V) {
-                    Log.e(TAG, "Sending file position = " + position
+                    Log.v(TAG, "Sending file position = " + position
                             + " readLength " + readLength + " bytes took "
                             + (System.currentTimeMillis() - timestamp) + " ms");
                 }

@@ -94,6 +94,7 @@ public interface IBluetoothMasApp {
         BluetoothMasAppParams bluetoothMasAppParams);
     public void startMnsSession(BluetoothDevice remoteDevice);
     public void stopMnsSession(BluetoothDevice remoteDevice);
+    public int getMasId();
     public boolean supportSms(boolean only);
     public boolean supportMms(boolean only);
     public boolean supportSmsMms(boolean only);

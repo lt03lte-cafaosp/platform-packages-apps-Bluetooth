@@ -25,23 +25,17 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.android.bluetooth.map;
 
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
+import android.net.Uri;
 import android.os.Handler;
 import android.util.Log;
 
-import com.android.bluetooth.map.MapUtils.EmailUtils;
+import com.android.bluetooth.map.MapUtils.SmsMmsUtils;
 
 import java.util.List;
-
-import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.DELETED;
-import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.DRAFT;
-import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.INBOX;
-import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.OUTBOX;
-import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.SENT;
 
 /**
  * This class provides the application interface for MAS Server It interacts
@@ -50,17 +44,16 @@ import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.SENT;
  * connection.
  */
 
-public class BluetoothMasAppOne extends BluetoothMasAppIf {
-    public final String TAG = "BluetoothMasAppIfOne";
-    public final boolean V = BluetoothMasService.VERBOSE;;
-
-    public BluetoothMasAppOne(Context context, Handler sessionStatusHandler,
-            BluetoothMns mnsClient) {
-        super(context, sessionStatusHandler, MESSAGE_TYPE_EMAIL);
-        // mnsClient = new BluetoothMns(context);
+public class BluetoothMasAppSmsMms extends BluetoothMasAppIf {
+    public final String TAG = "BluetoothMasAppSmsMms";
+    public BluetoothMasAppSmsMms(Context context, BluetoothMns mnsClient, int masId) {
+        super(context, MESSAGE_TYPE_SMS_MMS, masId);
         this.mnsClient = mnsClient;
 
-        if (V) Log.v(TAG, "BluetoothMasApp One Constructor called");
+        // Clear out deleted items from database
+        cleanUp();
+
+        if (V) Log.v(TAG, "BluetoothMasAppSmsMms Constructor called");
     }
 
     /**
@@ -68,8 +61,9 @@ public class BluetoothMasAppOne extends BluetoothMasAppIf {
      */
     public void startMnsSession(BluetoothDevice remoteDevice) {
         if (V) Log.v(TAG, "Start MNS Client");
-        mnsClient.getHandler().obtainMessage(BluetoothMns.MNS_CONNECT, 1,
-                -1, remoteDevice).sendToTarget();
+        mnsClient.getHandler()
+                .obtainMessage(BluetoothMns.MNS_CONNECT, 0, -1, remoteDevice)
+                .sendToTarget();
     }
 
     /**
@@ -77,36 +71,22 @@ public class BluetoothMasAppOne extends BluetoothMasAppIf {
      */
     public void stopMnsSession(BluetoothDevice remoteDevice) {
         if (V) Log.v(TAG, "Stop MNS Client");
-        mnsClient.getHandler().obtainMessage(BluetoothMns.MNS_DISCONNECT, 1,
-                -1, remoteDevice).sendToTarget();
+        mnsClient.getHandler()
+                .obtainMessage(BluetoothMns.MNS_DISCONNECT, 0, -1,
+                remoteDevice).sendToTarget();
     }
 
     @Override
     protected List<String> getCompleteFolderList() {
-        if (V) Log.v(TAG, "getCompleteFolderList");
-        // TODO differentiate email account id, take default email account for now
-        long id = EmailUtils.getDefaultEmailAccountId(mContext);
-        List<String> list = EmailUtils.getEmailFolderList(mContext, id);
-        if (!list.contains(INBOX)) {
-            list.add(INBOX);
-        }
-        if (!list.contains(OUTBOX)) {
-            list.add(OUTBOX);
-        }
-        if (!list.contains(SENT)) {
-            list.add(SENT);
-        }
-        if (!list.contains(DELETED)) {
-            list.add(DELETED);
-        }
-        if (!list.contains(DRAFT)) {
-            list.add(DRAFT);
-        }
-        return list;
+        return SmsMmsUtils.FORLDER_LIST_SMS_MMS;
     }
 
     @Override
     protected void cleanUp() {
-        // Nothing to clean up
+        // Remove the deleted item entries
+        mContext.getContentResolver().delete(Uri.parse("content://sms/"),
+                "thread_id = " + DELETED_THREAD_ID, null);
+        mContext.getContentResolver().delete(Uri.parse("content://mms/"),
+                "thread_id = " + DELETED_THREAD_ID, null);
     }
 }

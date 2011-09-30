@@ -28,10 +28,8 @@
 
 package com.android.bluetooth.map;
 
-
-import com.android.bluetooth.R;
-
 import android.app.Activity;
+import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -52,6 +50,10 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.CompoundButton.OnCheckedChangeListener;
+
+import com.android.bluetooth.R;
+
+import static com.android.bluetooth.map.BluetoothMasService.EXTRA_BLUETOOTH_DEVICE;
 
 /**
  * MapActivity shows two dialogues: One for accepting incoming map request and
@@ -127,8 +129,21 @@ public class BluetoothMasTestActivity extends Activity implements
     private void showMapDialog(int id) {
     }
 
+    private String getRemoteDeviceName() {
+        String remoteDeviceName = null;
+        Intent intent = getIntent();
+        if (intent.hasExtra(EXTRA_BLUETOOTH_DEVICE)) {
+            BluetoothDevice device = intent.getParcelableExtra(EXTRA_BLUETOOTH_DEVICE);
+            if (device != null) {
+                remoteDeviceName = device.getName();
+            }
+        }
+
+        return (remoteDeviceName != null) ? remoteDeviceName : getString(R.string.defaultname);
+    }
+
     private String createDisplayText(final int id) {
-        String mRemoteName = BluetoothMasService.getRemoteDeviceName();
+        String mRemoteName = getRemoteDeviceName();
         return null;
     }
 

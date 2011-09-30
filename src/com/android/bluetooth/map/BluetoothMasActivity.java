@@ -28,6 +28,7 @@
 
 package com.android.bluetooth.map;
 
+import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -50,6 +51,8 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import com.android.bluetooth.R;
 import com.android.internal.app.AlertActivity;
 import com.android.internal.app.AlertController;
+
+import static com.android.bluetooth.map.BluetoothMasService.EXTRA_BLUETOOTH_DEVICE;
 
 /**
  * MapActivity shows two dialogues: One for accepting incoming ftp request and
@@ -137,8 +140,21 @@ public class BluetoothMasActivity extends AlertActivity implements
         }
     }
 
+    private String getRemoteDeviceName() {
+        String remoteDeviceName = null;
+        Intent intent = getIntent();
+        if (intent.hasExtra(EXTRA_BLUETOOTH_DEVICE)) {
+            BluetoothDevice device = intent.getParcelableExtra(EXTRA_BLUETOOTH_DEVICE);
+            if (device != null) {
+                remoteDeviceName = device.getName();
+            }
+        }
+
+        return (remoteDeviceName != null) ? remoteDeviceName : getString(R.string.defaultname);
+    }
+
     private String createDisplayText(final int id) {
-        String mRemoteName = BluetoothMasService.getRemoteDeviceName();
+        String mRemoteName = getRemoteDeviceName();
         switch (id) {
         case DIALOG_YES_NO_CONNECT:
             String mMessage1 = getString(R.string.map_acceptance_dialog_title, mRemoteName,
@@ -209,6 +225,10 @@ public class BluetoothMasActivity extends AlertActivity implements
         if (extraName != null) {
             intent.putExtra(extraName, extraValue);
         }
+        Intent i = getIntent();
+        if (i.hasExtra(EXTRA_BLUETOOTH_DEVICE)) {
+            intent.putExtra(EXTRA_BLUETOOTH_DEVICE, i.getParcelableExtra(EXTRA_BLUETOOTH_DEVICE));
+        }
         sendBroadcast(intent);
     }
 
@@ -231,7 +251,7 @@ public class BluetoothMasActivity extends AlertActivity implements
         if (mCurrentDialog == DIALOG_YES_NO_CONNECT) {
             if(mView != null) {
                 messageView.setText(getString(R.string.map_acceptance_timeout_message,
-                        BluetoothMasService.getRemoteDeviceName()));
+                        getRemoteDeviceName()));
                 mAlert.getButton(DialogInterface.BUTTON_NEGATIVE).setVisibility(View.GONE);
                 mAlwaysAllowed.setVisibility(View.GONE);
                 mAlwaysAllowed.clearFocus();
@@ -251,8 +271,6 @@ public class BluetoothMasActivity extends AlertActivity implements
         if (mTimeout) {
             onTimeout();
         }
-
-
     }
 
     @Override

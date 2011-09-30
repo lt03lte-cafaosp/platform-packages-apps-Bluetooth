@@ -46,8 +46,8 @@ import static com.android.bluetooth.map.IBluetoothMasApp.MMS_HDLR_CONSTANT;
 /**
  * This class run an MNS session.
  */
-public class BluetoothMnsZero {
-    private static final String TAG = "BluetoothMnsZero";
+public class BluetoothMnsSmsMms {
+    private static final String TAG = "BluetoothMnsSmsMms";
 
     private static final boolean V = BluetoothMasService.VERBOSE;
 
@@ -85,7 +85,7 @@ public class BluetoothMnsZero {
 
     private boolean mIsRegistered = false;
 
-    public BluetoothMnsZero(Context context, BluetoothMns mnsObj) {
+    public BluetoothMnsSmsMms(Context context, BluetoothMns mnsObj) {
         /* check Bluetooth enable status */
         /*
          * normally it's impossible to reach here if BT is disabled. Just check

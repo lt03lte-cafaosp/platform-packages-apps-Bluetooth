@@ -108,8 +108,8 @@ public class BluetoothMns {
 
     private EventHandler mSessionHandler;
 
-    private BluetoothMnsZero bmz = null;
-    private BluetoothMnsOne bmo = null;
+    private BluetoothMnsSmsMms bmz = null;
+    private BluetoothMnsEmail bmo = null;
     public static final ParcelUuid BluetoothUuid_ObexMns = ParcelUuid
             .fromString("00001133-0000-1000-8000-00805F9B34FB");
 
@@ -127,8 +127,8 @@ public class BluetoothMns {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mContext = context;
 
-        bmz = new BluetoothMnsZero(mContext, this);
-        bmo = new BluetoothMnsOne(mContext, this);
+        bmz = new BluetoothMnsSmsMms(mContext, this);
+        bmo = new BluetoothMnsEmail(mContext, this);
 
         if (!mAdapter.isEnabled()) {
             Log.e(TAG, "Can't send event when Bluetooth is disabled ");
@@ -594,7 +594,7 @@ public class BluetoothMns {
                     s.close();
                 }
             } catch (IOException e) {
-                if (V) Log.e(TAG, "Error when close socket");
+                Log.e(TAG, "Error when close socket");
             }
             mSessionHandler.obtainMessage(RFCOMM_ERROR).sendToTarget();
             return;
