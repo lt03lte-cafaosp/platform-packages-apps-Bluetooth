@@ -107,9 +107,9 @@ public class MapUtils {
             serializer.startTag("", "MAP-msg-listing");
             serializer.attribute("", "version", "1.0");
             for (MsgListingConsts msg : list) {
-                serializer.startTag("", "");
+                serializer.startTag("", "msg");
 
-                serializer.attribute("", "msg handle", ("" + msg.msg_handle));
+                serializer.attribute("", "handle", ("" + msg.msg_handle));
                 if (msg.sendSubject == true) {
                     if (msg.subject == null){
                         serializer.attribute("", "subject", "");
@@ -184,14 +184,12 @@ public class MapUtils {
                     serializer.attribute("", "protected", msg.msg_protected);
                 }
 
-                serializer.endTag("", "");
+                serializer.endTag("", "msg");
 
             }
             serializer.endTag("", "MAP-msg-listing");
             serializer.endDocument();
             str1 = writer.toString();
-
-            str1 = removeMsgHdrSpace(str1);
 
             int line1 = 0;
             line1 = str1.indexOf("\n");
@@ -263,8 +261,8 @@ public class MapUtils {
             serializer.startDocument("", false);
             serializer.text("\n");
             for (MsgListingConsts msg : list) {
-                serializer.startTag("", "");
-                serializer.attribute("", "msg handle", ("" + msg.msg_handle));
+                serializer.startTag("", "msg");
+                serializer.attribute("", "handle", ("" + msg.msg_handle));
                 if (msg.subject != null) {
                     serializer.attribute("", "subject", msg.subject);
                 } else {
@@ -343,13 +341,12 @@ public class MapUtils {
 
                 }
 
-                serializer.endTag("", "");
+                serializer.endTag("", "msg");
 
             }
             serializer.endDocument();
             str1 = writer.toString();
 
-            str1 = removeMsgHdrSpace(str1);
             int line1 = 0;
             line1 = str1.indexOf("\n");
             if (line1 > 0) {
@@ -402,9 +399,9 @@ public class MapUtils {
             serializer.attribute("", "version", "1.0");
             serializer.text("\n");
 
-            serializer.startTag("", "");
+            serializer.startTag("", "event");
             if (type != null) {
-                serializer.attribute("", "event type", ("" + type));
+                serializer.attribute("", "type", ("" + type));
             } else {
 
             }
@@ -429,7 +426,7 @@ public class MapUtils {
             } else {
 
             }
-            serializer.endTag("", "");
+            serializer.endTag("", "event");
             serializer.text("\n");
             serializer.endTag("", "MAP-event-report");
             serializer.endDocument();
@@ -1705,46 +1702,6 @@ public class MapUtils {
         return vCard.substring(beginVersionPos, endVersionPos);
     }
 
-    /**
-     * removeMsgHdrSpace
-     *
-     * This method takes as input a String that contains message listings and
-     * removes a space between the < and the msg handle value. This space is
-     * inserted by the serializer causing an error in processing the message
-     * correctly. This private method parses the message and removes the spaces.
-     *
-     * @param String
-     *            Message to be parsed
-     * @return String This method returns the message String
-     */
-
-    private String removeMsgHdrSpace(String message) {
-        String str1 = null;
-        String str2 = null;
-
-        int index = 0;
-        int endSubstring = 0;
-
-        index = message.indexOf("< msg handle");
-        if (index < 0) {
-            str2 = message;
-
-        } else {
-            str2 = message.substring(0, index);
-            str2 = str2 + "\n";
-            index = 0;
-            while ((index = message.indexOf("msg handle", index)) > 0) {
-                endSubstring = message.indexOf("/>", index) + "/>".length();
-                str1 = "<" + message.substring(index, endSubstring);
-                index = index + 1;
-                str2 = str2 + str1;
-
-            }
-        }
-
-        return str2 + "</MAP-msg-listing>";
-
-    }
     /**
      * fetchVcardEmail
      *
