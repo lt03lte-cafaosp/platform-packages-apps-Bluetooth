@@ -620,14 +620,15 @@ public class BluetoothFtpService extends Service {
 
     private void notifyMediaScanner(Bundle obj,int op) {
         String[] mTypes = obj.getStringArray("mimetypes");
+        String[] fPaths = obj.getStringArray("filepaths");
         if((op == FTP_MEDIA_ADD) || (op == FTP_MEDIA_DELETE)) {
             new FtpMediaScannerNotifier(this,obj.getString("filepath"),
                   obj.getString("mimetype"),mSessionStatusHandler,op);
-        } else if (mTypes != null) {
-            new FtpMediaScannerNotifier(this,obj.getStringArray("filepaths"),
+        } else if (mTypes != null && fPaths != null) {
+            new FtpMediaScannerNotifier(this,fPaths,
                   mTypes,mSessionStatusHandler,op);
         } else {
-             Log.e(TAG, "Unexpected error! mTypes is null");
+             Log.e(TAG, "Unexpected error! mTypes or fPaths is null");
             return;
         }
     }

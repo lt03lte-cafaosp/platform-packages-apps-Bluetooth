@@ -465,8 +465,9 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
 
             int positioninfile = 0;
             File fileinfo = new File(mCurrentPath+ "/" + name);
-            if (fileinfo.getParentFile() !=  null) {
-                if(fileinfo.getParentFile().canWrite() == false) {
+            File parentFile = fileinfo.getParentFile();
+            if (parentFile != null) {
+                if (parentFile.canWrite() == false) {
                     if (D) Log.d(TAG,"Dir "+ fileinfo.getParent() +"is read-only");
                     return ResponseCodes.OBEX_DATABASE_LOCKED;
                 }
@@ -960,6 +961,7 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         }
 
         File [] files = dir.listFiles();
+        if (files == null) return;
         for(int i = 0; i < files.length; i++) {
             if (D) Log.d(TAG,"Files =" + files[i]);
             if(files[i].isDirectory()) {
