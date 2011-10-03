@@ -487,8 +487,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         BluetoothMasMessageListingRsp rsp = new BluetoothMasMessageListingRsp();
         boolean fileGenerated = false;
 
-        // TODO Do this based on the MasInstance
-        final String FILENAME = "msglist";
+        final String FILENAME = "msglist" + getMasId();
 
         List<MsgListingConsts> msgList = new ArrayList<MsgListingConsts>();
 
@@ -1982,7 +1981,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
                 Log.v(TAG, "\n\n");
             }
             if (str != null && (str.length() > 0)) {
-                final String FILENAME = "message";
+                final String FILENAME = "message" + getMasId();
                 FileOutputStream bos = null;
                 File file = new File(mContext.getFilesDir() + "/" + FILENAME);
                 file.delete();
@@ -3100,7 +3099,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         }
 
         if (strSms != null && (strSms.length() > 0)) {
-            final String FILENAME = "message";
+            final String FILENAME = "message" + getMasId();
             // BufferedOutputStream bos = null;
             FileOutputStream bos = null;
             File file = new File(context.getFilesDir() + "/" + FILENAME);
@@ -3155,7 +3154,7 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
             Log.v(TAG, "\n\n");
         }
         if (str != null && (str.length() > 0)) {
-            final String FILENAME = "message";
+            final String FILENAME = "message" + getMasId();
             FileOutputStream bos = null;
             File file = new File(mContext.getFilesDir() + "/" + FILENAME);
             file.delete();

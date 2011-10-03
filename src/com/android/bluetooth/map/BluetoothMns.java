@@ -458,7 +458,7 @@ public class BluetoothMns {
                 Log.v(TAG, " CONTENT OF EVENT REPORT FILE: " + str);
             }
 
-            final String FILENAME = "EventReport";
+            final String FILENAME = "EventReport" + masId;
             FileOutputStream fos = null;
             File file = new File(mContext.getFilesDir() + "/" + FILENAME);
             file.delete();

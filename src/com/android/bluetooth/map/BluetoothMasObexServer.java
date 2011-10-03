@@ -742,7 +742,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
     private final int pushMsg(Operation op, String name) {
         // TBD - Need to do this on a per masinstance basis
-        String DEFAULT_FILE = "PushMsg.txt";
+        String fileName = "PushMsg" + mAppIf.getMasId();
         int outputBufferSize = op.getMaxPacketSize();
         int readLength = 0;
         long timestamp = 0;
@@ -754,7 +754,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         File file = null;
         BluetoothMasPushMsgRsp pMsg = new BluetoothMasPushMsgRsp();;
 
-        file = new File(mContext.getFilesDir() + "/" + DEFAULT_FILE);
+        file = new File(mContext.getFilesDir() + "/" + fileName);
 
         try {
             is = op.openInputStream();
@@ -766,7 +766,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
         if (error != true) {
             try {
 
-                FileOutputStream fos = mContext.openFileOutput(DEFAULT_FILE,
+                FileOutputStream fos = mContext.openFileOutput(fileName,
                         Context.MODE_PRIVATE);
 
                 bos = new BufferedOutputStream(fos);
