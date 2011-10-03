@@ -37,6 +37,7 @@ import android.os.Bundle;
 import android.webkit.MimeTypeMap;
 
 import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.io.InputStream;
 import java.io.File;
@@ -151,6 +152,9 @@ public class FileUtils {
         try {
             reader = new FileInputStream(src);
             writer = new FileOutputStream(dest);
+        } catch(FileNotFoundException e) {
+            Log.e(TAG,"copyFile file not found "+ e.toString());
+            return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
         } catch(IOException e) {
             Log.e(TAG,"copyFile open stream failed "+ e.toString());
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
