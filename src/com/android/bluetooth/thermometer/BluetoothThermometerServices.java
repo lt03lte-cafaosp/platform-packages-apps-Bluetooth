@@ -28,17 +28,6 @@
 
 package com.android.bluetooth.thermometer;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.UUID;
-
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -52,9 +41,23 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.Parcel;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
+
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.UUID;
+import java.io.UnsupportedEncodingException;
 
 public class BluetoothThermometerServices extends Service {
 
@@ -128,6 +131,10 @@ public class BluetoothThermometerServices extends Service {
 
     public static final int TEMP_MSR_INTR_MAX = 65535;
 
+    public static final String HEALTH_THERMOMETER_SERVICE_UUID = "0000180900001000800000805f9b34fb";
+
+    public static final String DEVICE_INFORMATION_SERVICE_UUID = "0000180a00001000800000805f9b34fb";
+
     public static final String TEMPERATURE_MEASUREMENT_UUID = "00002a1c00001000800000805f9b34fb";
 
     public static final String TEMPERATURE_TYPE_UUID = "00002a1d00001000800000805f9b34fb";
@@ -137,6 +144,22 @@ public class BluetoothThermometerServices extends Service {
     public static final String MEASUREMENT_INTERVAL_UUID = "00002a2100001000800000805f9b34fb";
 
     public static final String DATE_TIME_UUID = "00002a0800001000800000805f9b34fb";
+
+    public static final String MANUFACTURER_NAME_STRING_UUID = "00002a2900001000800000805f9b34fb";
+
+    public static final String MODEL_NUMBER_STRING_UUID = "00002a2400001000800000805f9b34fb";
+
+    public static final String SERIAL_NUMBER_STRING_UUID = "00002a2500001000800000805f9b34fb";
+
+    public static final String HARDWARE_REVISION_STRING_UUID = "00002a2700001000800000805f9b34fb";
+
+    public static final String FIRMWARE_REVISION_STRING_UUID = "00002a2600001000800000805f9b34fb";
+
+    public static final String SOFTWARE_REVISION_STRING_UUID = "00002a2800001000800000805f9b34fb";
+
+    public static final String SYSTEM_ID_UUID = "00002a2300001000800000805f9b34fb";
+
+    public static final String CERTIFICATION_DATA_UUID = "00002a2a00001000800000805f9b34fb";
 
     public static final String THERMOMETER_SERVICE_OPERATION = "THERMOMETER_SERVICE_OPERATION";
 
@@ -175,16 +198,22 @@ public class BluetoothThermometerServices extends Service {
                 break;
             case GATT_SERVICE_STARTED_OBJ:
                 Log.d(TAG, "Received GATT_SERVICE_STARTED_OBJ message");
-                ArrayList<String> objList = msg.getData().getStringArrayList(
-                                                                            ACTION_GATT_SERVICE_EXTRA_OBJ);
-                mDevice.ServiceObjPathArray = objList;
-                Log.d(TAG, "GATT Service path array obj len : "
-                      + mDevice.ServiceObjPathArray.size());
-                mDevice.SelectedServiceObjPath = mDevice.ServiceObjPathArray
-                                                 .get(0);
+                ArrayList<String> gattDataList = msg.getData().getStringArrayList(
+                    ACTION_GATT_SERVICE_EXTRA_OBJ);
+                int size = gattDataList.size();
+                Log.d(TAG, "GATT Service data list len : "
+                      + size);
+                String selectedServiceObjPath = gattDataList.get(0);
                 Log.d(TAG, "GATT Service path array obj : "
-                      + mDevice.SelectedServiceObjPath);
-                getBluetoothGattService();
+                      + selectedServiceObjPath);
+                String uuidStr = gattDataList.get(size-1);
+                Log.d(TAG, "GATT Service uuidStr : "
+                      + uuidStr);
+                ParcelUuid selectedUUID = ParcelUuid.fromString(uuidStr);
+                Log.d(TAG, "ParcelUUID rep of selectedUUID : " + selectedUUID);
+                mDevice.uuidObjPathMap.put(selectedUUID, selectedServiceObjPath);
+                mDevice.objPathUuidMap.put(selectedServiceObjPath, selectedUUID);
+                getBluetoothGattService(selectedServiceObjPath, selectedUUID);
                 break;
             default:
                 break;
@@ -207,6 +236,7 @@ public class BluetoothThermometerServices extends Service {
                 mDevice = new BluetoothThermometerDevice();
                 mDevice.uuidObjPathMap = new HashMap<ParcelUuid, String>();
                 mDevice.objPathUuidMap = new HashMap<String, ParcelUuid>();
+                mDevice.uuidGattSrvMap = new HashMap<ParcelUuid, BluetoothGattService>();
                 tempTypeMap = new HashMap<Integer, String>();
                 populateTempType();
 
@@ -220,7 +250,6 @@ public class BluetoothThermometerServices extends Service {
                 this.registerReceiver(this.receiver, inFilter);
             } else {
                 Log.d(TAG, "Bluetooth is not on");
-                closeService();
             }
         }
     }
@@ -258,24 +287,10 @@ public class BluetoothThermometerServices extends Service {
     public void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy thermometer service");
-        Log.d(TAG, "Closing the thermometer service : " + closeService());
-    }
-
-    private boolean closeService() {
-        if (mDevice != null) {
-            if (mDevice.gattService != null) {
-                try {
-                    Log.d(TAG, "Calling gattService.close()");
-                    mDevice.gattService.close();
-                    mDevice = null;
-                } catch (Exception e) {
-                    Log.e(TAG, "Error while closing the Gatt Service");
-                    e.printStackTrace();
-                    return false;
-                }
-            }
-        }
-
+        Log.d(TAG, "Closing the thermometer health service : " +
+              closeService(convertStrToParcelUUID(HEALTH_THERMOMETER_SERVICE_UUID)));
+        Log.d(TAG, "Closing the thermometer health service : " +
+              closeService(convertStrToParcelUUID(DEVICE_INFORMATION_SERVICE_UUID)));
         Log.d(TAG, "Unregistering the receiver");
         if (this.receiver != null) {
             try {
@@ -284,7 +299,25 @@ public class BluetoothThermometerServices extends Service {
                 Log.e(TAG, "Error while unregistering the receiver");
             }
         }
+        mDevice = null;
+    }
 
+    private boolean closeService(ParcelUuid srvUuid) {
+        if (mDevice != null) {
+            BluetoothGattService gattService = mDevice.uuidGattSrvMap.get(srvUuid);
+            if (gattService != null) {
+                try {
+                    Log.d(TAG, "Calling gattService.close()");
+                    gattService.close();
+                    Log.d(TAG, "removing Gatt service for UUID : " + srvUuid);
+                    mDevice.uuidGattSrvMap.remove(srvUuid);
+                } catch (Exception e) {
+                    Log.e(TAG, "************Error while closing the Gatt Service");
+                    e.printStackTrace();
+                    return false;
+                }
+            }
+        }
         return true;
     }
 
@@ -292,13 +325,15 @@ public class BluetoothThermometerServices extends Service {
         public void onDiscoverCharacteristicsResult(String path, boolean result) {
             Log.d(TAG, "onDiscoverCharacteristicsResult : " +
                   "path : " + path + "result : " + result);
+            ParcelUuid srvUUID = mDevice.objPathUuidMap.get(path);
+            BluetoothGattService gattService = mDevice.uuidGattSrvMap.get(srvUUID);
             if (result) {
-                if (mDevice.gattService != null) {
+                if (gattService != null) {
                     Log.d(TAG, "gattService.getServiceUuid() ======= "
-                          + mDevice.gattService.getServiceUuid().toString());
+                          + srvUUID.toString());
                     try {
-                        discoverCharacteristics();
-                        registerForWatcher();
+                        discoverCharacteristics(srvUUID);
+                        registerForWatcher(srvUUID);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -398,44 +433,57 @@ public class BluetoothThermometerServices extends Service {
     };
 
     private final IBluetoothThermometerServices.Stub mBinder = new IBluetoothThermometerServices.Stub() {
-        public boolean startThermometerService(BluetoothDevice btDevice,
-                                               ParcelUuid uuid, IBluetoothThermometerCallBack callBack)
+        public synchronized boolean startThermometerService(BluetoothDevice btDevice,
+                                                            ParcelUuid uuid,
+                                                            IBluetoothThermometerCallBack callBack)
         throws RemoteException {
             Log.d(TAG, "Inside startGattService: ");
             if (mDevice == null) {
                 Log.e(TAG, "mDevice is null");
                 return false;
             }
-            if (mDevice.gattService == null) {
+            if (!(mDevice.uuidGattSrvMap.containsKey(uuid))) {
+                Log.d(TAG, "Creating new GATT service for UUID : " + uuid);
                 thermometerSrvCallBack = callBack;
-                mDevice.BDevice = btDevice;
-                Log.d(TAG, "GATT Extra Bt Device : " + mDevice.BDevice);
-                mDevice.SelectedServiceUUID = uuid;
-                Log.d(TAG, "GATT UUID : " + mDevice.SelectedServiceUUID);
-                Log.d(TAG, "Calling  btDevice.getGattServices");
-                return btDevice.getGattServices(uuid.getUuid());
+                if ((mDevice.BDevice != null) &&
+                    (mDevice.BDevice.getAddress().equals(btDevice.getAddress()))) {
+                    Log.d(TAG, "services have already been discovered. Create Gatt service");
+                    String objPath = mDevice.uuidObjPathMap.get(uuid);
+                    if (objPath != null) {
+                        Log.d(TAG, "GET GATT SERVICE for : " + uuid);
+                        getBluetoothGattService(objPath, uuid);
+                    } else {
+                        Log.d(TAG, "action GATT has not been received for uuid : " + uuid);
+                        return getGattServices(uuid, btDevice);
+                    }
+                } else {
+                    Log.d(TAG, "Primary services need to be discovered");
+                    return getGattServices(uuid, btDevice);
+                }
+
             } else {
+                Log.d(TAG, "Gatt service already exists for UUID : " + uuid);
                 bundleAndSendResult(
-                                   mDevice.SelectedServiceUUID,
+                                   uuid,
                                    BluetoothThermometerServices.THERMOMETER_SERVICE_OP_SERVICE_READY,
                                    true, new ArrayList<String>());
             }
             return true;
         }
 
-        public String getServiceName() throws RemoteException {
+        public synchronized String getServiceName(ParcelUuid serviceUuid) throws RemoteException {
             String srvName = "";
-            if (mDevice.gattService != null) {
+            /*if (mDevice.gattService != null) {
                 try {
                     srvName = mDevice.gattService.getServiceName();
                 } catch (Exception e) {
                     Log.e(TAG, "Error while getting the service name");
                 }
-            }
+            }*/
             return srvName;
         }
 
-        public void readCharacteristicsValue(ParcelUuid uuid)
+        public synchronized void readCharacteristicsValue(ParcelUuid uuid)
         throws RemoteException {
             Log.d(TAG,
                   "Inside BluetoothThermometerServices readCharacteristics");
@@ -471,6 +519,40 @@ public class BluetoothThermometerServices extends Service {
                                        uuid,
                                        BluetoothThermometerServices.THERMOMETER_SERVICE_OP_READ_VALUE,
                                        true, new ArrayList<String>(Arrays.asList(value)));
+                } else if ((convertStrToParcelUUID(MANUFACTURER_NAME_STRING_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(MODEL_NUMBER_STRING_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(SERIAL_NUMBER_STRING_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(HARDWARE_REVISION_STRING_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(FIRMWARE_REVISION_STRING_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(SOFTWARE_REVISION_STRING_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(SYSTEM_ID_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(CERTIFICATION_DATA_UUID)
+                            .toString().equals(readCharUUID))) {
+                    Log.d(TAG, "Reading the Device Information UTF-8 Charactersitic");
+                    String value = readDeviceInformationUtf8String(uuid);
+                    bundleAndSendResult(
+                                       uuid,
+                                       BluetoothThermometerServices.THERMOMETER_SERVICE_OP_READ_VALUE,
+                                       true, new ArrayList<String>(Arrays.asList(value)));
+
+                } else if ((convertStrToParcelUUID(SYSTEM_ID_UUID)
+                            .toString().equals(readCharUUID)) ||
+                           (convertStrToParcelUUID(CERTIFICATION_DATA_UUID)
+                            .toString().equals(readCharUUID))) {
+                    Log.d(TAG, "Reading the Device Information Charactersitic");
+                    String value = readDeviceInformationString(uuid);
+                    bundleAndSendResult(
+                                       uuid,
+                                       BluetoothThermometerServices.THERMOMETER_SERVICE_OP_READ_VALUE,
+                                       true, new ArrayList<String>(Arrays.asList(value)));
+
                 } else {
                     Log.e(TAG, "This characteristics : " + uuid + " cannot be read");
                     bundleAndSendResult(
@@ -487,7 +569,7 @@ public class BluetoothThermometerServices extends Service {
             }
         }
 
-        public boolean writeCharacteristicsValue(ParcelUuid uuid, String value)
+        public synchronized boolean writeCharacteristicsValue(ParcelUuid uuid, String value)
         throws RemoteException {
             Log.d(TAG,
                   "Inside BluetoothThermometerServices writeCharacteristics");
@@ -514,7 +596,7 @@ public class BluetoothThermometerServices extends Service {
             return result;
         }
 
-        public int readClientCharConf(ParcelUuid uuid)
+        public synchronized int readClientCharConf(ParcelUuid uuid)
         throws RemoteException {
             Log.d(TAG, "Inside BluetoothThermometerServices readClientCharConf");
             int result = -1;
@@ -539,7 +621,7 @@ public class BluetoothThermometerServices extends Service {
             return result;
         }
 
-        public boolean notifyIndicateValue(ParcelUuid uuid)
+        public synchronized boolean notifyIndicateValue(ParcelUuid uuid)
         throws RemoteException {
             Log.d(TAG, "Inside notifyIndicateValue");
             boolean result;
@@ -567,7 +649,7 @@ public class BluetoothThermometerServices extends Service {
             return result;
         }
 
-        public boolean clearNotifyIndicate(ParcelUuid uuid)
+        public synchronized boolean clearNotifyIndicate(ParcelUuid uuid)
         throws RemoteException {
             Log.d(TAG, "Inside clearNotifyIndicate");
             boolean result;
@@ -593,12 +675,20 @@ public class BluetoothThermometerServices extends Service {
             return result;
         }
 
-
-        public boolean closeThermometerService(BluetoothDevice btDevice,
-                                               ParcelUuid uuid) throws RemoteException {
-            return closeService();
+        public synchronized boolean closeThermometerService(BluetoothDevice btDevice,
+                                                            ParcelUuid srvUuid)
+        throws RemoteException {
+            return closeService(srvUuid);
         }
     };
+
+    private boolean getGattServices(ParcelUuid uuid, BluetoothDevice btDevice) {
+        mDevice.BDevice = btDevice;
+        Log.d(TAG, "GATT Extra Bt Device : " + mDevice.BDevice);
+        Log.d(TAG, "GATT UUID : " + uuid);
+        Log.d(TAG, "Calling  btDevice.getGattServices");
+        return btDevice.getGattServices(uuid.getUuid());
+    }
 
     private void bundleAndSendResult(ParcelUuid uuid, String operation,
                                      boolean result, ArrayList<String> values) {
@@ -619,29 +709,36 @@ public class BluetoothThermometerServices extends Service {
         return new ParcelUuid(convertUUIDStringToUUID(uuidStr));
     }
 
-    private void getBluetoothGattService() {
+    private void getBluetoothGattService(String objPath, ParcelUuid uuid) {
         if ((mDevice != null) && (mDevice.BDevice != null)) {
             Log.d(TAG, " ++++++ Creating BluetoothGattService with device = "
                   + mDevice.BDevice.getAddress() + " uuid "
-                  + mDevice.SelectedServiceUUID.toString() + " objPath = "
-                  + mDevice.SelectedServiceObjPath);
+                  + uuid.toString() + " objPath = "
+                  + objPath);
 
             BluetoothGattService gattService = new BluetoothGattService(mDevice.BDevice,
-                                                                        mDevice.SelectedServiceUUID,
-                                                                        mDevice.SelectedServiceObjPath,
+                                                                        uuid,
+                                                                        objPath,
                                                                         btGattCallback);
 
-            mDevice.gattService = gattService;
+            if (gattService != null) {
+                mDevice.uuidGattSrvMap.put(uuid, gattService);
+                Log.d(TAG, "Adding gatt service to map for : " + uuid + "size :" +
+                      mDevice.uuidGattSrvMap.size());
+            } else {
+                Log.e(TAG, "Gatt service is null for UUID : " + uuid.toString());
+            }
         } else {
             Log.e(TAG, " mDevice is null");
         }
 
     }
 
-    private void registerForWatcher() {
+    private void registerForWatcher(ParcelUuid srvUUID) {
         boolean regWatchRes;
+        BluetoothGattService gattService = mDevice.uuidGattSrvMap.get(srvUUID);
         try {
-            regWatchRes = mDevice.gattService.registerWatcher();
+            regWatchRes = gattService.registerWatcher();
         } catch (Exception e) {
             regWatchRes = false;
             e.printStackTrace();
@@ -649,28 +746,33 @@ public class BluetoothThermometerServices extends Service {
         Log.d(TAG, "register watcher result : " + regWatchRes);
     }
 
-    private void discoverCharacteristics() {
+    private void discoverCharacteristics(ParcelUuid srvUUID) {
         Log.d(TAG, "In discoverCharacteristics");
         Log.d(TAG, "Calling gattService.getCharacteristics()");
-        String[] charObjPathArray = mDevice.gattService
-                                    .getCharacteristics();
-        if (charObjPathArray != null) {
-            Log.d(TAG, " charObjPath length " + charObjPathArray.length);
-            for (String objPath : Arrays.asList(charObjPathArray)) {
-                ParcelUuid parcelUUID = mDevice.gattService
-                                        .getCharacteristicUuid(objPath);
-                mDevice.uuidObjPathMap.put(parcelUUID, objPath);
-                mDevice.objPathUuidMap.put(objPath, parcelUUID);
-                Log.d(TAG, " Map with key UUID : " + parcelUUID + " value : "
-                      + objPath);
+
+        BluetoothGattService gattService = mDevice.uuidGattSrvMap.get(srvUUID);
+        if (gattService != null) {
+            String[] charObjPathArray = gattService
+                                        .getCharacteristics();
+            if (charObjPathArray != null) {
+                Log.d(TAG, " charObjPath length " + charObjPathArray.length);
+                for (String objPath : Arrays.asList(charObjPathArray)) {
+                    ParcelUuid parcelUUID = gattService
+                                            .getCharacteristicUuid(objPath);
+                    mDevice.uuidObjPathMap.put(parcelUUID, objPath);
+                    mDevice.objPathUuidMap.put(objPath, parcelUUID);
+                    Log.d(TAG, " Map with key UUID : " + parcelUUID + " value : "
+                          + objPath);
+                }
+                Log.d(TAG, "Created map with size : " + mDevice.uuidObjPathMap.size());
+                bundleAndSendResult(srvUUID,
+                                    BluetoothThermometerServices.THERMOMETER_SERVICE_OP_SERVICE_READY,
+                                    true, new ArrayList<String>());
+            } else {
+                Log.e(TAG, " gattService.getCharacteristics() returned null");
             }
-            Log.d(TAG, "Created map with size : " + mDevice.uuidObjPathMap.size());
-            bundleAndSendResult(
-                               mDevice.SelectedServiceUUID,
-                               BluetoothThermometerServices.THERMOMETER_SERVICE_OP_SERVICE_READY,
-                               true, new ArrayList<String>());
         } else {
-            Log.e(TAG, " gattService.getCharacteristics() returned null");
+            Log.e(TAG, "Gatt service is null for UUID :" + srvUUID);
         }
 
     }
@@ -727,16 +829,41 @@ public class BluetoothThermometerServices extends Service {
         return result;
     }
 
+    private String readDeviceInformationUtf8String(ParcelUuid charUUID) {
+        String result = null;
+        String value = null;
+        try {
+            value = readCharacteristic(charUUID);
+            Log.d(TAG, "DeviceInformation String value before conversion : " + value);
+            result = convertUTF8Hex(value);
+        } catch (Exception e) {
+            Log.e(TAG, "Exception while readDeviceInformationUtf8String : " + e.getMessage());
+        }
+        return result;
+    }
+
+    private String readDeviceInformationString(ParcelUuid charUUID) {
+        String value = null;
+        try {
+            value = readCharacteristic(charUUID);
+            Log.d(TAG, "DeviceInformation String value before conversion : " + value);
+        } catch (Exception e) {
+            Log.e(TAG, "Exception while readDeviceInformation : " + e.getMessage());
+        }
+        return value;
+    }
+
     private String readCharacteristic(ParcelUuid charUUID) {
         String objPath = mDevice.uuidObjPathMap.get(charUUID);
-        if ((objPath == null) || (mDevice.gattService == null)) {
+        BluetoothGattService gattService = getGattService(charUUID);
+        if ((objPath == null) || (gattService == null)) {
             Log.e(TAG, "Object is null objPath : " + objPath +
-                  " gattService: " +  mDevice.gattService);
+                  " gattService: " +  gattService);
             return null;
         }
         Log.d(TAG, "Reading characterisitcs with uuid : " + charUUID
               + " and objPath : " + objPath);
-        byte[] rawValue = mDevice.gattService.readCharacteristicRaw(objPath);
+        byte[] rawValue = gattService.readCharacteristicRaw(objPath);
         Log.d(TAG, "Raw characteristic byte arr length : " + rawValue.length);
         Log.d(TAG, "Raw characteristic value : " + rawValue);
         for (int i = 0; i < rawValue.length; i++) {
@@ -754,18 +881,19 @@ public class BluetoothThermometerServices extends Service {
     private boolean updateCharacteristic(ParcelUuid charUUID) {
         boolean result = false;
         String objPath = mDevice.uuidObjPathMap.get(charUUID);
+        BluetoothGattService gattService = getGattService(charUUID);
 
-        if ((objPath == null) || (mDevice.gattService == null)) {
+        if ((objPath == null) || (gattService == null)) {
             Log.e(TAG, "Object is null objPath : " + objPath +
-                  " gattService: " +  mDevice.gattService);
+                  " gattService: " +  gattService);
             return false;
         }
 
         Log.d(TAG, "Updating characterisitcs with uuid : " + charUUID
               + " and objPath : " + objPath);
         try {
-            if (mDevice.gattService != null) {
-                result = mDevice.gattService.updateCharacteristicValue(objPath);
+            if (gattService != null) {
+                result = gattService.updateCharacteristicValue(objPath);
             } else {
                 Log.e(TAG, "GATTservice is null");
                 result = false;
@@ -780,14 +908,15 @@ public class BluetoothThermometerServices extends Service {
 
     private String getClientConfDesc(ParcelUuid uuid) {
         String objPath = mDevice.uuidObjPathMap.get(uuid);
+        BluetoothGattService gattService = getGattService(uuid);
 
-        if ((objPath == null) || (mDevice.gattService == null)) {
+        if ((objPath == null) || (gattService == null)) {
             Log.e(TAG, "Object is null objPath : " + objPath +
-                  " gattService: " +  mDevice.gattService);
+                  " gattService: " +  gattService);
             return null;
         }
 
-        String confStr = mDevice.gattService
+        String confStr = gattService
                          .getCharacteristicClientConf(objPath);
         Log.d(TAG, "Client char conf for : " + uuid + " is : " + confStr);
         return convertLittleEnHexStrToVal(confStr);
@@ -828,11 +957,12 @@ public class BluetoothThermometerServices extends Service {
 
     private boolean writeCharacteristic(ParcelUuid charUUID, byte[] data) {
         String objPath = mDevice.uuidObjPathMap.get(charUUID);
+        BluetoothGattService gattService = getGattService(charUUID);
         Boolean result;
 
-        if ((objPath == null) || (mDevice.gattService == null)) {
+        if ((objPath == null) || (gattService == null)) {
             Log.e(TAG, "Object is null objPath : " + objPath +
-                  " gattService: " +  mDevice.gattService);
+                  " gattService: " +  gattService);
             return false;
         }
 
@@ -842,7 +972,7 @@ public class BluetoothThermometerServices extends Service {
             Log.d(TAG, "data : " + Integer.toHexString(0xFF & data[i]));
         }
         try {
-            result = mDevice.gattService.writeCharacteristicRaw(objPath, data);
+            result = gattService.writeCharacteristicRaw(objPath, data);
             Log.d(TAG, "gattService.writeCharacteristicRaw : " + result);
         } catch (Exception e) {
             result = false;
@@ -853,10 +983,11 @@ public class BluetoothThermometerServices extends Service {
 
     private Boolean setClientConfDesc(ParcelUuid uuid, short value) {
         String objPath = mDevice.uuidObjPathMap.get(uuid);
+        BluetoothGattService gattService = getGattService(uuid);
 
-        if ((objPath == null) || (mDevice.gattService == null)) {
+        if ((objPath == null) || (gattService == null)) {
             Log.e(TAG, "Object is null objPath : " + objPath +
-                  " gattService: " +  mDevice.gattService);
+                  " gattService: " +  gattService);
             return false;
         }
 
@@ -865,8 +996,8 @@ public class BluetoothThermometerServices extends Service {
               + " little en val : " + confVal);
         Boolean result;
         try {
-            result = mDevice.gattService.setCharacteristicClientConf(objPath,
-                                                                     confVal);
+            result = gattService.setCharacteristicClientConf(objPath,
+                                                             confVal);
         } catch (Exception e) {
             result = false;
             e.printStackTrace();
@@ -876,6 +1007,59 @@ public class BluetoothThermometerServices extends Service {
         return result;
     }
 
+    private BluetoothGattService getGattService(ParcelUuid charUUID) {
+        BluetoothGattService gattService = null;
+        Log.d(TAG, "get GATT srevice for uuid : " + charUUID);
+        if ( (convertStrToParcelUUID(TEMPERATURE_MEASUREMENT_UUID)
+              .toString().equals(charUUID.toString())) ||
+             (convertStrToParcelUUID(TEMPERATURE_TYPE_UUID)
+              .toString().equals(charUUID.toString())) ||
+             (convertStrToParcelUUID(INTERMEDIATE_TEMPERATURE_UUID)
+              .toString().equals(charUUID.toString())) ||
+             (convertStrToParcelUUID(MEASUREMENT_INTERVAL_UUID)
+              .toString().equals(charUUID.toString())) ||
+             (convertStrToParcelUUID(DATE_TIME_UUID)
+              .toString().equals(charUUID.toString()))) {
+            Log.d(TAG, "get health thermometer service GATT service");
+            ParcelUuid srvUUID = convertStrToParcelUUID(HEALTH_THERMOMETER_SERVICE_UUID);
+            gattService = mDevice.uuidGattSrvMap.get(srvUUID);
+        } else if ((convertStrToParcelUUID(MANUFACTURER_NAME_STRING_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(MODEL_NUMBER_STRING_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(SERIAL_NUMBER_STRING_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(HARDWARE_REVISION_STRING_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(FIRMWARE_REVISION_STRING_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(SOFTWARE_REVISION_STRING_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(SYSTEM_ID_UUID)
+                    .toString().equals(charUUID.toString())) ||
+                   (convertStrToParcelUUID(CERTIFICATION_DATA_UUID)
+                    .toString().equals(charUUID.toString()))) {
+            Log.d(TAG, "get device information service GATT service");
+            ParcelUuid srvUUID = convertStrToParcelUUID(DEVICE_INFORMATION_SERVICE_UUID);
+            gattService = mDevice.uuidGattSrvMap.get(srvUUID);
+        } else {
+            Log.e(TAG, "Gatt service cannot be found for the UUID :" + charUUID);
+            gattService = null;
+        }
+        return gattService;
+    }
+
+    private static String convertUTF8Hex(String utf8Hex) {
+        byte[] bytes = new BigInteger(utf8Hex, 16).toByteArray();
+        String out = null;
+        try {
+            out = new String(bytes, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            Log.e(TAG, "Error while converting UTF-8 HEX string ");
+            e.printStackTrace();
+        }
+        return out;
+    }
     private static byte[] convertStrToDate(String dateStr) {
         SimpleDateFormat dateFormatter = new SimpleDateFormat(ISO_DATE_FORMAT);
         Calendar cal = null;
@@ -1095,19 +1279,4 @@ public class BluetoothThermometerServices extends Service {
             return uuid;
         }
     }
-}
-
-class ThermoCharTempMeasurement {
-    public static byte flags;
-    public static float tempValue;
-    public static String timestamp;
-    public static int tempType;
-    public static int clientCharacConfDesc;
-}
-
-class ThermoMsrInterval {
-    public static int msrInterval;
-    public static int clientCharacConfDesc;
-    public static int minRangeDesc = 1;
-    public static int maxRangeDesc = 65535;
 }
