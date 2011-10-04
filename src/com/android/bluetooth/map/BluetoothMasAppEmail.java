@@ -30,6 +30,7 @@ package com.android.bluetooth.map;
 
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
+import android.database.ContentObserver;
 import android.os.Handler;
 import android.util.Log;
 
@@ -37,6 +38,7 @@ import com.android.bluetooth.map.MapUtils.EmailUtils;
 
 import java.util.List;
 
+import static com.android.bluetooth.map.BluetoothMasService.MSG_SERVERSESSION_CLOSE;
 import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.DELETED;
 import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.DRAFT;
 import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.INBOX;
@@ -54,9 +56,25 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
     public final String TAG = "BluetoothMasAppEmail";
     public final boolean V = BluetoothMasService.VERBOSE;;
 
-    public BluetoothMasAppEmail(Context context, BluetoothMns mnsClient, int masId) {
-        super(context, MESSAGE_TYPE_EMAIL, masId);
+    private ContentObserver mObserver;
+
+    public BluetoothMasAppEmail(Context context, Handler handler, BluetoothMns mnsClient,
+            int masId) {
+        super(context, handler, MESSAGE_TYPE_EMAIL, masId);
         this.mnsClient = mnsClient;
+
+        mObserver = new ContentObserver(null) {
+            @Override
+            public void onChange(boolean selfChange) {
+                long id = EmailUtils.getDefaultEmailAccountId(mContext);
+                if (id == -1) {
+                    // no email account, disconnect
+                    // TODO: inform the user
+                    disconnect();
+                }
+                super.onChange(selfChange);
+            }
+        };
 
         if (V) Log.v(TAG, "BluetoothMasAppEmail Constructor called");
     }
@@ -103,8 +121,31 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
         return list;
     }
 
-    @Override
-    protected void cleanUp() {
-        // Nothing to clean up
+    public boolean checkPrecondition() {
+        long id = EmailUtils.getDefaultEmailAccountId(mContext);
+        if (id == -1) {
+            // no email account found
+            if (V) Log.v(TAG, "No Email account found.");
+            return false;
+        } else if (V) {
+            if (V) Log.v(TAG, "Email account found.");
+        }
+        return true;
+    }
+
+    public void onConnect() {
+        if (V) Log.v(TAG, "onConnect() registering email account content observer");
+        mContext.getContentResolver().registerContentObserver(
+                EmailUtils.EMAIL_ACCOUNT_URI, true, mObserver);
+    }
+
+    public void onDisconnect() {
+        if (V) Log.v(TAG, "onDisconnect() unregistering email account content observer");
+        mContext.getContentResolver().unregisterContentObserver(mObserver);
+    }
+
+    private void disconnect() {
+        if (V) Log.v(TAG, "disconnect() sending serversession close.");
+        mHandler.obtainMessage(MSG_SERVERSESSION_CLOSE, mMasId, -1).sendToTarget();
     }
 }

@@ -102,11 +102,14 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
 
     protected String mCurrentPath = null;
     protected BluetoothMns mnsClient;
+    protected Handler mHandler = null;
 
-    public BluetoothMasAppIf(Context context, int supportedMessageTypes, int masId) {
+    public BluetoothMasAppIf(Context context, Handler handler, int supportedMessageTypes,
+            int masId) {
         mContext = context;
         mSupportedMessageTypes = supportedMessageTypes;
         mMasId = masId;
+        mHandler = handler;
 
         if (V) Log.v(TAG, "Constructor called");
     }
@@ -1448,12 +1451,6 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
         }
 
         return ResponseCodes.OBEX_HTTP_PRECON_FAILED;
-    }
-
-    protected abstract void cleanUp();
-
-    public void disconnect() {
-        cleanUp();
     }
 
     /**

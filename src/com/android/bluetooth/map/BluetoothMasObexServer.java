@@ -572,6 +572,9 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                     return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
                 }
             }
+            if (!mAppIf.checkPrecondition()) {
+                return ResponseCodes.OBEX_HTTP_UNAVAILABLE;
+            }
             reply.setHeader(HeaderSet.WHO, uuid);
         } catch (IOException e) {
             Log.e(TAG, e.toString());
@@ -601,13 +604,14 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
 
         mState = MasState.MAS_SERVER_CONNECTED;
         if (D) Log.d(TAG, "Connect(): Success");
+        mAppIf.onConnect();
         return ResponseCodes.OBEX_HTTP_OK;
     }
 
     @Override
     public void onDisconnect(final HeaderSet req, final HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnect(): enter");
-        mAppIf.disconnect();
+        mAppIf.onDisconnect();
 
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
         if (mCallback != null) {

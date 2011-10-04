@@ -45,7 +45,6 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.text.TextUtils;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.android.bluetooth.R;
 
@@ -672,11 +671,11 @@ public class BluetoothMasService extends Service {
                     ((mSupportedMessageTypes & MESSAGE_TYPE_SMS) != 0x00) &&
                     ((mSupportedMessageTypes & MESSAGE_TYPE_MMS) != 0x00)) {
                 // BluetoothMasAppZero if and only if both SMS and MMS
-                appIf = new BluetoothMasAppSmsMms(context, mnsClient, 0);
+                appIf = new BluetoothMasAppSmsMms(context, mSessionStatusHandler, mnsClient, 0);
             } else if (((mSupportedMessageTypes & ~MESSAGE_TYPE_EMAIL) == 0x0) &&
                     ((mSupportedMessageTypes & MESSAGE_TYPE_EMAIL) != 0x0)) {
                 // BluetoothMasAppOne if and only if email
-                appIf = new BluetoothMasAppEmail(context, mnsClient, 1);
+                appIf = new BluetoothMasAppEmail(context, mSessionStatusHandler, mnsClient, 1);
             }
 
             mMapServer = new BluetoothMasObexServer(mSessionStatusHandler,

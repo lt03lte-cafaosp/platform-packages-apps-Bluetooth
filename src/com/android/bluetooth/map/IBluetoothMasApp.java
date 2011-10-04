@@ -89,7 +89,8 @@ public interface IBluetoothMasApp {
     public int msgStatus(String name, BluetoothMasAppParams bluetoothMasAppParams);
     public int msgUpdate(String name,
         BluetoothMasAppParams bluetoothMasAppParams);
-    public void disconnect();
+    public void onConnect();
+    public void onDisconnect();
     public int notification(BluetoothDevice remoteDevice,
         BluetoothMasAppParams bluetoothMasAppParams);
     public void startMnsSession(BluetoothDevice remoteDevice);
@@ -99,4 +100,5 @@ public interface IBluetoothMasApp {
     public boolean supportMms(boolean only);
     public boolean supportSmsMms(boolean only);
     public boolean supportEmail(boolean only);
+    public boolean checkPrecondition();
 }

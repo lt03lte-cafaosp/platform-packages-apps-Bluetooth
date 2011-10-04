@@ -46,8 +46,9 @@ import java.util.List;
 
 public class BluetoothMasAppSmsMms extends BluetoothMasAppIf {
     public final String TAG = "BluetoothMasAppSmsMms";
-    public BluetoothMasAppSmsMms(Context context, BluetoothMns mnsClient, int masId) {
-        super(context, MESSAGE_TYPE_SMS_MMS, masId);
+    public BluetoothMasAppSmsMms(Context context, Handler handler, BluetoothMns mnsClient,
+            int masId) {
+        super(context, handler, MESSAGE_TYPE_SMS_MMS, masId);
         this.mnsClient = mnsClient;
 
         // Clear out deleted items from database
@@ -81,12 +82,24 @@ public class BluetoothMasAppSmsMms extends BluetoothMasAppIf {
         return SmsMmsUtils.FORLDER_LIST_SMS_MMS;
     }
 
-    @Override
-    protected void cleanUp() {
+    private void cleanUp() {
         // Remove the deleted item entries
         mContext.getContentResolver().delete(Uri.parse("content://sms/"),
                 "thread_id = " + DELETED_THREAD_ID, null);
         mContext.getContentResolver().delete(Uri.parse("content://mms/"),
                 "thread_id = " + DELETED_THREAD_ID, null);
+    }
+
+    public boolean checkPrecondition() {
+        // TODO: Add any precondition check routine for this MAS instance
+        return true;
+    }
+
+    public void onConnect() {
+        // TODO: Add any routine to be run when OBEX connection established
+    }
+
+    public void onDisconnect() {
+        cleanUp();
     }
 }
