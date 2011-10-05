@@ -191,7 +191,7 @@ public class BluetoothMns {
             return;
         }
 
-        mSessionHandler = new EventHandler();
+        mSessionHandler = new EventHandler(sessionStatusHandler.getLooper());
         SmsMmsUtils smu = new SmsMmsUtils();
         folderListSmsMms = new ArrayList<String>();
         folderListSmsMms = smu.folderListSmsMmsMns(folderListSmsMms);
@@ -215,8 +215,8 @@ public class BluetoothMns {
      * Receives events from mConnectThread & mSession back in the main thread.
      */
     private class EventHandler extends Handler {
-        public EventHandler() {
-            super();
+        public EventHandler(Looper looper) {
+            super(looper);
         }
 
         @Override
