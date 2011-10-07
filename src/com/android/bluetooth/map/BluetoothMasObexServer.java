@@ -821,6 +821,7 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
             try {
                 pMsg = mAppIf.pushMsg(name, file, masAppParams.get());
             } catch (BadRequestException e) {
+                if (V) Log.v(TAG, "BadRequestException:" + e.getMessage(), e);
                 return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             }
 
@@ -830,9 +831,8 @@ public class BluetoothMasObexServer extends ServerRequestHandler {
                 reply = new HeaderSet();
                 reply.setHeader(HeaderSet.NAME, pMsg.msgHandle);
                 return pushHeader(op, reply);
-
             } else {
-                return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+                return pMsg.response;
             }
         } else {
             return ResponseCodes.OBEX_HTTP_BAD_REQUEST;

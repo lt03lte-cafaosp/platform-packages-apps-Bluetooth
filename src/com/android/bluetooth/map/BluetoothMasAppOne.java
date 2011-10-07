@@ -37,6 +37,12 @@ import com.android.bluetooth.map.MapUtils.EmailUtils;
 
 import java.util.List;
 
+import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.DELETED;
+import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.DRAFT;
+import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.INBOX;
+import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.OUTBOX;
+import static com.android.bluetooth.map.MapUtils.SmsMmsUtils.SENT;
+
 /**
  * This class provides the application interface for MAS Server It interacts
  * with the SMS repository using Sms Content Provider to service the MAS
@@ -80,7 +86,23 @@ public class BluetoothMasAppOne extends BluetoothMasAppIf {
         if (V) Log.v(TAG, "getCompleteFolderList");
         // TODO differentiate email account id, take default email account for now
         long id = EmailUtils.getDefaultEmailAccountId(mContext);
-        return EmailUtils.getEmailFolderList(mContext, id);
+        List<String> list = EmailUtils.getEmailFolderList(mContext, id);
+        if (!list.contains(INBOX)) {
+            list.add(INBOX);
+        }
+        if (!list.contains(OUTBOX)) {
+            list.add(OUTBOX);
+        }
+        if (!list.contains(SENT)) {
+            list.add(SENT);
+        }
+        if (!list.contains(DELETED)) {
+            list.add(DELETED);
+        }
+        if (!list.contains(DRAFT)) {
+            list.add(DRAFT);
+        }
+        return list;
     }
 
     @Override

@@ -28,6 +28,12 @@
 
 package com.android.bluetooth.map.MapUtils;
 
+import android.pim.vcard.VCardInterpreter;
+import android.pim.vcard.VCardParser;
+import android.pim.vcard.VCardParser_V21;
+import android.pim.vcard.VCardParser_V30;
+import android.pim.vcard.exception.VCardException;
+import android.pim.vcard.exception.VCardVersionException;
 import android.util.Log;
 import android.util.Xml;
 
@@ -36,8 +42,16 @@ import com.android.bluetooth.map.BluetoothMasService;
 import org.xmlpull.v1.XmlSerializer;
 
 import java.io.IOException;
+import java.io.StringBufferInputStream;
 import java.io.StringWriter;
 import java.util.List;
+
+import static android.pim.vcard.VCardConstants.PROPERTY_EMAIL;
+import static android.pim.vcard.VCardConstants.PROPERTY_FN;
+import static android.pim.vcard.VCardConstants.PROPERTY_N;
+import static android.pim.vcard.VCardConstants.PROPERTY_TEL;
+import static android.pim.vcard.VCardConstants.VERSION_V21;
+import static android.pim.vcard.VCardConstants.VERSION_V30;
 
 /**
  * MapUtils is a class of utility methods that provide routines for converting
@@ -848,22 +862,21 @@ public class MapUtils {
      * @param String
      *            - which is a bMessage formatted SMS message
      * @return This method returns a BmessageConsts object
+     * @throws BadRequestException
      */
-    public static BmessageConsts fromBmessageSMS(String bmsg) {
+    public static BmessageConsts fromBmessageSMS(String bmsg) throws BadRequestException {
         BmessageConsts bMsgObj = new BmessageConsts();
+        String vCard = fetchRecipientVcard(bmsg);
 
-        // Extract Telephone number of sender
-        String phoneNumber = null;
-        String vCard = null;
-        vCard = fetchRecipientVcard(bmsg);
-        phoneNumber = fetchVcardTel(vCard);
-        bMsgObj.setRecipientVcard_phone_number(phoneNumber);
+        RecipientVCard recipient = parseVCard(vCard);
+        if (recipient.mTel.length() == 0) {
+            throw new BadRequestException("No TEL in vCard");
+        }
+        bMsgObj.setRecipientVcard_phone_number(recipient.mTel);
+        if (V) Log.v(TAG, "Tel: " + recipient.mTel);
 
         // Extract vCard Version
-        bMsgObj.setVcard_version(fetchVcardVersion(vCard));
-
-        // Extract vCard Name
-        bMsgObj.setVcard_version(fetchVcardVersion(vCard));
+        bMsgObj.setVcard_version(recipient.mVersion);
 
         // Extract bMessage Version
         bMsgObj.setBmsg_version(fetchVersion(bmsg));
@@ -898,28 +911,31 @@ public class MapUtils {
      * @param String
      *            - which is a bMessage formatted SMS message
      * @return This method returns a BmessageConsts object
+     * @throws BadRequestException
      */
-    public static BmessageConsts fromBmessageMMS(String bmsg) {
+    public static BmessageConsts fromBmessageMMS(String bmsg) throws BadRequestException {
         BmessageConsts bMsgObj = new BmessageConsts();
 
-        // Extract Telephone number of sender
         String phoneNumber = null;
-        String vCard = null;
-        vCard = fetchRecipientVcard(bmsg);
+        String vCard = fetchRecipientVcard(bmsg);
+        if (V) Log.v(TAG, "vCard Info: " + vCard);
 
-        if (vCard.indexOf("EMAIL:") >= 0) {
-            phoneNumber = fetchVcardEmailforMms(vCard);
+        RecipientVCard recipient = parseVCard(vCard);
+        if (recipient.mEmail.length() > 0) {
+            phoneNumber = recipient.mEmail;
+        } else if (recipient.mTel.length() > 0) {
+            phoneNumber = recipient.mTel;
         } else {
-            phoneNumber = fetchVcardTel(vCard);
+            throw new BadRequestException("No Email/Tel in vCard");
         }
 
+        if (V) Log.v(TAG, "Email: " + recipient.mEmail);
+        if (V) Log.v(TAG, "Tel: " + recipient.mTel);
+        if (V) Log.v(TAG, "Recipeint address: " + phoneNumber);
         bMsgObj.setRecipientVcard_phone_number(phoneNumber);
 
         // Extract vCard Version
-        bMsgObj.setVcard_version(fetchVcardVersion(vCard));
-
-        // Extract vCard Name
-        bMsgObj.setVcard_version(fetchVcardVersion(vCard));
+        bMsgObj.setVcard_version(recipient.mVersion);
 
         // Extract bMessage Version
         bMsgObj.setBmsg_version(fetchVersion(bmsg));
@@ -958,39 +974,32 @@ public class MapUtils {
 
     public static BmessageConsts fromBmessageEmail(String bmsg) throws BadRequestException {
         BmessageConsts bMsgObj = new BmessageConsts();
-        // Extract Telephone number of sender
-        String email = null;
-        String vCard = null;
-        vCard = fetchRecepientVcardEmail(bmsg);
-        if (V){
-            Log.v(TAG, "vCard Info:: "+vCard);
+        String vCard = fetchRecipientVcard(bmsg);
+        if (V) Log.v(TAG, "vCard Info: " + vCard);
+
+        RecipientVCard recipient = parseVCard(vCard);
+        if (recipient.mEmail.length() == 0) {
+            throw new BadRequestException("No Email in recipient vCard");
         }
-        email = fetchRecipientEmail(bmsg);
-        if (V){
-            Log.v(TAG, "email Info:: "+email);
-        }
-        bMsgObj.setRecipientVcard_email(email);
+        bMsgObj.setRecipientVcard_email(recipient.mEmail);
+        if (V) Log.v(TAG, "Email: " + recipient.mEmail);
 
         String vcardOrig = fetchOriginatorVcardEmail(bmsg);
-        String emailOrig = fetchOriginatorEmail(bmsg);
-        if (V){
-            Log.v(TAG, "Vcard Originator Email:: "+emailOrig);
+        if (vcardOrig.length() > 0) {
+            RecipientVCard originator = parseVCard(vcardOrig);
+            if (originator.mEmail.length() == 0) {
+                throw new BadRequestException("No Email in originator vCard");
+            }
+            bMsgObj.setOriginatorVcard_email(originator.mEmail);
+            if (V) Log.v(TAG, "Orig Email: " + originator.mEmail);
+            if (originator.mFormattedName.length() > 0) {
+                if (V) Log.v(TAG, "Orig Formatted Name: " + originator.mFormattedName);
+                bMsgObj.setOriginatorVcard_name(originator.mFormattedName);
+            } else {
+                if (V) Log.v(TAG, "Orig Name: " + originator.mName);
+                bMsgObj.setOriginatorVcard_name(originator.mName);
+            }
         }
-        bMsgObj.setOriginatorVcard_email(emailOrig);
-
-        if (V){
-            Log.v(TAG, "Vcard Originatore Name:: "+fetchVcardName(vcardOrig));
-        }
-        String nameOrig = fetchVcardName(vcardOrig);
-        bMsgObj.setOriginatorVcard_name(nameOrig);
-
-        if (V){
-            Log.v(TAG, "Vcard version:: "+fetchVcardVersion(vCard));
-        }
-        // Extract vCard Version
-        bMsgObj.setVcard_version(fetchVcardVersion(vCard));
-
-        // Extract vCard Name
 
         if (V){
             Log.v(TAG, "Bmsg version:: "+fetchVersion(bmsg));
@@ -1092,24 +1101,27 @@ public class MapUtils {
         }
     }
 
-    private static String fetchOriginatorVcardEmail(String bmsg) {
+    private static String fetchOriginatorVcardEmail(String bmsg) throws BadRequestException {
         // Find the position of the first vCard in the string
-        int pos = bmsg.indexOf("BEGIN:VCARD");
-        if (V){
-            Log.v(TAG, "vCard start position:: "+pos);
+        int vCardBeginPos = bmsg.indexOf("BEGIN:VCARD");
+        if (vCardBeginPos == -1) {
+            // no vCard bad request
+            throw new BadRequestException("No Vcard");
         }
-        if (pos > 0) {
-            if (V){
-            	Log.v(TAG, "vCard start position greater than 0::");
-            }
-            int beginVcardPos = pos + ("\r\n".length());
-            int endVcardPos = bmsg.indexOf("END:VCARD");
-
-            return bmsg.substring(beginVcardPos, endVcardPos);
-
-        } else {
+        if (V) Log.v(TAG, "vCard start position: " + vCardBeginPos);
+        int bEnvPos = bmsg.indexOf("BEGIN:BENV");
+        if (vCardBeginPos > bEnvPos) {
+            // the first vCard is not originator
             return "";
         }
+        int vCardEndPos = bmsg.indexOf("END:VCARD", vCardBeginPos);
+        if (vCardEndPos == -1) {
+            // no END:VCARD bad request
+            throw new BadRequestException("No END:VCARD");
+        }
+        vCardEndPos += "END:VCARD".length();
+
+        return bmsg.substring(vCardBeginPos, vCardEndPos);
     }
 
     private static String fetchSubjectEmail(String body) {
@@ -1181,21 +1193,24 @@ public class MapUtils {
      * @param
      * @return String This method returns a Vcard String
      */
-    @SuppressWarnings("unused")
-    private static String fetchRecipientVcard(String bmsg) {
+    private static String fetchRecipientVcard(String bmsg) throws BadRequestException {
         // Locate BENV
         int locBENV = 0;
         int pos = 0;
         locBENV = bmsg.indexOf(CRLF + "BEGIN:BENV");
         pos = bmsg.indexOf(CRLF + "BEGIN:VCARD", locBENV);
-        if (locBENV < pos) {
-            pos = bmsg.indexOf(CRLF + "BEGIN:VCARD", locBENV);
-        } else {
-            pos = bmsg.indexOf(CRLF + "BEGIN:VCARD");
+        if (pos < 0) {
+            // no vCard in BENV
+            throw new BadRequestException("No vCard in BENV");
         }
         if (pos > 0) {
-            int beginVcardPos = pos;
+            int beginVcardPos = pos + CRLF.length();
             int endVcardPos = bmsg.indexOf("END:VCARD", pos);
+            if (endVcardPos < 0) {
+                // no END:VCARD in BENV
+                throw new BadRequestException("No END:VCARD in BENV");
+            }
+            endVcardPos += "END:VCARD".length();
             return bmsg.substring(beginVcardPos, endVcardPos);
 
         } else {
@@ -1503,7 +1518,17 @@ public class MapUtils {
             } else {
                 final int next = body.indexOf(CRLF, pos);
                 if (next == -1) {
-                    throw new BadRequestException("Ill-formatted bMessage, no empty line");
+                    // throw new BadRequestException("Ill-formatted bMessage, no empty line");
+                    // PTS: Instead of throwing Exception, return MSG
+                    int beginMsg = body.indexOf("BEGIN:MSG");
+                    if (beginMsg == -1) {
+                        throw new BadRequestException("Ill-formatted bMessage, no BEGIN:MSG");
+                    }
+                    int endMsg = body.indexOf("END:MSG", beginMsg);
+                    if (endMsg == -1) {
+                        throw new BadRequestException("Ill-formatted bMessage, no END:MSG");
+                    }
+                    return body.substring(beginMsg + "BEGIN:MSG".length(), endMsg - CRLF.length());
                 } else {
                     pos = next + CRLF.length();
                 }
@@ -1713,5 +1738,120 @@ public class MapUtils {
         public BadRequestException(String reason) {
             super("BadRequestException: " + reason);
         }
+    }
+
+    public static class RecipientVCard implements VCardInterpreter {
+        String mName = "";
+        String mFormattedName = "";
+        String mTel = "";
+        String mEmail = "";
+        String mVersion = "";
+        String mCurrentProperty = "";
+
+        public void end() {
+            if (V) Log.v(TAG, "end()");
+        }
+
+        public void endEntry() {
+            if (V) Log.v(TAG, "endEntry()");
+        }
+
+        public void endProperty() {
+            if (V) Log.v(TAG, "endProperty()");
+            mCurrentProperty = "";
+        }
+
+        public void propertyGroup(String group) {
+            if (V) Log.v(TAG, "propertyGroup(" + group + ")");
+        }
+
+        public void propertyName(String name) {
+            if (V) Log.v(TAG, "propertyName(" + name + ")");
+            mCurrentProperty = name;
+        }
+
+        public void propertyParamType(String type) {
+            if (V) Log.v(TAG, "propertyParamType(" + type + ")");
+        }
+
+        public void propertyParamValue(String value) {
+            if (V) Log.v(TAG, "propertyParamValue(" + value + ")");
+        }
+
+        public void propertyValues(List<String> values) {
+            if (V) Log.v(TAG, "propertyValues(" + values.toString() + "), Property=" + mCurrentProperty);
+            // The first appeared property in a vCard will be used
+            if (PROPERTY_N.equals(mCurrentProperty) && mName.length() == 0) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(values.get(0));
+                final int size = values.size();
+                for (int i = 0; i < size; i ++) {
+                    sb.append(", ");
+                    sb.append(values.get(i));
+                }
+                mName = sb.toString();
+                if (V) Log.v(TAG, PROPERTY_N + ": " + mName);
+            } else if (PROPERTY_TEL.equals(mCurrentProperty) && mTel.length() == 0) {
+                mTel = values.get(0);
+                if (V) Log.v(TAG, PROPERTY_TEL + ": " + mTel);
+            } else if (PROPERTY_EMAIL.equals(mCurrentProperty) && mEmail.length() == 0) {
+                mEmail = values.get(0);
+                if (V) Log.v(TAG, PROPERTY_EMAIL + ": " + mEmail);
+            } else if (PROPERTY_FN.equals(mCurrentProperty) && mFormattedName.length() == 0) {
+                mFormattedName = values.get(0);
+                if (V) Log.v(TAG, PROPERTY_FN + ": " + mFormattedName);
+            }
+        }
+
+        public void start() {
+            if (V) Log.v(TAG, "start()");
+        }
+
+        public void startEntry() {
+            if (V) Log.v(TAG, "startEntry()");
+            mName = "";
+            mFormattedName = "";
+            mTel = "";
+            mEmail = "";
+        }
+
+        public void startProperty() {
+            if (V) Log.v(TAG, "startProperty()");
+            mCurrentProperty = "";
+        }
+    }
+
+    static RecipientVCard parseVCard(String vCard) throws BadRequestException {
+        if (V) Log.v(TAG, "parseVCard(" + vCard + ")");
+        RecipientVCard recipient = new RecipientVCard();
+
+        try {
+            StringBufferInputStream is = new StringBufferInputStream(vCard);
+            VCardParser parser = new VCardParser_V21();
+            try {
+                if (V) Log.v(TAG, "try " + VERSION_V21);
+                recipient.mVersion = VERSION_V21;
+                parser.parse(is, recipient);
+            } catch (VCardVersionException e) {
+                is.close();
+                is = new StringBufferInputStream(vCard);
+                try {
+                    if (V) Log.v(TAG, "try " + VERSION_V30);
+                    recipient.mVersion = VERSION_V30;
+                    parser = new VCardParser_V30();
+                    parser.parse(is, recipient);
+                } catch (VCardVersionException e1) {
+                    throw new VCardException("vCard with unsupported version.");
+                }
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "Unable to parse vCard", e);
+            throw new BadRequestException("Unable to parse vCard");
+        } catch (VCardException e) {
+            Log.w(TAG, "Unable to parse vCard", e);
+            throw new BadRequestException("Unable to parse vCard");
+        }
+
+        return recipient;
     }
 }

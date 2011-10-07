@@ -208,22 +208,6 @@ public class SmsMmsUtils {
     public static final Uri SMS_URI = Uri.parse("content://sms");
     public static final Uri MMS_URI = Uri.parse("content://mms");
     public static final String[] THREAD_ID_COLUMN = new String[]{"thread_id"};
-    /**
-     * Retrieve the conversation thread id
-     */
-    public static int getSmsThreadId(Context context, String address) {
-        String id = SqlHelper.getFirstValueForColumn(context, SMS_URI, "thread_id",
-                "address=?", new String[]{address});
-        if (id.length() == 0) {
-            return -1;
-        }
-        try {
-            return Integer.parseInt(id);
-        } catch (NumberFormatException nfe) {
-            Log.e(TAG, "thead id is not number format " + nfe.getMessage());
-        }
-        return -1;
-    }
 
     /**
      * Obtain the number of MMS messages

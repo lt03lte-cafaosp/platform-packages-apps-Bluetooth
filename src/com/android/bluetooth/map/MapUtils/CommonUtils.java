@@ -74,8 +74,6 @@ public class CommonUtils {
     }
 
     public static class BluetoothMsgListRsp {
-        public int writeCount = 0;
-        public int processCount = 0;
         public int messageListingSize = 0;
         public BluetoothMasMessageListingRsp rsp;
         public List<MsgListingConsts> msgList = new ArrayList<MsgListingConsts>();
