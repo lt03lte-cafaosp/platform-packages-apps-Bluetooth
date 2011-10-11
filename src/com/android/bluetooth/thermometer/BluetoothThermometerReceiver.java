@@ -57,11 +57,9 @@ public class BluetoothThermometerReceiver extends BroadcastReceiver {
             return;
         }
         Intent in = new Intent();
-        if (in != null) {
-            in.putExtras(intent);
-            in.setClass(context, BluetoothThermometerServices.class);
-            in.putExtra("action", action);
-        }
+        in.putExtras(intent);
+        in.setClass(context, BluetoothThermometerServices.class);
+        in.putExtra("action", action);
 
         if (action.equals(BluetoothDevice.ACTION_GATT)) {
             try {
