@@ -47,6 +47,8 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.bluetooth.R;
+import com.android.bluetooth.map.BluetoothMns.MnsClient;
+import com.android.bluetooth.map.BluetoothMnsSmsMms;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -163,11 +165,35 @@ public class BluetoothMasService extends Service {
 
     private boolean mHasStarted = false;
     private int mStartId = -1;
+
     /**
      * The flag indicating MAP request has been notified.
      * This is set on when initiate notification and set off after accept/time out
      */
     private volatile boolean mIsRequestBeingNotified = false;
+
+    public static class MasInstanceInfo {
+        int mSupportedMessageTypes;
+        Class<? extends MnsClient> mMnsClientClass;
+        int mRfcommPort;
+
+        public MasInstanceInfo(int smt, Class<? extends MnsClient> _class, int port) {
+            mSupportedMessageTypes = smt;
+            mMnsClientClass = _class;
+            mRfcommPort = port;
+        }
+    }
+
+    public static final int MAX_INSTANCES = 2;
+    public static final MasInstanceInfo MAS_INS_INFO[] = new MasInstanceInfo[MAX_INSTANCES];
+
+    // The following information must match with corresponding
+    // SDP records supported message types and port number
+    // Please refer sdptool.c, BluetoothService.java, & init.qcom.rc
+    static {
+        MAS_INS_INFO[0] = new MasInstanceInfo(MESSAGE_TYPE_SMS_MMS, BluetoothMnsSmsMms.class, 16);
+        MAS_INS_INFO[1] = new MasInstanceInfo(MESSAGE_TYPE_EMAIL, BluetoothMnsEmail.class, 17);
+    }
 
     public BluetoothMasService() {
         mConnectionManager = new BluetoothMasObexConnectionManager();
@@ -397,11 +423,10 @@ public class BluetoothMasService extends Service {
                 new ArrayList<BluetoothMasObexConnection>();
 
         public BluetoothMasObexConnectionManager() {
-            // These connections must match with corresponding
-            // SDP records supported message types and port number
-            // Please refer sdptool.c, BluetoothService.java, & init.qcom.rc
-            mConnections.add(new BluetoothMasObexConnection(MESSAGE_TYPE_SMS_MMS, 0, 16));
-            mConnections.add(new BluetoothMasObexConnection(MESSAGE_TYPE_EMAIL, 1, 17));
+            for (int i = 0; i < MAX_INSTANCES; i ++) {
+                mConnections.add(new BluetoothMasObexConnection(
+                        MAS_INS_INFO[i].mSupportedMessageTypes, i, MAS_INS_INFO[i].mRfcommPort));
+            }
         }
 
         public void initiateObexServerSession(BluetoothDevice device) {
