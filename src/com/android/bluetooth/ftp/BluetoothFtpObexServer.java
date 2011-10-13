@@ -49,6 +49,7 @@ import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.util.Date;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.lang.StringBuffer;
 
@@ -69,6 +70,19 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
     private static final boolean V = BluetoothFtpService.VERBOSE;
 
     private static final int UUID_LENGTH = 16;
+
+    /* To help parsing file attributes */
+    private static final int INDEX_YEAR = 0;
+
+    private static final int INDEX_MONTH = 1;
+
+    private static final int INDEX_DATE = 2;
+
+    private static final int INDEX_TIME = 3;
+
+    private static final int INDEX_TIME_HOUR = 0;
+
+    private static final int INDEX_TIME_MINUTE = 1;
 
     // type for list folder contents
     private static final String TYPE_LISTING = "x-obex/folder-listing";
@@ -1070,36 +1084,6 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         if (V) Log.v(TAG, "pushBytes - result = " + pushResult);
         return pushResult;
     }
-    /* Convert Month string to number strings for months */
-    private final String convertMonthtoDigit(String Month) {
-        if(Month.compareTo("Jan")== 0) {
-            return "01";
-        } else if (Month.compareTo("Feb")== 0){
-            return "02";
-        } else if (Month.compareTo("Mar")== 0){
-            return "03";
-        } else if (Month.compareTo("Apr")== 0){
-            return "04";
-        } else if (Month.compareTo("May")== 0){
-            return "05";
-        } else if (Month.compareTo("Jun")== 0){
-            return "06";
-        } else if (Month.compareTo("Jul")== 0){
-            return "07";
-        } else if (Month.compareTo("Aug")== 0){
-            return "08";
-        } else if (Month.compareTo("Sep")== 0){
-            return "09";
-        } else if (Month.compareTo("Oct")== 0){
-            return "10";
-        } else if (Month.compareTo("Nov")== 0){
-            return "11";
-        } else if (Month.compareTo("Dec")== 0){
-            return "12";
-        } else {
-            return "00";
-        }
-    }
 
     /** Form and Send an XML format String to client for Folder listing */
     private final int sendFolderListingXml(final int type,Operation op,final File[] files) {
@@ -1116,69 +1100,51 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         result.append('\r');
         result.append('\n');
 
-        for(int i =0; i < files.length; i++){
-            if(files[i].isDirectory()) {
-                String dirperm = "";
-                if(files[i].canRead() && files[i].canWrite()) {
-                    dirperm = "RW";
-                } else if(files[i].canRead()) {
-                    dirperm = "R";
-                } else if(files[i].canWrite()) {
-                    dirperm = "W";
-                }
-                Date date = new Date(files[i].lastModified());
-		/* Date Format returned "EEE MMM dd HH:mm:ss zzz+xx:xx yyyy"
-                 * For ex :             "Tue Jan 01 00:00:00 GMT+00:00 1980"
-                 */
+        /* For the purpose of parsing file attributes and to maintain the standard,
+         * enforce the format to be used
+         */
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy MM dd HH:mm");
 
-                StringBuffer xmldateformat = new StringBuffer(date.toString().substring(30,34));
-                xmldateformat.append(convertMonthtoDigit(date.toString().substring(4,7)));
-                xmldateformat.append(date.toString().substring(8,10));
-                xmldateformat.append("T");
-                xmldateformat.append(date.toString().substring(11,13));
-                xmldateformat.append(date.toString().substring(14,16));
-                xmldateformat.append("00Z");
+        String name = "";
+        String permission  = "";
+        for(int i =0; i < files.length; i++) {
 
-                if (D) Log.d(TAG,"<folder name = " + files[i].getName()+ " size = "
-                                + files[i].length() + "modified = " + date.toString()
-                                + "xmldateformat.toString() = " + xmldateformat.toString());
-                result.append("<folder name=\"" + files[i].getName()+ "\"" + " size=\"" +
-                    files[i].length() + "\"" + " user-perm=\"" + dirperm + "\"" +
-                    " modified=\"" + xmldateformat.toString()  + "\"" + "/>");
-                result.append('\r');
-                result.append('\n');
+            if (files[i].isDirectory()) {
+               name = "folder name";
+            } else {
+               name = "file name";
             }
-            else {
-                String userperm = "";
-                if(files[i].canRead() && files[i].canWrite()) {
-                    userperm = "RW";
-                } else if(files[i].canRead()) {
-                    userperm = "R";
-                } else if(files[i].canWrite()) {
-                    userperm = "W";
-                }
 
-                Date date = new Date(files[i].lastModified());
-                /*First put in the Year into String buffer */
-                StringBuffer xmldateformat = new StringBuffer(date.toString().substring(30,34));
-
-                xmldateformat.append(convertMonthtoDigit(date.toString().substring(4,7)));
-                xmldateformat.append(date.toString().substring(8,10));
-                xmldateformat.append("T");
-                xmldateformat.append(date.toString().substring(11,13));
-                xmldateformat.append(date.toString().substring(14,16));
-                xmldateformat.append("00Z");
-
-                if (D) Log.d(TAG,"<file name = " + files[i].getName() + "size = " +
-                        files[i].length() + "Append user-perm = "
-                        + userperm + "Date in string format = " + date.toString()
-                        + "files[i].modifieddate = " + xmldateformat.toString() );
-                result.append("<file name=\"" + files[i].getName()+ "\"" + " size=\"" +
-                    files[i].length() + "\"" + " user-perm=\"" + userperm + "\"" + " modified=\""
-                    + xmldateformat.toString()  + "\"" + "/>");
-                result.append('\r');
-                result.append('\n');
+            if (files[i].canRead() && files[i].canWrite()) {
+               permission = "RW";
+            } else if(files[i].canRead()) {
+               permission = "R";
+            } else if(files[i].canWrite()) {
+               permission = "W";
             }
+
+            Date date = new Date(files[i].lastModified());
+            String[] dateset = sdf.format(date).split(" ");
+
+            StringBuffer xmldateformat = new StringBuffer(dateset[INDEX_YEAR]);
+            xmldateformat.append(dateset[INDEX_MONTH]);
+            xmldateformat.append(dateset[INDEX_DATE]);
+
+            String[] timeset = dateset[INDEX_TIME].split(":");
+            xmldateformat.append("T");
+            xmldateformat.append(timeset[INDEX_TIME_HOUR]);
+            xmldateformat.append(timeset[INDEX_TIME_MINUTE]);
+            xmldateformat.append("00Z");
+
+            if (D) Log.d(TAG, name +"=" + files[i].getName()+ " size="
+                            + files[i].length() + " modified=" + date.toString()
+                            + " dateformat to send=" + xmldateformat.toString());
+
+            result.append("<" + name + "=\"" + files[i].getName()+ "\"" + " size=\"" +
+                files[i].length() + "\"" + " user-perm=\"" + permission + "\"" +
+                " modified=\"" + xmldateformat.toString()  + "\"" + "/>");
+            result.append('\r');
+            result.append('\n');
         }
         result.append("</folder-listing>");
         result.append('\r');
