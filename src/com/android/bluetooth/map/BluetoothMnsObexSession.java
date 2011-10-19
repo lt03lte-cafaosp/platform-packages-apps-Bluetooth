@@ -170,6 +170,7 @@ public class BluetoothMnsObexSession {
 
         ClientOperation putOperation = null;
         OutputStream outputStream = null;
+        InputStream inputStream = null;
         try {
             synchronized (this) {
                 mWaitingForRemote = true;
@@ -191,6 +192,7 @@ public class BluetoothMnsObexSession {
                 try {
                     if (V) Log.v(TAG, "Send headerset Event ");
                     outputStream = putOperation.openOutputStream();
+                    inputStream = putOperation.openInputStream();
                 } catch (IOException e) {
                     Log.e(TAG, "Error when opening OutputStream");
                     error = true;
@@ -216,6 +218,7 @@ public class BluetoothMnsObexSession {
 
                     /* check remote abort */
                     responseCode = putOperation.getResponseCode();
+                    responseCode = ResponseCodes.OBEX_HTTP_OK;
 
                     if (V) Log.v(TAG, "Response code is " + responseCode);
                     if (responseCode != ResponseCodes.OBEX_HTTP_CONTINUE
@@ -260,8 +263,11 @@ public class BluetoothMnsObexSession {
                         }
                     }
                 }
+                if (inputStream != null) {
+                    inputStream.close();
+                }
                 if (putOperation != null) {
-                   putOperation.close();
+                    putOperation.close();
                 }
             } catch (IOException e) {
                 Log.e(TAG, "Error when closing stream after send");
