@@ -28,9 +28,6 @@
 
 package com.android.bluetooth.thermometer;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -40,6 +37,9 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.ParcelUuid;
 import android.util.Log;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 public class BluetoothThermometerReceiver extends BroadcastReceiver {
 
@@ -80,11 +80,13 @@ public class BluetoothThermometerReceiver extends BroadcastReceiver {
                     Message objMsg = new Message();
                     objMsg.what = BluetoothThermometerServices.GATT_SERVICE_STARTED_OBJ;
                     Bundle objBundle = new Bundle();
-                    ArrayList<String> objPathList = new ArrayList<String>(Arrays.asList(ObjectPathArray));
+                    ArrayList<String> gattDataList = new ArrayList<String>(
+                        Arrays.asList(ObjectPathArray));
+                    gattDataList.add(uuid.toString());
                     objBundle.putStringArrayList(
-                                                BluetoothThermometerServices.ACTION_GATT_SERVICE_EXTRA_OBJ,
-                                                objPathList);
-                    Log.d(TAG, " objPathList  : " + objPathList.get(0));
+                        BluetoothThermometerServices.ACTION_GATT_SERVICE_EXTRA_OBJ,
+                        gattDataList);
+                    Log.d(TAG, " gattDataList  : " + gattDataList.get(0));
                     objMsg.setData(objBundle);
                     Log.d(TAG, " before sendmessage : " + objMsg.what);
                     handler.sendMessage(objMsg);
