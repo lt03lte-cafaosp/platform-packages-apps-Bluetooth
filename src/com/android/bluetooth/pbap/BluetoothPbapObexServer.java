@@ -690,10 +690,9 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             Log.w(TAG, "vcardString is null!");
             return ResponseCodes.OBEX_HTTP_OK;
         }
-
-        int vcardStringLen = vcardString.length();
+         byte [] vcardInBytes = vcardString.getBytes();
+        int vcardStringLen = vcardInBytes.length;
         if (D) Log.d(TAG, "Send Data: len=" + vcardStringLen);
-
         OutputStream outputStream = null;
         int pushResult = ResponseCodes.OBEX_HTTP_OK;
         try {
@@ -718,9 +717,8 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             if (vcardStringLen - position < outputBufferSize) {
                 readLength = vcardStringLen - position;
             }
-            String subStr = vcardString.substring(position, position + readLength);
             try {
-                outputStream.write(subStr.getBytes(), 0, readLength);
+                outputStream.write(vcardInBytes, position, readLength);
             } catch (IOException e) {
                 Log.e(TAG, "write outputstrem failed" + e.toString());
                 pushResult = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
