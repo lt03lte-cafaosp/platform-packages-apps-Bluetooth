@@ -127,7 +127,7 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     private BluetoothAdapter mAdapter;
 
-    private BluetoothOppBatch mBatch;
+    public BluetoothOppBatch mBatch;
 
     public BluetoothBppObexClientSession mSession;
 

@@ -295,7 +295,7 @@ public class BluetoothBppObexClientSession{
                         Thread.sleep(sSleepTime);
                         // Wait for 1 min and if there is no action, then,
                         // it will send error message
-                        if (mTimeout++ > 2*60 ) {
+                        if (mTimeout++ > 2*600 ) {
                             sendErrorReport(BluetoothShare.STATUS_OBEX_DATA_ERROR);
                         }
                     } catch (InterruptedException e) {
