@@ -69,17 +69,17 @@ public interface IBluetoothMasApp {
      */
     public static final long HANDLE_OFFSET[] = {
         0,          // MAS id 0
-        1 << 62,    // MAS id 1
-        2 << 62,    // MAS id 2
-        3 << 62,    // MAS id 3
-        4 << 62,    // MAS id 4
-        5 << 62,    // MAS id 5
-        6 << 62,    // MAS id 6
-        7 << 62,    // MAS id 7
-        8 << 62,    // MAS id 8
-        9 << 62,    // MAS id 9
-        10 << 62,   // MAS id 10
-        11 << 62,   // MAS id 11
+        1 << 59,    // MAS id 1
+        2 << 59,    // MAS id 2
+        3 << 59,    // MAS id 3
+        4 << 59,    // MAS id 4
+        5 << 59,    // MAS id 5
+        6 << 59,    // MAS id 6
+        7 << 59,    // MAS id 7
+        8 << 59,    // MAS id 8
+        9 << 59,    // MAS id 9
+        10 << 59,   // MAS id 10
+        11 << 59,   // MAS id 11
         Long.MAX_VALUE
     };
 

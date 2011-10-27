@@ -39,6 +39,7 @@ import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
+import android.database.ContentObserver;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -48,10 +49,11 @@ import android.util.Log;
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.map.BluetoothMns.MnsClient;
-import com.android.bluetooth.map.BluetoothMnsSmsMms;
+import com.android.bluetooth.map.MapUtils.EmailUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.obex.ServerSession;
 
@@ -185,6 +187,8 @@ public class BluetoothMasService extends Service {
     }
 
     public static final int MAX_INSTANCES = 2;
+    public static final int EMAIL_MAS_START = 1;
+    public static final int EMAIL_MAS_END = 1;
     public static final MasInstanceInfo MAS_INS_INFO[] = new MasInstanceInfo[MAX_INSTANCES];
 
     // The following information must match with corresponding
@@ -195,8 +199,34 @@ public class BluetoothMasService extends Service {
         MAS_INS_INFO[1] = new MasInstanceInfo(MESSAGE_TYPE_EMAIL, BluetoothMnsEmail.class, 17);
     }
 
+    private ContentObserver mEmailAccountObserver;
+
+    private void updateEmailAccount() {
+        List<Long> list = EmailUtils.getEmailAccountIdList(this);
+        ArrayList<Long> notAssigned = new ArrayList<Long>();
+        EmailUtils.removeMasIdIfNotPresent(list);
+        for (Long id : list) {
+            int masId = EmailUtils.getMasId(id);
+            if (masId == -1) {
+                notAssigned.add(id);
+            }
+        }
+        for (int i = EMAIL_MAS_START; i <= EMAIL_MAS_END; i ++) {
+            long accountId = EmailUtils.getAccountId(i);
+            if (accountId == -1 && notAssigned.size() > 0) {
+                EmailUtils.updateMapTable(notAssigned.remove(0), i);
+            }
+        }
+    }
+
     public BluetoothMasService() {
         mConnectionManager = new BluetoothMasObexConnectionManager();
+        mEmailAccountObserver = new ContentObserver(null) {
+            @Override
+            public void onChange(boolean selfChange) {
+                updateEmailAccount();
+            }
+        };
     }
 
     @Override
@@ -220,6 +250,9 @@ public class BluetoothMasService extends Service {
                 Log.v(TAG, "BT is not ON, no start");
             }
         }
+        updateEmailAccount();
+        getContentResolver().registerContentObserver(
+                EmailUtils.EMAIL_ACCOUNT_URI, true, mEmailAccountObserver);
     }
 
     @Override
@@ -297,6 +330,8 @@ public class BluetoothMasService extends Service {
             Log.v(TAG, "Map Service onDestroy");
 
         super.onDestroy();
+        getContentResolver().unregisterContentObserver(mEmailAccountObserver);
+        EmailUtils.clearMapTable();
         closeService();
     }
 

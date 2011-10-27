@@ -100,7 +100,7 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
      */
     public void startMnsSession(BluetoothDevice remoteDevice) {
         if (V) Log.v(TAG, "Start MNS Client");
-        mMnsClient.getHandler().obtainMessage(BluetoothMns.MNS_CONNECT, 1,
+        mMnsClient.getHandler().obtainMessage(BluetoothMns.MNS_CONNECT, mMasId,
                 -1, remoteDevice).sendToTarget();
     }
 
@@ -109,7 +109,7 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
      */
     public void stopMnsSession(BluetoothDevice remoteDevice) {
         if (V) Log.v(TAG, "Stop MNS Client");
-        mMnsClient.getHandler().obtainMessage(BluetoothMns.MNS_DISCONNECT, 1,
+        mMnsClient.getHandler().obtainMessage(BluetoothMns.MNS_DISCONNECT, mMasId,
                 -1, remoteDevice).sendToTarget();
     }
 
@@ -137,16 +137,10 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
     }
 
     public boolean checkPrecondition() {
-        if (!EmailUtils.hasEmailAccount(mContext)) {
-            // no email account found
-            if (V) Log.v(TAG, "No Email account found.");
+        long id = EmailUtils.getAccountId(mMasId);
+        if (id == -1) {
             return false;
-        } else if (V) {
-            if (V) Log.v(TAG, "Email account found.");
         }
-        // TODO: update mapping Email account to masId somewhere else
-        long id = EmailUtils.getDefaultEmailAccountId(mContext);
-        EmailUtils.updateMapTable(id, mMasId);
         return true;
     }
 
@@ -524,7 +518,8 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
         Uri uriEmail = Uri.parse(urlEmail);
         ContentResolver crEmail = mContext.getContentResolver();
 
-        String whereClauseEmail  = EmailUtils.getConditionString(folderName, mContext, appParams);
+        String whereClauseEmail  = EmailUtils.getConditionString(folderName, mContext, appParams,
+                mMasId);
 
         if (V){
                 Log.v(TAG, "## whereClauseEmail ##:" + whereClauseEmail);
