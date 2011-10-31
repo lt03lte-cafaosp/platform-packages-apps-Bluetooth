@@ -1188,8 +1188,10 @@ public class BluetoothBppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 }
             } catch (IOException e) {
                 Log.e(TAG, "Rfcomm socket connect exception " + e);
-                INSTANCE.removeChannel(device, BluetoothBppConstant.DPS_UUID16);
-                INSTANCE.removeChannel(device, BluetoothBppConstant.STS_UUID16);
+                if (INSTANCE != null) {
+                    INSTANCE.removeChannel(device, BluetoothBppConstant.DPS_UUID16);
+                    INSTANCE.removeChannel(device, BluetoothBppConstant.STS_UUID16);
+                }
                 markConnectionFailed(btSocket);
                 return;
             }
