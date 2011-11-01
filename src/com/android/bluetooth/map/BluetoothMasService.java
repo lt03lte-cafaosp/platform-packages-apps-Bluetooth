@@ -801,7 +801,7 @@ public class BluetoothMasService extends Service {
 
                         if (!mConnectionManager.isAllowedConnection(device)) {
                             connSocket.close();
-                            break;
+                            continue;
                         }
                         mConnSocket = connSocket;
                         boolean trust = device.getTrustState();
