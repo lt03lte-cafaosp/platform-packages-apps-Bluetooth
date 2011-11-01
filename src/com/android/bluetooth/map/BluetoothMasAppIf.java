@@ -76,9 +76,15 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
 
     protected static final String INTERNAL_ERROR = "ERROR";
 
+    // IOP work around for BMW carkit
+    // The connection is dropped by the carkit When GetMessagesListing results empty list
+    // So, we ignore improper filtering request by messageType.
+    protected static final String BMW = "BMW";
+
     protected Context mContext;
     protected int mSupportedMessageTypes;
     protected int mMasId;
+    protected String mRemoteDeviceName;
 
     protected String mCurrentPath = null;
     protected BluetoothMns mMnsClient;
@@ -88,12 +94,13 @@ public abstract class BluetoothMasAppIf implements IBluetoothMasApp {
     protected final long OFFSET_END;
 
     public BluetoothMasAppIf(Context context, Handler handler, int supportedMessageTypes,
-            BluetoothMns mnsClient, int masId) {
+            BluetoothMns mnsClient, int masId, String remoteDeviceName) {
         mContext = context;
         mSupportedMessageTypes = supportedMessageTypes;
         mMasId = masId;
         mHandler = handler;
         mMnsClient = mnsClient;
+        mRemoteDeviceName = remoteDeviceName;
 
         OFFSET_START = HANDLE_OFFSET[masId];
         OFFSET_END = HANDLE_OFFSET[masId + 1] - 1;

@@ -76,8 +76,8 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
     private ContentObserver mObserver;
 
     public BluetoothMasAppEmail(Context context, Handler handler, BluetoothMns mnsClient,
-            int masId) {
-        super(context, handler, MESSAGE_TYPE_EMAIL, mnsClient, masId);
+            int masId, String remoteDeviceName) {
+        super(context, handler, MESSAGE_TYPE_EMAIL, mnsClient, masId, remoteDeviceName);
 
         mObserver = new ContentObserver(null) {
             @Override
@@ -202,7 +202,8 @@ public class BluetoothMasAppEmail extends BluetoothMasAppIf {
             }
 
             if (appParams.FilterPriority == 0 || appParams.FilterPriority == 0x02) {
-                if((appParams.FilterMessageType & 0x04) == 0){
+                if((appParams.FilterMessageType & 0x04) == 0 ||
+                        (mRemoteDeviceName != null && mRemoteDeviceName.startsWith(BMW))){
                     String folderName;
                     if (splitStrings.length < 3) {
                         Log.e(TAG, "The folder path is invalid.");
