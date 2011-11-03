@@ -446,7 +446,9 @@ public class BluetoothMasAppIf {
     private List<VcardContent> list;
 
     private VcardContent getVcardContent(String phoneAddress) {
-
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "getVcardContent(" + phoneAddress + ")");
+        }
         VcardContent vCard = new VcardContent();
         vCard.tel = phoneAddress;
 
@@ -457,10 +459,12 @@ public class BluetoothMasAppIf {
                 new String[] { PhoneLookup._ID, PhoneLookup.LOOKUP_KEY,
                         PhoneLookup.DISPLAY_NAME }, null, null, null);
         if (cursorContacts == null) {
-            return vCard;
+            return null;
         }
         cursorContacts.moveToFirst();
         if (cursorContacts.getCount() > 0) {
+            vCard.name = cursorContacts
+                    .getString(PHONELOOKUP_DISPLAY_NAME_COLUMN_INDEX);
             long contactId = cursorContacts
                     .getLong(PHONELOOKUP_ID_COLUMN_INDEX);
             String lookupKey = cursorContacts
@@ -474,8 +478,6 @@ public class BluetoothMasAppIf {
                     new String[] { Id }, null);
             if (crEm != null) {
                 if (crEm.moveToFirst()) {
-                    vCard.name = cursorContacts
-                            .getString(PHONELOOKUP_DISPLAY_NAME_COLUMN_INDEX);
                     vCard.email = "";
                     if (crEm.moveToFirst()) {
                         do {
@@ -520,11 +522,15 @@ public class BluetoothMasAppIf {
             }
         }
 
+        String regExp = filterString.replace("*", ".*[0-9A-Za-z].*");
         if (found == true) {
-            String regExp = filterString.replace("*", ".*[0-9A-Za-z].*");
             if ((foundEntry.tel.matches(".*"+regExp+".*"))
                     || (foundEntry.name.matches(".*"+regExp+".*"))
                     || (foundEntry.email.matches(".*"+regExp+".*"))) {
+                return true;
+            }
+        } else if (phoneAddress != null && phoneAddress.length() > 0) {
+            if (phoneAddress.matches(".*"+regExp+".*")) {
                 return true;
             }
         }
@@ -536,7 +542,9 @@ public class BluetoothMasAppIf {
      */
     private String getContactName(String phoneNumber) {
         // TODO Optimize this (get from list)
-
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "getContactName(" + phoneNumber + ")");
+        }
         boolean found = false;
         VcardContent foundEntry = null;
         if(phoneNumber == null){
@@ -549,6 +557,9 @@ public class BluetoothMasAppIf {
             if (elem.tel.contains(phoneNumber)) {
                 found = true;
                 foundEntry = elem;
+                if (Log.isLoggable(TAG, Log.DEBUG)) {
+                    Log.d(TAG, "from cache");
+                }
                 break;
             }
         }
@@ -556,6 +567,9 @@ public class BluetoothMasAppIf {
             foundEntry = getVcardContent(phoneNumber);
             if (foundEntry != null) {
                 list.add(foundEntry);
+                if (Log.isLoggable(TAG, Log.DEBUG)) {
+                    Log.d(TAG, "found from contact");
+                }
                 found = true;
             }
         }
@@ -563,7 +577,7 @@ public class BluetoothMasAppIf {
             return foundEntry.name;
         }
 
-        return null;
+        return "";
     }
 
     private class OwnerInfo {
@@ -2209,17 +2223,26 @@ public class BluetoothMasAppIf {
             bmsg.setFolder(Telecom + "/" + Msg + "/" + containingFolder);
 
             bmsg.setVcard_version("2.1");
-            VcardContent vcard = getVcardContent(getMmsMsgAddress(msgID));
+            String mmsMsgAddress = getMmsMsgAddress(msgID);
+            VcardContent vcard = getVcardContent(mmsMsgAddress);
             String type = cr.getString(cr.getColumnIndex("msg_box"));
             // Inbox is type 1.
             if (type.equalsIgnoreCase("1")) {
-                bmsg.setOriginatorVcard_name(vcard.name);
-                bmsg.setOriginatorVcard_phone_number(vcard.tel);
+                if (vcard != null) {
+                    bmsg.setOriginatorVcard_name(vcard.name);
+                    bmsg.setOriginatorVcard_phone_number(vcard.tel);
+                } else {
+                    bmsg.setOriginatorVcard_phone_number(mmsMsgAddress);
+                }
                 bmsg.setRecipientVcard_name(getOwnerName());
                 bmsg.setRecipientVcard_phone_number(getOwnerNumber());
             } else {
-                bmsg.setRecipientVcard_name(vcard.name);
-                bmsg.setRecipientVcard_phone_number(vcard.tel);
+                if (vcard != null) {
+                    bmsg.setRecipientVcard_name(vcard.name);
+                    bmsg.setRecipientVcard_phone_number(vcard.tel);
+                } else {
+                    bmsg.setRecipientVcard_phone_number(mmsMsgAddress);
+                }
                 bmsg.setOriginatorVcard_name(getOwnerName());
                 bmsg.setOriginatorVcard_phone_number(getOwnerNumber());
 
@@ -2829,19 +2852,27 @@ public class BluetoothMasAppIf {
             bmsg.setFolder(Telecom + "/" + Msg + "/" + containingFolder);
 
             bmsg.setVcard_version("2.1");
-            VcardContent vcard = getVcardContent(cr.getString(cr
-                    .getColumnIndex("address")));
+            String address = cr.getString(cr.getColumnIndex("address"));
+            VcardContent vcard = getVcardContent(address);
 
             String type = cr.getString(cr.getColumnIndex("type"));
             if (type.equalsIgnoreCase("1")) {
                 // The address in database is of originator
-                bmsg.setOriginatorVcard_name(vcard.name);
-                bmsg.setOriginatorVcard_phone_number(vcard.tel);
+                if (vcard != null) {
+                    bmsg.setOriginatorVcard_name(vcard.name);
+                    bmsg.setOriginatorVcard_phone_number(vcard.tel);
+                } else {
+                    bmsg.setOriginatorVcard_phone_number(address);
+                }
                 bmsg.setRecipientVcard_name(getOwnerName());
                 bmsg.setRecipientVcard_phone_number(getOwnerNumber());
             } else {
-                bmsg.setRecipientVcard_name(vcard.name);
-                bmsg.setRecipientVcard_phone_number(vcard.tel);
+                if (vcard != null) {
+                    bmsg.setRecipientVcard_name(vcard.name);
+                    bmsg.setRecipientVcard_phone_number(vcard.tel);
+                } else {
+                    bmsg.setRecipientVcard_phone_number(address);
+                }
                 bmsg.setOriginatorVcard_name(getOwnerName());
                 bmsg.setOriginatorVcard_phone_number(getOwnerNumber());
             }
@@ -2910,8 +2941,14 @@ public class BluetoothMasAppIf {
             String senderName = null;
             if (isOutgoingSMSMessage(msgType) == true) {
                 senderName = getOwnerName();
+                if (Log.isLoggable(TAG, Log.DEBUG)) {
+                    Log.d(TAG, "owner");
+                }
             } else {
                 senderName = getContactName(address);
+            }
+            if (Log.isLoggable(TAG, Log.DEBUG)) {
+                Log.d(TAG, "set Sender_name:" + senderName);
             }
             ml.setSender_name(senderName);
         }
