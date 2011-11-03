@@ -88,8 +88,8 @@ public class BluetoothMasAppSmsMms extends BluetoothMasAppIf {
     private static final String MMS = "MMS";
 
     public BluetoothMasAppSmsMms(Context context, Handler handler, BluetoothMns mnsClient,
-            int masId) {
-        super(context, handler, MESSAGE_TYPE_SMS_MMS, mnsClient, masId);
+            int masId, String remoteDeviceName) {
+        super(context, handler, MESSAGE_TYPE_SMS_MMS, mnsClient, masId, remoteDeviceName);
         SMS_OFFSET_START = OFFSET_START;
         MMS_OFFSET_START = OFFSET_START + ((OFFSET_END - OFFSET_START) / 2);
 
@@ -191,7 +191,8 @@ public class BluetoothMasAppSmsMms extends BluetoothMasAppIf {
                         ((appParams.FilterMessageType & 0x01) == 0 &&
                                 phoneType == TelephonyManager.PHONE_TYPE_GSM) ||
                         ((appParams.FilterMessageType & 0x02) == 0 &&
-                                phoneType == TelephonyManager.PHONE_TYPE_CDMA)) {
+                                phoneType == TelephonyManager.PHONE_TYPE_CDMA) ||
+                        (mRemoteDeviceName != null && mRemoteDeviceName.startsWith(BMW))) {
                     BluetoothMsgListRsp bmlrSms = msgListSms(msgList, folderName,
                             rsp, appParams);
                     bmlr.msgList = bmlrSms.msgList;

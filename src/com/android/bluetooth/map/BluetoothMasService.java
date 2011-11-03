@@ -696,11 +696,13 @@ public class BluetoothMasService extends Service {
                     ((mSupportedMessageTypes & MESSAGE_TYPE_SMS) != 0x00) &&
                     ((mSupportedMessageTypes & MESSAGE_TYPE_MMS) != 0x00)) {
                 // BluetoothMasAppZero if and only if both SMS and MMS
-                appIf = new BluetoothMasAppSmsMms(context, mSessionStatusHandler, mnsClient, 0);
+                appIf = new BluetoothMasAppSmsMms(context, mSessionStatusHandler, mnsClient,
+                        mMasId, device.getName());
             } else if (((mSupportedMessageTypes & ~MESSAGE_TYPE_EMAIL) == 0x0) &&
                     ((mSupportedMessageTypes & MESSAGE_TYPE_EMAIL) != 0x0)) {
                 // BluetoothMasAppOne if and only if email
-                appIf = new BluetoothMasAppEmail(context, mSessionStatusHandler, mnsClient, 1);
+                appIf = new BluetoothMasAppEmail(context, mSessionStatusHandler, mnsClient,
+                        mMasId, device.getName());
             }
 
             mMapServer = new BluetoothMasObexServer(mSessionStatusHandler,
