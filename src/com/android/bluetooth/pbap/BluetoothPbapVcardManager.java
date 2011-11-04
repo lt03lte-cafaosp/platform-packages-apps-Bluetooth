@@ -221,7 +221,7 @@ public class BluetoothPbapVcardManager {
             } else if (orderByWhat == BluetoothPbapObexServer.ORDER_BY_ALPHABETICAL) {
                 if (V) Log.v(TAG, "getPhonebookNameList, order by alpha");
                 contactCursor = mResolver.query(myUri, CONTACTS_PROJECTION, CLAUSE_ONLY_VISIBLE,
-                        null, Contacts.DISPLAY_NAME);
+                        null, Contacts.DISPLAY_NAME+ " COLLATE NOCASE");
             }
             if (contactCursor != null) {
                 for (contactCursor.moveToFirst(); !contactCursor.isAfterLast(); contactCursor
@@ -437,7 +437,7 @@ public class BluetoothPbapVcardManager {
         } else if (orderByWhat == BluetoothPbapObexServer.ORDER_BY_ALPHABETICAL) {
             try {
                 contactCursor = mResolver.query(myUri, CONTACTS_PROJECTION, CLAUSE_ONLY_VISIBLE,
-                        null, Contacts.DISPLAY_NAME);
+                        null, Contacts.DISPLAY_NAME+ " COLLATE NOCASE");
                 if (contactCursor != null) {
                     contactCursor.moveToPosition(offset - 1);
                     contactId = contactCursor.getLong(CONTACTS_ID_COLUMN_INDEX);
