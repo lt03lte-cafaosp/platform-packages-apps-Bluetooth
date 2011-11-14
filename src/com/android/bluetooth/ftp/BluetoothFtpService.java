@@ -860,17 +860,29 @@ public class BluetoothFtpService extends Service {
                 case MSG_INTERNAL_OBEX_RFCOMM_SESSION_UP:
                     if (VERBOSE) Log.v(TAG,"MSG_INTERNAL_OBEX_RFCOMM_SESSION_UP");
                     try {
-                      closeL2capSocket(true, false);
+                        /* Once the FTP is connected over RFCOMM, close the L2CAP socket on the
+                         PSM and RFCOMM socket on the SCN to reject further connection
+                         request */
+                        closeL2capSocket(true, false);
+                        mL2capServerSocket = null;
+                        closeRfcommSocket(true, false);
+                        mRfcommServerSocket = null;
                     } catch (IOException ex) {
-                      Log.e(TAG, "CloseSocket error: " + ex);
+                        Log.e(TAG, "CloseSocket error: " + ex);
                     }
                     break;
                 case MSG_INTERNAL_OBEX_L2CAP_SESSION_UP:
                     if (VERBOSE) Log.v(TAG,"MSG_INTERNAL_OBEX_L2CAP_SESSION_UP");
                     try {
-                      closeRfcommSocket(true, false);
+                        /* Once the FTP is connected over L2CAP, Close the RFCOMM socket on the
+                         SCN and L2CAP socket on the PSM to reject further connection
+                         request */
+                        closeRfcommSocket(true, false);
+                        mRfcommServerSocket = null;
+                        closeL2capSocket(true, false);
+                        mL2capServerSocket = null;
                     } catch (IOException ex) {
-                      Log.e(TAG, "CloseSocket error: " + ex);
+                        Log.e(TAG, "CloseSocket error: " + ex);
                     }
                     break;
                 default:
