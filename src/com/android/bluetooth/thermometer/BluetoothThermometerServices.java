@@ -972,7 +972,7 @@ public class BluetoothThermometerServices extends Service {
             Log.d(TAG, "data : " + Integer.toHexString(0xFF & data[i]));
         }
         try {
-            result = gattService.writeCharacteristicRaw(objPath, data);
+            result = gattService.writeCharacteristicRaw(objPath, data, true);
             Log.d(TAG, "gattService.writeCharacteristicRaw : " + result);
         } catch (Exception e) {
             result = false;
