@@ -53,9 +53,6 @@ import com.android.bluetooth.R;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.util.ArrayList;
 
 import javax.obex.ServerOperation;
@@ -71,7 +68,7 @@ public class BluetoothPbapVcardManager {
 
     private Context mContext;
 
-    private PbapByteArray mVcardResults;
+    private StringBuilder mVcardResults = null;
 
     static final String[] PHONES_PROJECTION = new String[] {
             Data._ID, // 0
@@ -569,11 +566,9 @@ public class BluetoothPbapVcardManager {
         public boolean onInit(Context context) {
             try {
                 outputStream = operation.openOutputStream();
+                mVcardResults = new StringBuilder();
                 if (phoneOwnVCard != null) {
-                    mVcardResults = new PbapByteArray(phoneOwnVCard.getBytes());
-                }else
-                {
-                    mVcardResults = new PbapByteArray();
+                    mVcardResults.append(phoneOwnVCard);
                 }
             } catch (IOException e) {
                 Log.e(TAG, "open outputstrem failed" + e.toString());
@@ -587,19 +582,23 @@ public class BluetoothPbapVcardManager {
             int vcardLen = vcard.length();
             if (V) Log.v(TAG, "The length of this vcard is: " + vcardLen);
 
-            mVcardResults.addAll(vcard.getBytes());
-            int vcardByteLen = mVcardResults.size();
+            mVcardResults.append(vcard);
+            int vcardByteLen = mVcardResults.toString().getBytes().length;
             if (V) Log.v(TAG, "The byte length of this vcardResults is: " + vcardByteLen);
 
             if (vcardByteLen >= maxPacketSize) {
                 long timestamp = 0;
                 int position = 0;
+
                 // Need while loop to handle the big vcard case
                 while (!BluetoothPbapObexServer.sIsAborted
                         && position < (vcardByteLen - maxPacketSize)) {
                     if (V) timestamp = System.currentTimeMillis();
+
+                    String subStr = mVcardResults.toString().substring(position,
+                            position + maxPacketSize);
                     try {
-                        outputStream.write(mVcardResults.toArray(),position, maxPacketSize);
+                        outputStream.write(subStr.getBytes(), 0, maxPacketSize);
                     } catch (IOException e) {
                         Log.e(TAG, "write outputstrem failed" + e.toString());
                         return false;
@@ -609,15 +608,16 @@ public class BluetoothPbapVcardManager {
 
                     position += maxPacketSize;
                 }
-                mVcardResults.removeRange(0, position);
+                mVcardResults.delete(0, position);
             }
             return true;
         }
 
         public void onTerminate() {
             // Send out last packet
-           try {
-                outputStream.write(mVcardResults.toArray(), 0, mVcardResults.size());
+            byte[] lastBytes = mVcardResults.toString().getBytes();
+            try {
+                outputStream.write(lastBytes, 0, lastBytes.length);
             } catch (IOException e) {
                 Log.e(TAG, "write outputstrem failed" + e.toString());
             }
@@ -629,72 +629,5 @@ public class BluetoothPbapVcardManager {
                 if (V) Log.v(TAG, "CloseStream ok!");
             }
         }
-    }
-
-
-
-    public class PbapByteArray implements Serializable {
-
-        private byte[] array;
-        private int size;
-         public PbapByteArray(byte[] data) {
-             array = new byte[(int) (data.length * 1.1) + 1];
-             size = data.length;
-             System.arraycopy(data, 0, array, 0, size);
-         }
-
-         public PbapByteArray() {
-             array = new byte[1];
-             size = 0;
-         }
-
-         public byte[] toArray() {
-             byte[] result = new byte[size];
-             System.arraycopy(array, 0, result, 0, size);
-             return result;
-         }
-
-            public int size() {
-             return size;
-            }
-
-            public void removeRange(int fromIndex, int toIndex) {
-                checkRange(fromIndex);
-                checkRange(toIndex);
-                if (fromIndex >= toIndex) {
-                    return;
-                }
-                int numtomove = size - toIndex;
-                if (numtomove > 0) {
-                    System.arraycopy(array, toIndex, array, fromIndex, numtomove);
-                }
-                size -= (toIndex - fromIndex);
-            }
-
-             public void addAll(byte[] data) {
-                 int dataLen = data.length;
-                 if (dataLen == 0) {
-                     return;
-                 }
-                 int newcap = size + (int) (dataLen * 1.1) + 1;
-                 ensureCapacity(newcap);
-                 System.arraycopy(data, 0, array, size, dataLen);
-                 size += dataLen;
-             }
-
-             public void ensureCapacity(int mincap) {
-                 if (mincap > array.length) {
-                     int newcap = ((array.length * 3) >> 1) + 1;
-                     byte[] olddata = array;
-                     array = new byte[newcap < mincap ? mincap : newcap];
-                     System.arraycopy(olddata, 0, array, 0, size);
-                 }
-             }
-
-             private void checkRange(int index) {
-                    if (index < 0 || index >= size) {
-                        throw new IndexOutOfBoundsException("Index should be at least 0 and less than " + size + ", found " + index);
-                    }
-             }
     }
 }
