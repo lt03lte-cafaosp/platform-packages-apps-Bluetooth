@@ -100,6 +100,10 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
 
     public static final String ROOT_FOLDER_PATH = "/sdcard";
 
+    private static final String FOLDER_NAME_DOT = ".";
+
+    private static final String FOLDER_NAME_DOTDOT = "..";
+
     List<String> filenames;
 
     List<String> types;
@@ -288,7 +292,12 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         try {
             name = (String)request.getHeader(HeaderSet.NAME);
             destname =  (String)request.getHeader(HeaderSet.DEST_NAME);
-
+            /* Renaming directory to "." or ".." is not allowed */
+            if (TextUtils.equals(destname, FOLDER_NAME_DOT) ||
+                TextUtils.equals(destname, FOLDER_NAME_DOTDOT) ) {
+               if(D)  Log.d(TAG, "cannot rename the directory to " + destname);
+               return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
+            }
             if(D)  Log.d(TAG,"Rename "+ name +" to "+destname);
             File src = new File(mCurrentPath + "/" + name);
             File dest = new File(mCurrentPath + "/" + destname);
@@ -357,6 +366,12 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
          */
         try{
            name = (String)request.getHeader(HeaderSet.NAME);
+           /* Not allowed to delete a folder name with "." and ".." */
+           if (TextUtils.equals(name, FOLDER_NAME_DOT) ||
+               TextUtils.equals(name, FOLDER_NAME_DOTDOT) ) {
+              if(D)  Log.d(TAG, "cannot delete the directory " + name);
+              return ResponseCodes.OBEX_HTTP_UNAUTHORIZED;
+           }
            if (D) Log.d(TAG,"OnDelete File = " + name +
                                           "mCurrentPath = " + mCurrentPath );
            File deleteFile = new File(mCurrentPath + "/" + name);
@@ -434,6 +449,12 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             request = op.getReceivedHeader();
             length = extractLength(request);
             name = (String)request.getHeader(HeaderSet.NAME);
+            /* Put with directory name "." and ".." is not allowed */
+            if (TextUtils.equals(name, FOLDER_NAME_DOT) ||
+                TextUtils.equals(name, FOLDER_NAME_DOTDOT) ) {
+               if(D) Log.d(TAG, "cannot put the directory " + name);
+               return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
+            }
             filetype = (String)request.getHeader(HeaderSet.TYPE);
             if (D) Log.d(TAG,"type = " + filetype + " name = " + name
                     + " Current Path = " + mCurrentPath + "length = " + length);
@@ -622,6 +643,13 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
         if (D) Log.d(TAG, "backup=" + backup + " create=" + create +
                    " name=" + tmp_path +"mCurrentPath = " + mCurrentPath);
 
+        /* If the name is "." or ".." do not allow to create or set the directory */
+        if (TextUtils.equals(tmp_path, FOLDER_NAME_DOT) ||
+            TextUtils.equals(tmp_path, FOLDER_NAME_DOTDOT)) {
+           if(D) Log.d(TAG, "cannot create or set the directory to " + tmp_path);
+           return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
+        }
+
         /* If backup flag is set then if the current path is not null then
          * remove the substring till '/' in the current path For ex. if current
          * path is "/sdcard/bluetooth" we will return a string "/sdcard" into
@@ -712,6 +740,12 @@ public class BluetoothFtpObexServer extends ServerRequestHandler {
             request = op.getReceivedHeader();
             type = (String)request.getHeader(HeaderSet.TYPE);
             name = (String)request.getHeader(HeaderSet.NAME);
+            /* Get with folder name "." and ".." is not allowed */
+            if (TextUtils.equals(name, FOLDER_NAME_DOT) ||
+                TextUtils.equals(name, FOLDER_NAME_DOTDOT) ) {
+               if(D) Log.d(TAG, "cannot get the folder " + name);
+               return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
+            }
         } catch (IOException e) {
             Log.e(TAG,"onGet request headers "+ e.toString());
             if (D) Log.d(TAG, "request headers error");
