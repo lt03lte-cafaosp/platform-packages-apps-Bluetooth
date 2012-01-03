@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -135,6 +135,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
         private Uri contentUri;
         private Context mContext1;
         private int position;
+        private volatile boolean interrupted = false;
 
         public ContentResolverUpdateThread(Context context, Uri cntUri, int pos) {
             super("BtOpp ContentResolverUpdateThread");
@@ -159,6 +160,14 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                 mContext1.getContentResolver().update(contentUri, updateValues,
                         null, null);
 
+                /*
+                    Check if the Operation is interrupted before entering sleep
+                */
+                if (interrupted == true) {
+                    if (V) Log.v(TAG, "ContentResolverUpdateThread was interrupted before sleep !, exiting");
+                    return;
+                }
+
                 try {
                     Thread.sleep(sSleepTime);
                 } catch (InterruptedException e1) {
@@ -166,6 +175,12 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                     return;
                 }
             }
+        }
+
+        @Override
+        public void interrupt() {
+            interrupted = true;
+            super.interrupt();
         }
     }
 
