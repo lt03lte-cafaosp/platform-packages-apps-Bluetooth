@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2008-2009, Motorola, Inc.
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * All rights reserved.
  *
@@ -388,7 +389,7 @@ public class BluetoothPbapVcardManager {
         }
         String SearchOnlyNumber = onlyphoneNumber.toString();
         Cursor contactCursor = null;
-        Uri uri = Data.CONTENT_URI;
+        Uri uri = Phone.CONTENT_URI;
 
         try {
             contactCursor = mResolver.query(uri, PHONES_PROJECTION, CLAUSE_ONLY_VISIBLE,
