@@ -730,14 +730,6 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
                     Constants.updateShareStatus(mContext1, mInfo.mId, status);
 
-                    if (Constants.ZERO_LENGTH_FILE) {
-                      /* Mark the status as success when a zero length file is rejected
-                       * by the remote device. It allows us to continue the transfer if
-                       * we have a batch and the file(s) are yet be sent in the row.
-                       */
-                      status = BluetoothShare.STATUS_SUCCESS;
-                    }
-
                     if (inputStream != null) {
                         inputStream.close();
                     }

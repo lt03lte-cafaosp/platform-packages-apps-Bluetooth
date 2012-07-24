@@ -560,6 +560,17 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             msg.what = BluetoothOppObexSession.MSG_SHARE_COMPLETE;
             msg.obj = mCurrentShare;
             msg.sendToTarget();
+        } else if ((newstatus == BluetoothShare.STATUS_FORBIDDEN) &&
+                  Constants.ZERO_LENGTH_FILE) {
+            /* Mark the status as success when a zero length file is rejected
+             * by the remote device. It allows us to continue the transfer if
+             * we have a batch and the file(s) are yet to be sent in the row.
+             */
+            Message msg = Message.obtain(mSessionHandler);
+            msg.what = BluetoothOppObexSession.MSG_SHARE_COMPLETE;
+            msg.obj = mCurrentShare;
+            msg.sendToTarget();
+            Constants.ZERO_LENGTH_FILE = false;
         } else {
             Message msg = Message.obtain(mSessionHandler);
             msg.what = BluetoothOppObexSession.MSG_SESSION_ERROR;
