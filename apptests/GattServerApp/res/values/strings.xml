@@ -40,4 +40,6 @@
     <string name="Clear_Preferred_Device_List">Clear preferred device list</string>
     <string name="Connect_Preferred_Device_List">Connect Request for preferred device list</string>
     <string name="Cancel_Connect_Preferred_Device_List">Cancel connect request for preferred device list</string>
+    <string name="Auto_Connect">Auto Connect</string>
+    <string name="Auto_Connect_Cancel">Auto Connect Cancel</string>
 </resources>
