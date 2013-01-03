@@ -58,7 +58,7 @@
                 <action android:name="android.bluetooth.devicepicker.action.DEVICE_SELECTED" />
             </intent-filter>
             <intent-filter>
-                <action android:name="android.bluetooth.device.action.LE_CONN_PARAMS" />
+                <action android:name="qualcomm.bluetooth.device.action.LE_CONN_PARAMS" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
