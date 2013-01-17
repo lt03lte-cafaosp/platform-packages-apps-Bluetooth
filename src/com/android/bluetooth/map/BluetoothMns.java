@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -127,6 +127,8 @@ public class BluetoothMns implements MessageNotificationListener {
     private HashSet<Integer> mWaitingMasId = new HashSet<Integer>();
     private final Queue<Pair<Integer, String>> mEventQueue = new ConcurrentLinkedQueue<Pair<Integer, String>>();
     private boolean mSendingEvent = false;
+
+    private Object mMNSStopSync = new Object();
 
     public BluetoothMns(Context context) {
         /* check Bluetooth enable status */
@@ -603,10 +605,12 @@ public class BluetoothMns implements MessageNotificationListener {
      */
     public void stop() {
         if (V) Log.v(TAG, "stop");
-        if (mSession != null) {
-            if (V) Log.v(TAG, "Stop mSession");
-            mSession.disconnect();
-            mSession = null;
+        synchronized (mMNSStopSync) {
+            if (mSession != null) {
+                if (V) Log.v(TAG, "Stop mSession");
+                mSession.disconnect();
+                mSession = null;
+            }
         }
     }
 
