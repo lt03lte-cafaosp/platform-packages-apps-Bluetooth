@@ -47,6 +47,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+import java.util.Locale;
 
 public class EmailUtils {
     public static final String TAG = "EmailUtils";
@@ -335,36 +336,40 @@ public class EmailUtils {
         }
 
         if ((appParams.ParameterMask & BIT_SENDER_NAME) != 0) {
-            if(senderName.contains("")){
-                String[] senderStr = senderName.split("");
-                if(senderStr !=null && senderStr.length > 0){
-                    if (V){
-                        Log.v(TAG, " ::Sender name split String 0:: " + senderStr[0]
-                                + "::Sender name split String 1:: " + senderStr[1]);
+            if(senderName != null) {
+                if(senderName.contains("")){
+                    String[] senderStr = senderName.split("");
+                    if(senderStr !=null && senderStr.length > 0){
+                        if (V){
+                            Log.v(TAG, " ::Sender name split String 0:: " + senderStr[0]
+                                    + "::Sender name split String 1:: " + senderStr[1]);
+                        }
+                        emailMsg.setSender_name(senderStr[1].trim());
                     }
-                    emailMsg.setSender_name(senderStr[1].trim());
                 }
-            }
-            else{
-                emailMsg.setSender_name(senderName.trim());
+                else{
+                    emailMsg.setSender_name(senderName.trim());
+                }
             }
        }
 
         if ((appParams.ParameterMask & BIT_SENDER_ADDRESSING) != 0) {
-            if(senderAddressing.contains("")){
-                String[] senderAddrStr = senderAddressing.split("");
-                if(senderAddrStr !=null && senderAddrStr.length > 0){
-                    if (V){
-                        Log.v(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
-                                + "::Sender Addressing split String 1:: " + senderAddrStr[1]);
+            if(senderAddressing != null) {
+                if(senderAddressing.contains("")){
+                    String[] senderAddrStr = senderAddressing.split("");
+                    if(senderAddrStr !=null && senderAddrStr.length > 0){
+                        if (V){
+                            Log.v(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
+                                    + "::Sender Addressing split String 1:: " + senderAddrStr[1]);
+                        }
+                        emailMsg.setSender_addressing(senderAddrStr[0].trim());
                     }
-                    emailMsg.setSender_addressing(senderAddrStr[0].trim());
+                }
+                else{
+                    emailMsg.setSender_addressing(senderAddressing.trim());
                 }
             }
-            else{
-                emailMsg.setSender_addressing(senderAddressing.trim());
-            }
-       }
+        }
 
         if ((appParams.ParameterMask & BIT_RECIPIENT_NAME) != 0) {
             String multiRecepients = "";
@@ -634,7 +639,7 @@ public class EmailUtils {
                 sb.append("Content-Transfer-Encoding: 8bit").append("\r\n");
                 // BMW 14692 carkit accepts Date format in "EEE, dd MMM yyyy HH:mm:ss Z"
                 sb.append("Date:");
-                sb.append(new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").format(date));
+                sb.append(new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z, Locale.US").format(date));
                 sb.append("\r\n");
                 sb.append("Subject:").append(subjectText).append("\r\n").append("\r\n");
                 sb.append(emailBody).append("\r\n");
