@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="Read_Value" >Leer valor</string>
+    <string name="enter_path_loss" >Entrar com Threshold Path Loss</string>
+    <string name="unregister_rssi" >Anular registro</string>
+    <string name="closeService" >Cerrar servicio</string>
+    <string name="Tx_power_Service" >Servicio de potencia de TX</string>
+    <string name="Get_BT_devices" >Obtener dispositivos BT</string>
+    <string name="characteristics_prompt" >Seleccionar una característica</string>
+    <string name="Link_Loss_Service" >Servicio de Pérdida de Link</string>
+    <string name="Write_Value" >Escriba el valor</string>
+    <string name="enter_rssi" >Ingrese umbral Rssi</string>
+    <string name="proximity_app_name" >LEProximity</string>
+    <string name="empty_string" >0.0</string>
+    <string name="Immediate_Alert_Service" >Servicio de Alertas Inmediato</string>
+    <string name="proximity_hello" >Hola Mundo, LEProximityClient!</string>
+    <string name="enter" >Entrar</string>
+    <string name="resgister_rssi" >Registro de RSSI</string>
+    <string name="characteristics_array" >Nivel de Alerta de link Pérdido</string>
+    <string name="imm_alert_characteristics_array" >Imm Nível de Alerta</string>
+    <string name="tx_power_characteristics_array" >TX Power Level</string>
+</resources>

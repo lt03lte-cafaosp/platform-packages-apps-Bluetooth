@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="map_notif_title" >Solicitação de chave de sessão para MAP</string>
+    <string name="map_acceptance_timeout_message" >Não havia tempo para aceitar conexão com% 1 $ s</string>
+    <string name="map_authentication_timeout_message" >Tempo limite excedido para entrar com chave de sessão com %1$s</string>
+    <string name="map_acceptance_dialog_header" >Acesso a pasta do telefone</string>
+    <string name="map_acceptance_dialog_title" >%1$s gostaria de acessar as pastas de seu telefone. Dar acesso para %2$s?</string>
+    <string name="map_session_key_dialog_header" >Exige chave de sessão Bluetooth</string>
+    <string name="map_session_key_dialog_title" >Digite a chave da sessão para %1$s</string>
+    <string name="map_alert_conn_failed_message" >Falha na conexão MAP Bluetooth</string>
+    <string name="map_notif_message" >Permitir o acesso à pasta raiz por %1$s</string>
+    <string name="map_notif_ticker" >Pedido de autenticação Obex</string>
+</resources>

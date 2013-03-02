@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="status_bpp_output_area_full" >Falha na impressão devido a área de saída cheia</string>
+    <string name="status_bpp_media_jam" >Falha na impressão devido a papel enroscado</string>
+    <string name="status_bpp_media_low" >Falha na impressão devido a baixo tonner</string>
+    <string name="app_name_bpp" >Bluetooth BPP</string>
+    <string name="bpp_main" >Impressão Bluetooth</string>
+    <string name="status_bpp_marker_supply_low" >Falha na impressão devido ao baixo nível de tinta</string>
+    <string name="status_bpp_refused_by_printer" >Falha na impressão devido a recusa pela impressora</string>
+    <string name="status_bpp_aborted_by_printer" >Falha na impressão devido falha da impressora</string>
+    <string name="status_bpp_output_area_almost_full" >Falha na impressão devido a área de saída estar quase cheia</string>
+    <string name="bpp_authentication_timeout_message" >Tempo excedido para chave de sessão de entrada com %1$s</string>
+    <string name="bpp_cancel" >Cancelar</string>
+    <string name="status_bpp_door_open" >Falha na impressão devido a porta aberta</string>
+    <string name="status_bpp_sucess" >Impressão concluída com sucesso</string>
+    <string name="bpp_session_key_dialog_title" >Digite chave de sessão para %1$s</string>
+    <string name="bpp_setting_text" >Configuração</string>
+    <string name="status_bpp_cancelled_by_printer" >Falha na impressão devido cancelamento pela impressora</string>
+    <string name="status_bpp_media_empty" >Falha na impressão devido a falta de papel</string>
+    <string name="status_bpp_canceled_by_user" >Impressão cancelada pelo usuário</string>
+    <string name="status_bpp_unknown_error_by_printer" >Falha na impressão devido a um erro desconhecido na impressora</string>
+    <string name="status_bpp_disconnected" >Falha na impressão devido a perda de conexão Bluetooth</string>
+    <string name="status_bpp_marker_supply_empty" >Falha na impressão devido ao baixo nível de tinta</string>
+    <string name="bpp_printing_button_text" >Impressão</string>
+    <string name="bpp_session_key_dialog_header" >Solicitação de chave de sessão Bluetooth</string>
+    <string name="status_bpp_marker_failure" >Falha na impressão devido a falha no indicador</string>
+    <string name="status_bpp_stopped_by_printer" >Falha na impressão devido a parada da impressora</string>
+    <string name="status_bpp_paused" >Falha na impressão devido a uma pausa</string>
+    <string-array name="numberup" >
+        <item>"Uma página por lado"</item>
+        <item>"Duas páginas por lado"</item>
+        <item>"Quatro páginas por lado"</item>
+    </string-array>
+    <string-array name="orientation" >
+        <item>"Retrato"</item>
+        <item>"Paisagem"</item>
+        <item>"Paisagem reversa"</item>
+        <item>"Retrato reverso"</item>
+    </string-array>
+    <string-array name="sides" >
+        <item>"Unilateral"</item>
+        <item>"Dois lados de Borda Longa"</item>
+        <item>"Dois lados de Borda Curta"</item>
+    </string-array>
+    <string-array name="numberup_val" >
+        <item>"Um"</item>
+        <item>"Dois"</item>
+        <item>"Três"</item>
+    </string-array>
+    <string-array name="sides_val" >
+        <item>"Unilateral"</item>
+        <item>"Dois lados de Borda Longa"</item>
+        <item>"Dois lados de Borda Curta"</item>
+    </string-array>
+    <string-array name="orientation_val" >
+        <item>"Retrato"</item>
+        <item>"Paisagem"</item>
+        <item>"Paisagem reversa"</item>
+        <item>"Retrato reverso"</item>
+    </string-array>
+</resources>

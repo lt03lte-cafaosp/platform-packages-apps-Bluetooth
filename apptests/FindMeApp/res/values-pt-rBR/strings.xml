@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="findme_app_name" >LEFindMe</string>
+    <string name="Connect_FindMe" >Conectar ao dispositivo</string>
+    <string name="Alert_Level_List" ><font size="20"><b><u>Selecione um alerta abaixo</u></b></font></string>
+    <string name="findme_hello" >Olá mundo, LEFindMeClient!</string>
+    <string name="Cancel_Connect_FindMe" >Cancelar conectividade do dispositivo</string>
+</resources>
