@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="Add_To_Preferred_Device_List" >Adicionar en la lista de dispositivos preferidos</string>
+    <string name="Remove_From_Preferred_Device_List" >Remover de la lista de dispositivos preferidos</string>
+    <string name="app_name" >GattServerApp</string>
+    <string name="device_list" >Lista de Dispositivos Conectados</string>
+    <string name="Register_Value" >Registrar Servidor</string>
+    <string name="Unregister_Value" >Cancelar registro del servidor</string>
+    <string name="conn_req_device_list" >Lista de Dispositivos que requisitaran conexión</string>
+    <string name="Disconnect_Value" >Desconectar</string>
+    <string name="hello" >Hola Mundo!, GattServerApp!</string>
+    <string name="Connect_Preferred_Device_List" >Lista de dispositivos preferidos</string>
+    <string name="Clear_Preferred_Device_List" >Limpiar lista de dispositivos preferidos</string>
+    <string name="Cancel_Connect_Preferred_Device_List" >Cancelar solicitud de conectar para lista de dispositivos preferidos</string>
+    <string name="Cancel_Connect_Req" >Cancelar solicitud de conectar</string>
+    <string name="Connect_Value" >Conectar al cliente</string>
+</resources>
