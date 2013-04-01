@@ -271,7 +271,7 @@ public class BluetoothThermometerServices extends Service {
                 BluetoothThermometerReceiver.registerHandler(msgHandler);
 
                 inFilter = new IntentFilter();
-                inFilter.addAction("android.bluetooth.device.action.GATT");
+                inFilter.addAction("qualcomm.bluetooth.device.action.GATT");
                 inFilter.addAction("android.bluetooth.device.action.ACL_DISCONNECTED");
                 this.receiver = new BluetoothThermometerReceiver();
                 Log.d(TAG, "Registering the receiver");

@@ -229,7 +229,7 @@ public class BluetoothFtpService extends Service {
     // package and class name to which we send intent to check phone book access permission
     private static final String ACCESS_AUTHORITY_PACKAGE = "com.android.settings";
     private static final String ACCESS_AUTHORITY_CLASS =
-                         "com.android.settings.bluetooth.BluetoothPermissionRequest";
+                         "com.qualcomm.settings.bluetooth.BluetoothPermissionRequest";
 
     public BluetoothFtpService() {
     }
