@@ -396,10 +396,10 @@ public class LEProximityServices extends Service {
                 LEProximityReceiver.registerHandler(msgHandler);
 
                 inFilter = new IntentFilter();
-                inFilter.addAction("qualcomm.bluetooth.device.action.GATT");
+                inFilter.addAction("android.bluetooth.device.action.GATT");
                 inFilter.addAction("android.bluetooth.device.action.ACL_DISCONNECTED");
                 inFilter.addAction("android.bluetooth.device.action.ACL_CONNECTED");
-                inFilter.addAction("qualcomm.bluetooth.device.action.RSSI_UPDATE");
+                inFilter.addAction("android.bluetooth.device.action.RSSI_UPDATE");
 
                 this.receiver = new LEProximityReceiver();
                 Log.d(TAG, "Registering the receiver");
