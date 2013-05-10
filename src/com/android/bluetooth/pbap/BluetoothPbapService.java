@@ -177,7 +177,7 @@ public class BluetoothPbapService extends Service {
     // package and class name to which we send intent to check phone book access permission
     private static final String ACCESS_AUTHORITY_PACKAGE = "com.android.settings";
     private static final String ACCESS_AUTHORITY_CLASS =
-        "com.qualcomm.settings.bluetooth.BluetoothPermissionRequest";
+        "com.android.settings.bluetooth.BluetoothPermissionRequest";
 
     public BluetoothPbapService() {
         mState = BluetoothPbap.STATE_DISCONNECTED;
