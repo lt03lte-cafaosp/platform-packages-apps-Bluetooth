@@ -207,7 +207,9 @@ public class Constants {
         "text/html",
         "application/zip",
         "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.ms-powerpoint",
         "application/pdf",
     };
