@@ -51,7 +51,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import android.os.SystemProperties;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 
 /**
  * Provides Bluetooth Pan Device profile, as a service in
@@ -76,6 +77,8 @@ public class PanService extends ProfileService {
     private static final int MESSAGE_DISCONNECT = 2;
     private static final int MESSAGE_CONNECT_STATE_CHANGED = 11;
     private boolean mTetherOn = false;
+    private static final String PAN_PREFERENCE_FILE = "PANMGR";
+    private static final String PAN_TETHER_SETTING = "TETHERSTATE";
 
     AsyncChannel mTetherAc;
 
@@ -320,25 +323,27 @@ public class PanService extends ProfileService {
     }
      boolean isTetheringOn() {
         // TODO(BT) have a variable marking the on/off state
-        if (SystemProperties.getBoolean("bluetooth.mTetherOn", false) == true) {
-             if(DBG) Log.d(TAG, "isTetheringOn : " + SystemProperties.getBoolean("bluetooth.mTetherOn", false));
-             return true;
-        }
-        return false;
+        SharedPreferences tethsetting = getSharedPreferences(PAN_PREFERENCE_FILE, 0);
+        mTetherOn = tethsetting.getBoolean(PAN_TETHER_SETTING, false);
+        return mTetherOn;
     }
 
     void setBluetoothTethering(boolean value) {
-
+        if(DBG) Log.d(TAG, "setBluetoothTethering: " + value +", mTetherOn: " + mTetherOn);
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH_ADMIN permission");
-        mTetherOn = SystemProperties.getBoolean("bluetooth.mTetherOn", false) ;
-        if (DBG) Log.d(TAG, "setBluetoothTethering: " + value +", mTetherOn: " + mTetherOn);
 
-        if (SystemProperties.getBoolean("bluetooth.mTetherOn", false) != value){
+        SharedPreferences tethsetting = getSharedPreferences(PAN_PREFERENCE_FILE, 0);
+        if(mTetherOn != value) {
+
+            SharedPreferences.Editor editor = tethsetting.edit();
+            editor.putBoolean(PAN_TETHER_SETTING, value);
+
+            // Commit the edit!
+            editor.commit();
             //drop any existing panu or pan-nap connection when changing the tethering state
-            SystemProperties.set("bluetooth.mTetherOn", value?"true":"false");
-
+            mTetherOn = value;
             List<BluetoothDevice> DevList = getConnectedDevices();
-            for (BluetoothDevice dev : DevList)
+            for(BluetoothDevice dev : DevList)
                 disconnect(dev);
         }
     }
