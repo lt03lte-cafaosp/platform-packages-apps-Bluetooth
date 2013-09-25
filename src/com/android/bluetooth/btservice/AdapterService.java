@@ -779,6 +779,31 @@ public class AdapterService extends Service {
             return service.setRemoteAlias(device, name);
         }
 
+        public boolean getRemoteTrust(BluetoothDevice device) {
+            Log.d(TAG,"getRemoteTrust");
+            if (!Utils.checkCaller()) {
+                Log.w(TAG,"getRemoteTrust(): not allowed for non-active user");
+                return false;
+            }
+
+            AdapterService service = getService();
+            if (service == null) return false;
+            return service.getRemoteTrust(device);
+        }
+
+
+        public boolean setRemoteTrust(BluetoothDevice device, boolean trustValue) {
+            Log.d(TAG,"setRemoteTrust to "+ trustValue);
+            if (!Utils.checkCaller()) {
+                Log.w(TAG,"setRemoteTrust(): not allowed for non-active user");
+                return false;
+            }
+
+            AdapterService service = getService();
+            if (service == null) return false;
+            return service.setRemoteTrust(device, trustValue);
+        }
+
         public int getRemoteClass(BluetoothDevice device) {
             if (!Utils.checkCaller()) {
                 Log.w(TAG,"getRemoteClass(): not allowed for non-active user");
@@ -810,6 +835,17 @@ public class AdapterService extends Service {
             AdapterService service = getService();
             if (service == null) return false;
             return service.fetchRemoteUuids(device);
+        }
+
+        public boolean fetchRemoteMasInstances(BluetoothDevice device) {
+            if (!Utils.checkCaller()) {
+                Log.w(TAG,"fetchMasInstances(): not allowed for non-active user");
+                return false;
+            }
+
+            AdapterService service = getService();
+            if (service == null) return false;
+            return service.fetchRemoteMasInstances(device);
         }
 
         public boolean setPin(BluetoothDevice device, boolean accept, int len, byte[] pinCode) {
@@ -1257,6 +1293,21 @@ public class AdapterService extends Service {
         return true;
     }
 
+    boolean getRemoteTrust(BluetoothDevice device) {
+        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        DeviceProperties deviceProp = mRemoteDevices.getDeviceProperties(device);
+        if (deviceProp == null) return false;
+        return deviceProp.getTrust();
+    }
+
+    boolean setRemoteTrust(BluetoothDevice device, boolean trustValue) {
+        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        DeviceProperties deviceProp = mRemoteDevices.getDeviceProperties(device);
+        if (deviceProp == null) return false;
+        deviceProp.setTrust(trustValue);
+        return true;
+    }
+
      int getRemoteClass(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         DeviceProperties deviceProp = mRemoteDevices.getDeviceProperties(device);
@@ -1277,6 +1328,12 @@ public class AdapterService extends Service {
         mRemoteDevices.fetchUuids(device);
         return true;
     }
+
+      boolean fetchRemoteMasInstances(BluetoothDevice device) {
+         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         mRemoteDevices.fetchMasInstances(device);
+         return true;
+     }
 
      boolean setPin(BluetoothDevice device, boolean accept, int len, byte[] pinCode) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
@@ -1414,6 +1471,7 @@ public class AdapterService extends Service {
             accept, int passkey);
 
     /*package*/ native boolean getRemoteServicesNative(byte[] address);
+    /*package*/ native boolean getRemoteMasInstancesNative(byte[] address);
 
     // TODO(BT) move this to ../btsock dir
     private native int connectSocketNative(byte[] address, int type,
