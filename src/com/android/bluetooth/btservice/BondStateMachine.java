@@ -235,6 +235,7 @@ final class BondStateMachine extends StateMachine {
     }
 
     private boolean cancelBond(BluetoothDevice dev) {
+        if(mAdapterService == null) return false;
         if (dev.getBondState() == BluetoothDevice.BOND_BONDING) {
             byte[] addr = Utils.getBytesFromAddress(dev.getAddress());
             if (!mAdapterService.cancelBondNative(addr)) {
@@ -247,6 +248,7 @@ final class BondStateMachine extends StateMachine {
     }
 
     private boolean removeBond(BluetoothDevice dev, boolean transition) {
+        if(mAdapterService == null) return false;
         if (dev.getBondState() == BluetoothDevice.BOND_BONDED) {
             byte[] addr = Utils.getBytesFromAddress(dev.getAddress());
             if (!mAdapterService.removeBondNative(addr)) {
@@ -261,6 +263,7 @@ final class BondStateMachine extends StateMachine {
     }
 
     private boolean createBond(BluetoothDevice dev, boolean transition) {
+        if(mAdapterService == null) return false;
         if (dev.getBondState() == BluetoothDevice.BOND_NONE) {
             infoLog("Bond address is:" + dev);
             byte[] addr = Utils.getBytesFromAddress(dev.getAddress());
