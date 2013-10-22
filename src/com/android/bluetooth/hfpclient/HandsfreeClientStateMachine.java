@@ -181,6 +181,20 @@ final class HandsfreeClientStateMachine extends StateMachine {
         boolean outgoing = state == BluetoothHandsfreeClientCall.CALL_STATE_DIALING ||
                state == BluetoothHandsfreeClientCall.CALL_STATE_ALERTING;
 
+        if (state == BluetoothHandsfreeClientCall.CALL_STATE_ALERTING ||
+                    state == BluetoothHandsfreeClientCall.CALL_STATE_INCOMING) {
+            int newAudioMode = AudioManager.MODE_IN_CALL;
+            int currMode = mAudioManager.getMode();
+            if (currMode != newAudioMode) {
+                // request audio focus before setting the new mode
+                mAudioManager.requestAudioFocusForCall(AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.AUDIOFOCUS_GAIN);
+                Log.d(TAG, "setAudioMode Setting audio mode from "
+                        + currMode + " to " + newAudioMode);
+                mAudioManager.setMode(newAudioMode);
+            }
+        }
+
         // new call always takes lowest possible id, starting with 1
         Integer id = 1;
         while (mCalls.containsKey(id)) {
