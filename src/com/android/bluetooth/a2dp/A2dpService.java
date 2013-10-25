@@ -16,12 +16,13 @@
 
 package com.android.bluetooth.a2dp;
 
-import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothUuid;
 import android.bluetooth.IBluetoothA2dp;
 import android.content.Context;
 import android.content.Intent;
+import android.os.ParcelUuid;
 import android.provider.Settings;
 import android.util.Log;
 import com.android.bluetooth.btservice.ProfileService;
@@ -42,6 +43,13 @@ public class A2dpService extends ProfileService {
     private A2dpStateMachine mStateMachine;
     private Avrcp mAvrcp;
     private static A2dpService sAd2dpService;
+    static final ParcelUuid[] A2DP_SOURCE_UUID = {
+        BluetoothUuid.AudioSource
+    };
+    static final ParcelUuid[] A2DP_SOURCE_SINK_UUIDS = {
+        BluetoothUuid.AudioSource,
+        BluetoothUuid.AudioSink
+    };
 
     protected String getName() {
         return TAG;
@@ -116,14 +124,13 @@ public class A2dpService extends ProfileService {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                        "Need BLUETOOTH ADMIN permission");
 
-        BluetoothClass remoteclass = device.getBluetoothClass();
-        if (DBG) {
-            Log.d(TAG,"getRemoteClass " + remoteclass.toString());
-        }
-        if (!remoteclass.doesClassMatch(BluetoothClass.PROFILE_A2DP)) {
+        if (getPriority(device) == BluetoothProfile.PRIORITY_OFF) {
             return false;
         }
-        if (getPriority(device) == BluetoothProfile.PRIORITY_OFF) {
+        ParcelUuid[] featureUuids = device.getUuids();
+        if ((BluetoothUuid.containsAnyUuid(featureUuids, A2DP_SOURCE_UUID)) &&
+            !(BluetoothUuid.containsAllUuids(featureUuids ,A2DP_SOURCE_SINK_UUIDS))) {
+            Log.e(TAG,"Remote does not have A2dp Sink UUID");
             return false;
         }
 
