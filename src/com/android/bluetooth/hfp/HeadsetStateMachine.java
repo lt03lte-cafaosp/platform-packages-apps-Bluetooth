@@ -688,6 +688,9 @@ final class HeadsetStateMachine extends StateMachine {
                         broadcastConnectionState(device, BluetoothProfile.STATE_DISCONNECTED,
                                        BluetoothProfile.STATE_CONNECTING);
                         break;
+                    } else {
+                            broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_DISCONNECTING,
+                                       BluetoothProfile.STATE_CONNECTED);
                     }
 
                     synchronized (HeadsetStateMachine.this) {
@@ -706,7 +709,7 @@ final class HeadsetStateMachine extends StateMachine {
                                    BluetoothProfile.STATE_CONNECTED);
                     if (!disconnectHfpNative(getByteAddress(device))) {
                         broadcastConnectionState(device, BluetoothProfile.STATE_CONNECTED,
-                                       BluetoothProfile.STATE_DISCONNECTED);
+                                       BluetoothProfile.STATE_DISCONNECTING);
                         break;
                     }
                     transitionTo(mPending);
@@ -932,6 +935,21 @@ final class HeadsetStateMachine extends StateMachine {
 
             boolean retValue = HANDLED;
             switch(message.what) {
+                case CONNECT:
+                {
+                    BluetoothDevice device = (BluetoothDevice) message.obj;
+                    if (mCurrentDevice.equals(device)) {
+                        break;
+                    }
+                    deferMessage(obtainMessage(DISCONNECT, mCurrentDevice));
+                    deferMessage(obtainMessage(CONNECT, message.obj));
+                    if (disconnectAudioNative(getByteAddress(mCurrentDevice))) {
+                        log("Disconnecting SCO audio");
+                    } else {
+                        Log.e(TAG, "disconnectAudioNative failed");
+                    }
+                }
+                break;
                 case DISCONNECT:
                 {
                     BluetoothDevice device = (BluetoothDevice) message.obj;
@@ -1096,7 +1114,14 @@ final class HeadsetStateMachine extends StateMachine {
                 case HeadsetHalConstants.AUDIO_STATE_DISCONNECTED:
                     if (mAudioState != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
                         mAudioState = BluetoothHeadset.STATE_AUDIO_DISCONNECTED;
+                    if (mAudioManager.isSpeakerphoneOn()) {
+                        // User option might be speaker as sco disconnection
+                        // is delayed setting back the speaker option.
                         mAudioManager.setBluetoothScoOn(false);
+                        mAudioManager.setSpeakerphoneOn(true);
+                    } else {
+                        mAudioManager.setBluetoothScoOn(false);
+                    }
                         if (mA2dpSuspend) {
                             if ((!isInCall()) && (mPhoneState.getNumber().isEmpty())) {
                                 log("Audio is closed,Set A2dpSuspended=false");

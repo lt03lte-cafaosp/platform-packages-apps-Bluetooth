@@ -347,15 +347,24 @@ class AdapterProperties {
     private boolean updateCountersAndCheckForConnectionStateChange(int state, int prevState) {
         switch (prevState) {
             case BluetoothProfile.STATE_CONNECTING:
-                mProfilesConnecting--;
+                if (mProfilesConnecting > 0)
+                    mProfilesConnecting--;
+                else
+                    Log.e(TAG, "mProfilesConnecting " + mProfilesConnecting);
                 break;
 
             case BluetoothProfile.STATE_CONNECTED:
-                mProfilesConnected--;
+                if (mProfilesConnected > 0)
+                    mProfilesConnected--;
+                else
+                    Log.e(TAG, "mProfilesConnected " + mProfilesConnected);
                 break;
 
             case BluetoothProfile.STATE_DISCONNECTING:
-                mProfilesDisconnecting--;
+                if (mProfilesDisconnecting > 0)
+                    mProfilesDisconnecting--;
+                else
+                    Log.e(TAG, "mProfilesDisconnecting " + mProfilesDisconnecting);
                 break;
         }
 
@@ -506,8 +515,18 @@ class AdapterProperties {
                     /* mDiscoverableTimeout is part of the
                        adapterPropertyChangedCallback received before
                        onBluetoothReady */
-                    if (mDiscoverableTimeout != 0)
-                      setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
+                    switch (mScanMode) {
+                        case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
+                            if (mDiscoverableTimeout != 0)
+                                setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
+                            else
+                                setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+                            break;
+                        case BluetoothAdapter.SCAN_MODE_NONE:
+                        case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
+                        default:
+                            setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
+                    }
                     /* though not always required, this keeps NV up-to date on first-boot after flash */
                     setDiscoverableTimeout(mDiscoverableTimeout);
             }
@@ -524,6 +543,21 @@ class AdapterProperties {
         //continue with disable sequence
         debugLog("onBluetoothDisable()");
         mBluetoothDisabling = true;
+
+        if (getState() == BluetoothAdapter.STATE_TURNING_OFF) {
+           switch (mScanMode) {
+               case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
+                   if (mDiscoverableTimeout != 0)
+                       setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
+                   else
+                       setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+                   break;
+               case BluetoothAdapter.SCAN_MODE_NONE:
+               case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
+               default:
+                   setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
+           }
+        }
     }
     void discoveryStateChangeCallback(int state) {
         infoLog("Callback:discoveryStateChangeCallback with state:" + state + " disc: " + mDiscovering);

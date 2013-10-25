@@ -126,9 +126,11 @@ final class RemoteDevices {
         private String mAlias;
         private int mBondState;
         private boolean mTrustValue;
+        int retry_count;
 
         DeviceProperties() {
             mBondState = BluetoothDevice.BOND_NONE;
+            retry_count = 0;
         }
 
         /**
@@ -495,6 +497,7 @@ final class RemoteDevices {
             if (device.getBondState() == BluetoothDevice.BOND_BONDING) {
                 /*Broadcasting PAIRING_CANCEL intent as well in this case*/
                 intent = new Intent(BluetoothDevice.ACTION_PAIRING_CANCEL);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
                 mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
             }
             intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
