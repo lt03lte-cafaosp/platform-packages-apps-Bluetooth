@@ -188,10 +188,14 @@ final class RemoteDevices {
         /**
          * @param mAlias the mAlias to set
          */
-        void setAlias(String mAlias) {
+        void setAlias(String alias) {
             synchronized (mObject) {
-                mAdapterService.setDevicePropertyNative(mAddress,
-                    AbstractionLayer.BT_PROPERTY_REMOTE_FRIENDLY_NAME, mAlias.getBytes());
+                if(alias == null) {
+                   mAlias = null;
+                } else {
+                    mAdapterService.setDevicePropertyNative(mAddress,
+                        AbstractionLayer.BT_PROPERTY_REMOTE_FRIENDLY_NAME, alias.getBytes());
+                }
             }
         }
 
@@ -302,12 +306,7 @@ final class RemoteDevices {
                             debugLog("Remote Device name is: " + device.mName);
                             break;
                         case AbstractionLayer.BT_PROPERTY_REMOTE_FRIENDLY_NAME:
-                            if (device.mAlias != null) {
-                                System.arraycopy(val, 0, device.mAlias, 0, val.length);
-                            }
-                            else {
-                                device.mAlias = new String(val);
-                            }
+                            device.mAlias = new String(val);
                             break;
                         case AbstractionLayer.BT_PROPERTY_BDADDR:
                             device.mAddress = val;
