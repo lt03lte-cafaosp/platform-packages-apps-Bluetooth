@@ -552,6 +552,8 @@ public class BluetoothOppService extends Service {
                 mNotifier.updateNotification();
 
                 cursor.close();
+                if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+                cursor = null;
             }
         }
 
@@ -978,6 +980,8 @@ public class BluetoothOppService extends Service {
                 if (V) Log.v(TAG, "Delete aborted inbound share, number = " + delNum);
             }
             cursorToFile.close();
+            if (V) Log.v(TAG, "Freeing cursor: " + cursorToFile);
+            cursorToFile = null;
         }
 
         // on boot : remove unconfirmed inbound shares.
@@ -1014,6 +1018,8 @@ public class BluetoothOppService extends Service {
             }
         }
         cursor.close();
+        if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+        cursor = null;
     }
 
     private static class MediaScannerNotifier implements MediaScannerConnectionClient {
