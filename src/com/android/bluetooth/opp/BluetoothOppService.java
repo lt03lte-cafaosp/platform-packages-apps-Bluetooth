@@ -45,6 +45,7 @@ import android.content.IntentFilter;
 import android.database.CharArrayBuffer;
 import android.database.ContentObserver;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteException;
 import android.media.MediaScannerConnection;
 import android.media.MediaScannerConnection.MediaScannerConnectionClient;
 import android.net.Uri;
@@ -278,7 +279,8 @@ public class BluetoothOppService extends Service {
                      * 2. If there is ongoing transfer, hold it for 20 seconds(1 seconds * 20 times)
                      * 3. If there is on-hold connection, reject directly
                      */
-                    if (mBatchs.size() == 0 && mPendingConnection == null) {
+                    if (((mBatchs.size() == 0) || ((mBatchs.size() > 0) && (mServerTransfer == null)
+                        )) && mPendingConnection == null) {
                         Log.i(TAG, "Start Obex Server");
                         createServerSession(transport);
                     } else {
@@ -303,7 +305,8 @@ public class BluetoothOppService extends Service {
                     }
                     break;
                 case MSG_INCOMING_CONNECTION_RETRY:
-                    if (mBatchs.size() == 0) {
+                    if ((mBatchs.size() == 0) || ((mBatchs.size() > 0) && (mServerTransfer == null))
+                        ) {
                         Log.i(TAG, "Start Obex Server");
                         createServerSession(mPendingConnection);
                         mIncomingRetries = 0;
@@ -436,8 +439,14 @@ public class BluetoothOppService extends Service {
                     }
                     mPendingUpdate = false;
                 }
-                Cursor cursor = getContentResolver().query(BluetoothShare.CONTENT_URI, null, null,
+                Cursor cursor;
+                try {
+                    cursor = getContentResolver().query(BluetoothShare.CONTENT_URI, null, null,
                         null, BluetoothShare._ID);
+                } catch (SQLiteException e) {
+                    cursor = null;
+                    Log.e(TAG, "SQLite exception: " + e);
+                }
 
                 if (cursor == null) {
                     return;
@@ -555,6 +564,22 @@ public class BluetoothOppService extends Service {
 
     }
 
+    private BluetoothOppTransfer insertShareWithOngoingBatch(BluetoothOppTransfer transfer,
+                        BluetoothOppBatch batch, int arrayPos, BluetoothOppObexSession session) {
+        if(transfer == null) {
+            transfer = new BluetoothOppTransfer(this, mPowerManager, batch, session);
+            if (transfer != null) {
+                transfer.start();
+            } else {
+                Log.e(TAG, "Unexpected error! mTransfer is null");
+                mBatchs.remove(batch);
+                mBatchId--;
+                mShares.remove(arrayPos);
+            }
+        }
+        return transfer;
+    }
+
     private void insertShare(Cursor cursor, int arrayPos) {
         String uriString = cursor.getString(cursor.getColumnIndexOrThrow(BluetoothShare.URI));
         Uri uri;
@@ -669,6 +694,14 @@ public class BluetoothOppService extends Service {
                     mBatchs.add(newBatch);
                     if (V) Log.v(TAG, "Service add new Batch " + newBatch.mId + " for info " +
                             info.mId);
+                    if (info.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
+                        mTransfer = insertShareWithOngoingBatch(mTransfer, newBatch, arrayPos,
+                            null);
+                    } else if (info.mDirection == BluetoothShare.DIRECTION_INBOUND) {
+                        mServerTransfer = insertShareWithOngoingBatch(mServerTransfer, newBatch,
+                            arrayPos, mServerSession);
+                    }
+
                     if (Constants.USE_TCP_DEBUG && !Constants.USE_TCP_SIMPLE_SERVER) {
                         // only allow  concurrent serverTransfer in debug mode
                         if (info.mDirection == BluetoothShare.DIRECTION_INBOUND) {
@@ -935,9 +968,15 @@ public class BluetoothOppService extends Service {
                 + BluetoothShare.DIRECTION_INBOUND + " AND " + BluetoothShare.STATUS + "="
                 + BluetoothShare.STATUS_RUNNING;
 
-        Cursor cursorToFile = contentResolver.query(BluetoothShare.CONTENT_URI,
-                                  new String[] { BluetoothShare._DATA },
-                                  WHERE_INBOUND_INTERRUPTED_ON_POWER_OFF, null, null);
+        Cursor cursorToFile;
+        try {
+            cursorToFile = contentResolver.query(BluetoothShare.CONTENT_URI,
+                new String[] { BluetoothShare._DATA },
+                WHERE_INBOUND_INTERRUPTED_ON_POWER_OFF, null, null);
+        } catch (SQLiteException e) {
+                cursorToFile = null;
+                Log.e(TAG, "SQLite exception: " + e);
+        }
 
         // remove the share and the respective file which was interrupted by battery
         // removal in the local device
@@ -967,9 +1006,15 @@ public class BluetoothOppService extends Service {
         final String WHERE_INBOUND_SUCCESS = BluetoothShare.DIRECTION + "="
                 + BluetoothShare.DIRECTION_INBOUND + " AND " + BluetoothShare.STATUS + "="
                 + BluetoothShare.STATUS_SUCCESS + " AND " + INVISIBLE;
-        Cursor cursor = contentResolver.query(BluetoothShare.CONTENT_URI, new String[] {
-            BluetoothShare._ID
-        }, WHERE_INBOUND_SUCCESS, null, BluetoothShare._ID); // sort by id
+        Cursor cursor;
+        try {
+            cursor = contentResolver.query(BluetoothShare.CONTENT_URI, new String[] {
+                BluetoothShare._ID
+                }, WHERE_INBOUND_SUCCESS, null, BluetoothShare._ID); // sort by id
+        } catch (SQLiteException e) {
+            cursor = null;
+            Log.e(TAG, "SQLite exception: " + e);
+        }
 
         if (cursor == null) {
             return;
