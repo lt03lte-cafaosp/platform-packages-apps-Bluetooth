@@ -81,7 +81,6 @@ final class Avrcp {
     private long mNextPosMs;
     private long mPrevPosMs;
     private long mSkipStartTime;
-    private Timer mTimer;
     private int mFeatures;
     private int mAbsoluteVolume;
     private int mLastSetVolume;
@@ -92,6 +91,7 @@ final class Avrcp {
     private int mAbsVolRetryTimes;
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
+    private int mSkipAmount;
 
     /* AVRC IDs from avrc_defs.h */
     private static final int AVRC_ID_REWIND = 0x48;
@@ -123,10 +123,16 @@ final class Avrcp {
     private static final int MESSAGE_FAST_FORWARD = 10;
     private static final int MESSAGE_REWIND = 11;
     private static final int MESSAGE_FF_REW_TIMEOUT = 12;
+
+    private static final int MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT = 13;
+    private static final int SET_ADDR_PLAYER_TIMEOUT = 2000;
+
     private int mAddressedPlayerChangedNT;
     private int mAvailablePlayersChangedNT;
     private int mAddressedPlayerId;
+    private String mRequestedAddressedPlayerPackageName;
 
+    private static final int MESSAGE_CHANGE_PLAY_POS = 12;
     private static final int MSG_UPDATE_STATE = 100;
     private static final int MSG_SET_METADATA = 101;
     private static final int MSG_SET_TRANSPORT_CONTROLS = 102;
@@ -144,11 +150,17 @@ final class Avrcp {
     private static final int KEY_STATE_RELEASE = 0;
     private static final int SKIP_PERIOD = 400;
     private static final int SKIP_DOUBLE_INTERVAL = 3000;
+    private static final long MAX_MULTIPLIER_VALUE = 128L;
     private static final int CMD_TIMEOUT_DELAY = 2000;
     private static final int MAX_ERROR_RETRY_TIMES = 3;
     private static final int AVRCP_MAX_VOL = 127;
     private static final int AVRCP_BASE_VOLUME_STEP = 1;
     private final static int MESSAGE_PLAYERSETTINGS_TIMEOUT = 602;
+
+    private static final int ERR_INVALID_PLAYER_ID = 0x11;
+    private static final int ERR_ADDR_PLAYER_FAILS = 0x13;
+    private static final int ERR_ADDR_PLAYER_SUCCEEDS = 0x04;
+
     //Intents for PlayerApplication Settings
     private static final String PLAYERSETTINGS_REQUEST = "org.codeaurora.music.playersettingsrequest";
     private static final String PLAYERSETTINGS_RESPONSE =
@@ -239,7 +251,6 @@ final class Avrcp {
         mPlaybackIntervalMs = 0L;
         mAddressedPlayerId = 0; //  0 signifies bad entry
         mPlayPosChangedNT = NOTIFICATION_TYPE_CHANGED;
-        mTimer = null;
         mFeatures = 0;
         mAbsoluteVolume = -1;
         mLastSetVolume = -1;
@@ -422,6 +433,11 @@ final class Avrcp {
             Log.e(TAG,"Unable to unregister Avrcp receiver", e);
         }
         mMediaPlayers.clear();
+        if (mHandler.hasMessages(MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT)) {
+            mHandler.removeMessages(MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT);
+            mRequestedAddressedPlayerPackageName = null;
+            if (DEBUG) Log.v(TAG, "Addressed player message cleanup as part of doQuit");
+        }
     }
 
     public void cleanup() {
@@ -634,6 +650,12 @@ final class Avrcp {
                 registerNotificationRspPlayPosNative(mPlayPosChangedNT, (int)getPlayPosition());
                 break;
 
+            case MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT:
+                if (DEBUG) Log.v(TAG, "setAddressedPlayer fails, Times out");
+                setAdressedPlayerRspNative ((byte)ERR_ADDR_PLAYER_FAILS);
+                mRequestedAddressedPlayerPackageName = null;
+                break;
+
             case MESSAGE_VOLUME_CHANGED:
                 if (DEBUG) Log.v(TAG, "MESSAGE_VOLUME_CHANGED: volume=" + msg.arg1 +
                                                               " ctype=" + msg.arg2);
@@ -709,7 +731,7 @@ final class Avrcp {
 
             case MESSAGE_FAST_FORWARD:
             case MESSAGE_REWIND:
-                final int skipAmount;
+                int skipAmount;
                 if (msg.what == MESSAGE_FAST_FORWARD) {
                     if (DEBUG) Log.v(TAG, "MESSAGE_FAST_FORWARD");
                     skipAmount = BASE_SKIP_AMOUNT;
@@ -718,32 +740,33 @@ final class Avrcp {
                     skipAmount = -BASE_SKIP_AMOUNT;
                 }
 
-                removeMessages(MESSAGE_FF_REW_TIMEOUT);
+                if (hasMessages(MESSAGE_CHANGE_PLAY_POS) &&
+                        (skipAmount != mSkipAmount)) {
+                    Log.w(TAG, "missing release button event:" + mSkipAmount);
+                }
+
+                if ((!hasMessages(MESSAGE_CHANGE_PLAY_POS)) ||
+                        (skipAmount != mSkipAmount)) {
+                    mSkipStartTime = SystemClock.elapsedRealtime();
+                }
+
+                removeMessages(MESSAGE_CHANGE_PLAY_POS);
                 if (msg.arg1 == KEY_STATE_PRESS) {
-                    if (mTimer == null) {
-                        /** Begin fast forwarding */
-                        mSkipStartTime = SystemClock.elapsedRealtime();
-                        TimerTask task = new TimerTask() {
-                            @Override
-                            public void run() {
-                                changePositionBy(skipAmount*getSkipMultiplier());
-                            }
-                        };
-                        mTimer = new Timer();
-                        mTimer.schedule(task, 0, SKIP_PERIOD);
-                    }
-                    sendMessageDelayed(obtainMessage(MESSAGE_FF_REW_TIMEOUT), BUTTON_TIMEOUT_TIME);
-                } else if (msg.arg1 == KEY_STATE_RELEASE && mTimer != null) {
-                    mTimer.cancel();
-                    mTimer = null;
+                    mSkipAmount = skipAmount;
+                    changePositionBy(mSkipAmount * getSkipMultiplier());
+                    Message posMsg = obtainMessage(MESSAGE_CHANGE_PLAY_POS);
+                    posMsg.arg1 = 1;
+                    sendMessageDelayed(posMsg, SKIP_PERIOD);
                 }
                 break;
 
-            case MESSAGE_FF_REW_TIMEOUT:
-                if (DEBUG) Log.v(TAG, "MESSAGE_FF_REW_TIMEOUT: FF/REW response timed out");
-                if (mTimer != null) {
-                    mTimer.cancel();
-                    mTimer = null;
+            case MESSAGE_CHANGE_PLAY_POS:
+                if (DEBUG) Log.v(TAG, "MESSAGE_CHANGE_PLAY_POS:" + msg.arg1);
+                changePositionBy(mSkipAmount * getSkipMultiplier());
+                if (msg.arg1 * SKIP_PERIOD < BUTTON_TIMEOUT_TIME) {
+                    Message posMsg = obtainMessage(MESSAGE_CHANGE_PLAY_POS);
+                    posMsg.arg1 = msg.arg1 + 1;
+                    sendMessageDelayed(posMsg, SKIP_PERIOD);
                 }
                 break;
             case MSG_UPDATE_RCC_CHANGE:
@@ -1019,6 +1042,11 @@ final class Avrcp {
     private void setAddressedPlayer(int playerId) {
         if (DEBUG) Log.v(TAG, "setAddressedPlayer");
         String packageName = null;
+        if (mRequestedAddressedPlayerPackageName != null) {
+            if (DEBUG) Log.v(TAG, "setAddressedPlayer: Request in progress, Reject this Request");
+            setAdressedPlayerRspNative ((byte)ERR_ADDR_PLAYER_FAILS);
+            return;
+        }
         if (mMediaPlayers.size() > 0) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
             while (rccIterator.hasNext()) {
@@ -1029,15 +1057,23 @@ final class Avrcp {
             }
         }
         if(packageName != null) {
+            if (playerId == mAddressedPlayerId) {
+                if (DEBUG) Log.v(TAG, "setAddressedPlayer: Already addressed, sending success");
+                setAdressedPlayerRspNative ((byte)ERR_ADDR_PLAYER_SUCCEEDS);
+                return;
+            }
             String newPackageName = packageName.replace("com.android", "org.codeaurora");
             Intent mediaIntent = new Intent(newPackageName + ".setaddressedplayer");
             mediaIntent.setPackage(packageName);
             mContext.sendBroadcast(mediaIntent); // This needs to be caught in respective media players
             if (DEBUG) Log.v(TAG, "Intent Broadcasted: " + newPackageName + ".setaddressedplayer");
-            setAdressedPlayerRspNative ((byte)0x04);
-        }else {
-            if (DEBUG) Log.v(TAG, "Error: No such media player available, hence can not be addressed");
-            setAdressedPlayerRspNative ((byte)0x011);
+            mRequestedAddressedPlayerPackageName = packageName;
+            Message msg = mHandler.obtainMessage(MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT);
+            mHandler.sendMessageDelayed(msg, SET_ADDR_PLAYER_TIMEOUT);
+            Log.v(TAG, "Post MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT");
+        } else {
+            if (DEBUG) Log.v(TAG, "setAddressedPlayer fails: No such media player available");
+            setAdressedPlayerRspNative ((byte)ERR_INVALID_PLAYER_ID);
         }
     }
     private void getFolderItems(byte scope, int start, int end, int attrCnt) {
@@ -1082,8 +1118,23 @@ final class Avrcp {
         if (isAvailable == 1)
             available = true;
 
-        if (focussed)
+        if (focussed) {
             isResetFocusRequired = true; // need to reset other player's focus.
+            if (mRequestedAddressedPlayerPackageName != null) {
+                if (callingPackageName.equals(mRequestedAddressedPlayerPackageName)) {
+                    mHandler.removeMessages(MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT);
+                    if (DEBUG) Log.v(TAG, "SetAddressedPlayer succeeds for: "
+                                                + mRequestedAddressedPlayerPackageName);
+                    mRequestedAddressedPlayerPackageName = null;
+                    setAdressedPlayerRspNative ((byte)ERR_ADDR_PLAYER_SUCCEEDS);
+                } else {
+                    if (DEBUG) Log.v(TAG, "SetaddressedPlayer package mismatch with: "
+                                                + mRequestedAddressedPlayerPackageName);
+                }
+            } else {
+                if (DEBUG) Log.v(TAG, "SetaddressedPlayer request is not in progress");
+            }
+        }
 
         if (mMediaPlayers.size() > 0) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
@@ -1211,7 +1262,8 @@ final class Avrcp {
 
     private int getSkipMultiplier() {
         long currentTime = SystemClock.elapsedRealtime();
-        return (int) Math.pow(2, (currentTime - mSkipStartTime)/SKIP_DOUBLE_INTERVAL);
+        long multi = (long) Math.pow(2, (currentTime - mSkipStartTime)/SKIP_DOUBLE_INTERVAL);
+        return (int) Math.min(MAX_MULTIPLIER_VALUE, multi);
     }
 
     private void sendTrackChangedRsp() {
