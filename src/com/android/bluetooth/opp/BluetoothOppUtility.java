@@ -46,6 +46,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
+import android.database.CursorWindowAllocationException;
+import android.database.sqlite.SQLiteException;
 import android.util.Log;
 
 import java.io.File;
@@ -68,7 +70,20 @@ public class BluetoothOppUtility {
     public static BluetoothOppTransferInfo queryRecord(Context context, Uri uri) {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         BluetoothOppTransferInfo info = new BluetoothOppTransferInfo();
-        Cursor cursor = context.getContentResolver().query(uri, null, null, null, null);
+        Cursor cursor = null;
+        try {
+            cursor = context.getContentResolver().query(uri, null, null, null, null);
+        } catch (SQLiteException e) {
+             if (cursor != null){
+                cursor.close();
+            }
+            cursor = null;
+            Log.e(TAG, "queryRecord: " + e);
+        } catch (CursorWindowAllocationException e) {
+            cursor = null;
+            Log.e(TAG, "queryRecord: " + e);
+        }
+
         if (cursor != null) {
             if (cursor.moveToFirst()) {
                 info.mID = cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare._ID));
@@ -136,10 +151,22 @@ public class BluetoothOppUtility {
         ArrayList<String> uris = Lists.newArrayList();
         final String WHERE = BluetoothShare.TIMESTAMP + " == " + timeStamp;
 
-        Cursor metadataCursor = context.getContentResolver().query(BluetoothShare.CONTENT_URI,
+        Cursor metadataCursor = null;
+        try {
+            metadataCursor = context.getContentResolver().query(BluetoothShare.CONTENT_URI,
                 new String[] {
                     BluetoothShare._DATA
                 }, WHERE, null, BluetoothShare._ID);
+        } catch (SQLiteException e) {
+           if (metadataCursor != null) {
+               metadataCursor.close();
+           }
+           metadataCursor = null;
+           Log.e(TAG, "queryTransfersInBatch: " + e);
+        } catch (CursorWindowAllocationException e) {
+           metadataCursor = null;
+           Log.e(TAG, "queryTransfersInBatch: " + e);
+        }
 
         if (metadataCursor == null) {
             return null;
