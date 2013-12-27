@@ -249,7 +249,9 @@ public class BluetoothMapService extends ProfileService {
         if (getRemoteDevice().equals(device)) {
             switch (mState) {
                 case BluetoothMap.STATE_CONNECTED:
-                    closeService();
+                    //do no call close service else map service will close
+                    //closeService();
+                    mConnectionManager.stopObexServerSessionAll();
                     setState(BluetoothMap.STATE_DISCONNECTED, BluetoothMap.RESULT_CANCELED);
                     result = true;
                     break;
@@ -794,6 +796,11 @@ public class BluetoothMapService extends ProfileService {
                       // In case getRemoteName failed and return null
                       if (TextUtils.isEmpty(sRemoteDeviceName)) {
                           sRemoteDeviceName = getString(R.string.defaultname);
+                      }
+                      if (!mConnectionManager.isAllowedConnection(mRemoteDevice)) {
+                          mConnSocket.close();
+                          mConnSocket = null;
+                          continue;
                       }
                       boolean trust = mRemoteDevice.getTrustState();
                       if (DEBUG) Log.d(TAG, "GetTrustState() = " + trust);
