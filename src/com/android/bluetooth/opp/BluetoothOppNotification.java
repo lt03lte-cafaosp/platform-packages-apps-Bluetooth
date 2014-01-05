@@ -305,6 +305,8 @@ class BluetoothOppNotification {
             }
         }
         cursor.close();
+        if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+        cursor = null;
 
         // Add the notifications
         for (NotificationItem item : mNotifications.values()) {
@@ -412,6 +414,8 @@ class BluetoothOppNotification {
         }
         if (V) Log.v(TAG, "outbound: succ-" + outboundSuccNumber + "  fail-" + outboundFailNumber);
         cursor.close();
+        if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+        cursor = null;
 
         outboundNum = outboundSuccNumber + outboundFailNumber;
         // create the outbound notification
@@ -459,6 +463,8 @@ class BluetoothOppNotification {
         }
         if (V) Log.v(TAG, "inbound: succ-" + inboundSuccNumber + "  fail-" + inboundFailNumber);
         cursor.close();
+        if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+        cursor = null;
 
         inboundNum = inboundSuccNumber + inboundFailNumber;
         // create the inbound notification
@@ -525,5 +531,7 @@ class BluetoothOppNotification {
             mNotificationMgr.notify(id, n);
         }
         cursor.close();
+        if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+        cursor = null;
     }
 }
