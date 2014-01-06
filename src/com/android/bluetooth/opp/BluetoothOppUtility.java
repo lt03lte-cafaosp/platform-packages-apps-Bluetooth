@@ -121,6 +121,8 @@ public class BluetoothOppUtility {
                             + info.mDestAddr);
             }
             cursor.close();
+            if (V) Log.v(TAG, "Freeing cursor: " + cursor);
+            cursor = null;
         } else {
             info = null;
             if (V) Log.v(TAG, "BluetoothOppManager Error: not got data from db for uri:" + uri);
@@ -157,6 +159,8 @@ public class BluetoothOppUtility {
             if (V) Log.d(TAG, "Uri in this batch: " + path.toString());
         }
         metadataCursor.close();
+        if (V) Log.v(TAG, "Freeing cursor: " + metadataCursor);
+        metadataCursor = null;
         return uris;
     }
 
@@ -316,12 +320,12 @@ public class BluetoothOppUtility {
         return (info != null) ? info : BluetoothOppSendFileInfo.SEND_FILE_INFO_ERROR;
     }
 
-    static void closeSendFileInfo(Uri uri) {
-        if (D) Log.d(TAG, "closeSendFileInfo: uri=" + uri);
-        BluetoothOppSendFileInfo info = sSendFileMap.remove(uri);
-        if (info != null && info.mInputStream != null) {
+    static void closeSendFileInfo(Uri uri, BluetoothOppSendFileInfo sendFileInfo) {
+        if (D) Log.d(TAG, "closeSendFileInfo: uri=" + uri + "sendFileInfo: " + sendFileInfo);
+        boolean removed = sSendFileMap.remove(uri, sendFileInfo);
+        if (removed && sendFileInfo != null && sendFileInfo.mInputStream != null) {
             try {
-                info.mInputStream.close();
+                sendFileInfo.mInputStream.close();
             } catch (IOException ignored) {
             }
         }
