@@ -2287,7 +2287,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
     private void setVCardFromEmailAddress(BluetoothMapbMessage message, String emailAddr, boolean incoming) {
         if(D) Log.d(TAG, "setVCardFromEmailAddress, emailAdress is " +emailAddr);
         String contactId = null, contactName = null;
-        String[] phoneNumbers = null;
+        String[] phoneNumbers = {""};
         String[] emailAddresses = new String[1];
         StringTokenizer emailId;
         Cursor p;
