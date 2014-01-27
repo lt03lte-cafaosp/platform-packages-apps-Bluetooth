@@ -164,4 +164,14 @@ final public class HandsfreeClientHalConstants {
     final static int CHLD_FEAT_MERGE         = 0x00000020;
     // 4  Connect two calls and leave (disconnect from) multiparty */
     final static int CHLD_FEAT_MERGE_DETACH  = 0x00000040;
+
+    // AT Commands
+    // These Commands values must match with Constants defined in
+    // tBTA_HF_CLIENT_AT_CMD_TYPE in bta_hf_client_api.h
+    // used for sending vendor specific AT cmds to AG.
+
+    final static int HANDSFREECLIENT_AT_CMD_NREC = 15;
+
+    // Flag to check for local NREC support
+    final static boolean HANDSFREECLIENT_NREC_SUPPORTED = true;
 }

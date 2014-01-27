@@ -565,6 +565,24 @@ static jboolean requestLastVoiceTagNumberNative(JNIEnv *env, jobject object) {
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
 
+static jboolean sendATCmdNative(JNIEnv *env, jobject object, jint cmd,
+                                jint val1, jint val2, jstring arg_str) {
+    bt_status_t status;
+    const char *arg;
+
+    if (!sBluetoothHfpClientInterface) return JNI_FALSE;
+
+    arg = env->GetStringUTFChars(arg_str, NULL);
+
+    if ((status = sBluetoothHfpClientInterface->send_at_cmd(cmd,val1,val2,arg)) !=
+            BT_STATUS_SUCCESS) {
+        ALOGE("Failed to send cmd, status: %d", status);
+    }
+
+    env->ReleaseStringUTFChars(arg_str, arg);
+    return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+}
+
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
     {"initializeNative", "()V", (void *) initializeNative},
@@ -585,6 +603,7 @@ static JNINativeMethod sMethods[] = {
     {"sendDtmfNative", "(B)Z", (void *) sendDtmfNative},
     {"requestLastVoiceTagNumberNative", "()Z",
         (void *) requestLastVoiceTagNumberNative},
+    {"sendATCmdNative", "(IIILjava/lang/String;)Z", (void *) sendATCmdNative},
 };
 
 int register_com_android_bluetooth_hfpclient(JNIEnv* env)
