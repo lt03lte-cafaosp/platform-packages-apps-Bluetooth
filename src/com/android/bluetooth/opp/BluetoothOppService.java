@@ -472,7 +472,8 @@ public class BluetoothOppService extends Service {
     private void updateFromProvider() {
         synchronized (BluetoothOppService.this) {
             mPendingUpdate = true;
-            if (mUpdateThread == null) {
+            if ((mUpdateThread == null) && (mAdapter != null)
+                && mAdapter.isEnabled()) {
                 mUpdateThread = new UpdateThread();
                 mUpdateThread.start();
             }
@@ -719,7 +720,7 @@ public class BluetoothOppService extends Service {
                 if (sendFileInfo == null || sendFileInfo.mInputStream == null) {
                     Log.e(TAG, "Can't open file for OUTBOUND info " + info.mId);
                     Constants.updateShareStatus(this, info.mId, BluetoothShare.STATUS_BAD_REQUEST);
-                    BluetoothOppUtility.closeSendFileInfo(info.mUri);
+                    BluetoothOppUtility.closeSendFileInfo(info.mUri, sendFileInfo);
                     return;
                 }
             }
@@ -898,6 +899,11 @@ public class BluetoothOppService extends Service {
             if (batch.hasShare(info)) {
                 if (V) Log.v(TAG, "Service cancel batch for share " + info.mId);
                 batch.cancelBatch();
+            }
+            if (mTransfer != null) {
+                if (V) Log.v(TAG, "Stop transfer session");
+                mTransfer.stop();
+                mTransfer = null;
             }
             if (batch.isEmpty()) {
                 if (V) Log.v(TAG, "Service remove batch  " + batch.mId);
