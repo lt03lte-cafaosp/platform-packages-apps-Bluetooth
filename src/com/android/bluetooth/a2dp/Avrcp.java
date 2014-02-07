@@ -52,6 +52,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.Iterator;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothA2dp;
 
 /**
  * support Bluetooth AVRCP profile.
@@ -97,6 +101,11 @@ final class Avrcp {
     /* AVRC IDs from avrc_defs.h */
     private static final int AVRC_ID_REWIND = 0x48;
     private static final int AVRC_ID_FAST_FOR = 0x49;
+    public static final int AVRC_ID_PLAY = 0x44;
+    public static final int AVRC_ID_PAUSE = 0x46;
+    public static final int AVRC_ID_VOL_UP = 0x41;
+    public static final int AVRC_ID_VOL_DOWN = 0x42;
+    public static final int AVRC_ID_STOP = 0x45;
 
     /* BTRC features */
     public static final int BTRC_FEAT_METADATA = 0x01;
@@ -127,11 +136,16 @@ final class Avrcp {
 
     private static final int MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT = 13;
     private static final int SET_ADDR_PLAYER_TIMEOUT = 2000;
+    private static final int MESSAGE_SEND_PASS_THROUGH_CMD = 2001;
+    private static final int MESSAGE_SET_ADDR_PLAYER = 2002;
+    private static final int MESSAGE_GET_FOLDER_ITEMS = 2003;
 
     private int mAddressedPlayerChangedNT;
     private int mAvailablePlayersChangedNT;
     private int mAddressedPlayerId;
     private String mRequestedAddressedPlayerPackageName;
+    private BluetoothDevice mDevice;
+    private int mIsConnected;
 
     private static final int MESSAGE_CHANGE_PLAY_POS = 12;
     private static final int MSG_UPDATE_STATE = 100;
@@ -161,6 +175,10 @@ final class Avrcp {
     private static final int ERR_INVALID_PLAYER_ID = 0x11;
     private static final int ERR_ADDR_PLAYER_FAILS = 0x13;
     private static final int ERR_ADDR_PLAYER_SUCCEEDS = 0x04;
+
+    private static final int AVRCP_CONNECTED = 1;
+    public  static final int KEY_STATE_PRESSED = 0;
+    public  static final int KEY_STATE_RELEASED = 1;
 
     //Intents for PlayerApplication Settings
     private static final String PLAYERSETTINGS_REQUEST = "org.codeaurora.music.playersettingsrequest";
@@ -260,6 +278,7 @@ final class Avrcp {
         mAbsVolRetryTimes = 0;
         keyPressState = KEY_STATE_RELEASE; //Key release state
         mContext = context;
+        mIsConnected = 0;
 
         initNative();
 
@@ -659,8 +678,8 @@ final class Avrcp {
                 break;
 
             case MESSAGE_VOLUME_CHANGED:
-                if (DEBUG) Log.v(TAG, "MESSAGE_VOLUME_CHANGED: volume=" + msg.arg1 +
-                                                              " ctype=" + msg.arg2);
+                if (DEBUG) Log.v(TAG, "MESSAGE_VOLUME_CHANGED: volume=" + ((byte)msg.arg1 & 0x7f)
+                                                        + " ctype=" + msg.arg2);
 
                 if (msg.arg2 == AVRC_RSP_ACCEPT || msg.arg2 == AVRC_RSP_REJ) {
                     if (mVolCmdInProgress == false) {
@@ -674,8 +693,11 @@ final class Avrcp {
                 if (mAbsoluteVolume != msg.arg1 && (msg.arg2 == AVRC_RSP_ACCEPT ||
                                                     msg.arg2 == AVRC_RSP_CHANGED ||
                                                     msg.arg2 == AVRC_RSP_INTERIM)) {
-                    notifyVolumeChanged(msg.arg1);
-                    mAbsoluteVolume = msg.arg1;
+                    byte absVol = (byte)((byte)msg.arg1 & 0x7f); //need to discard MSB as it is kept for RFD
+                    notifyVolumeChanged((int)absVol);
+                    mAbsoluteVolume = absVol;
+                    long pecentVolChanged = ((long)absVol * 100) / 0x7f;
+                    Log.e(TAG, "percent volume changed: " + pecentVolChanged + "%");
                 } else if (msg.arg2 == AVRC_RSP_REJ) {
                     Log.e(TAG, "setAbsoluteVolume call rejected");
                 }
@@ -731,6 +753,11 @@ final class Avrcp {
                 }
                 break;
 
+            case MESSAGE_SEND_PASS_THROUGH_CMD:
+                if (DEBUG) Log.v(TAG, "MESSAGE_SEND_PASS_THROUGH_CMD");
+                sendPassThroughCommandNative(msg.arg1, msg.arg2);
+                break;
+
             case MESSAGE_FAST_FORWARD:
             case MESSAGE_REWIND:
                 int skipAmount;
@@ -777,6 +804,16 @@ final class Avrcp {
                 int isFocussed = msg.arg1;
                 int isAvailable = msg.arg2;
                 processRCCStateChange(callingPackageName, isFocussed, isAvailable);
+                break;
+
+            case MESSAGE_SET_ADDR_PLAYER:
+                processSetAddressedPlayer(msg.arg1);
+                break;
+
+            case MESSAGE_GET_FOLDER_ITEMS:
+                FolderListEntries folderListEntries = (FolderListEntries)msg.obj;
+                processGetFolderItems(folderListEntries.mScope, folderListEntries.mStart,
+                    folderListEntries.mEnd, folderListEntries.mAttrCnt);
                 break;
             }
         }
@@ -916,6 +953,24 @@ final class Avrcp {
         }
     }
 
+    class FolderListEntries {
+        byte mScope;
+        int mStart;
+        int mEnd;
+        int mAttrCnt;
+        public FolderListEntries() {
+            mScope = 0;
+            mStart = 0;
+            mEnd = 0;
+            mAttrCnt = 0;
+        }
+        public FolderListEntries(byte scope, int start, int end, int attrCnt) {
+            mScope = scope;
+            mStart = start;
+            mEnd = end;
+            mAttrCnt = attrCnt;
+        }
+    }
     class Metadata {
         private String artist;
         private String trackTitle;
@@ -1043,7 +1098,13 @@ final class Avrcp {
     }
 
     private void setAddressedPlayer(int playerId) {
-        if (DEBUG) Log.v(TAG, "setAddressedPlayer");
+        if (DEBUG) Log.v(TAG, "setAddressedPlayer: PlayerID: " + playerId);
+        Message msg = mHandler.obtainMessage(MESSAGE_SET_ADDR_PLAYER, playerId, 0, 0);
+        mHandler.sendMessage(msg);
+    }
+
+    private void processSetAddressedPlayer(int playerId) {
+        if (DEBUG) Log.v(TAG, "processSetAddressedPlayer: PlayerID: " + playerId);
         String packageName = null;
         if (mRequestedAddressedPlayerPackageName != null) {
             if (DEBUG) Log.v(TAG, "setAddressedPlayer: Request in progress, Reject this Request");
@@ -1079,8 +1140,35 @@ final class Avrcp {
             setAdressedPlayerRspNative ((byte)ERR_INVALID_PLAYER_ID);
         }
     }
+
+    private void onConnectionStateChanged(int state, byte[] address) {
+        Log.v(TAG, "onConnectionStateChanged");
+        mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+            (Utils.getAddressStringFromByte(address));
+        Intent intent = new Intent(BluetoothA2dp.ACTION_AVRCP_CONNECTION_STATE_CHANGED);
+        intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, mIsConnected);
+        intent.putExtra(BluetoothProfile.EXTRA_STATE, state);
+        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mDevice);
+        intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+        mContext.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        Log.v(TAG, "Device Address: " + mDevice.getAddress());
+        mIsConnected = state;
+        Log.v(TAG, "mIsConnected: " + mIsConnected);
+    }
+
     private void getFolderItems(byte scope, int start, int end, int attrCnt) {
         if (DEBUG) Log.v(TAG, "getFolderItems");
+        if (DEBUG) Log.v(TAG, "scope: " + scope + " attrCnt: " + attrCnt);
+        if (DEBUG) Log.v(TAG, "start: " + start + " end: " + end);
+        FolderListEntries folderListEntries = new FolderListEntries (scope, start, end, attrCnt);
+        Message msg = mHandler.obtainMessage(MESSAGE_GET_FOLDER_ITEMS, 0, 0, folderListEntries);
+        mHandler.sendMessage(msg);
+    }
+
+    private void processGetFolderItems(byte scope, int start, int end, int attrCnt) {
+        if (DEBUG) Log.v(TAG, "processGetFolderItems");
+        if (DEBUG) Log.v(TAG, "scope: " + scope + " attrCnt: " + attrCnt);
+        if (DEBUG) Log.v(TAG, "start: " + start + " end: " + end);
         if (scope == 0x00) { // populate mediaplayer item list here
             byte[] folderItems = new byte[attrCnt]; // this value needs to be configured as per the Max pckt size received in request frame from stack
             int[] folderItemLengths = new int[32]; // need to check if we can configure this dynamically
@@ -1106,10 +1194,12 @@ final class Avrcp {
             getFolderItemsRspNative ((byte)0x04, 0x1357, availableMediaPlayers, folderItems, folderItemLengths);
         }
     }
+
     private void registerNotification(int eventId, int param) {
         Message msg = mHandler.obtainMessage(MESSAGE_REGISTER_NOTIFICATION, eventId, param);
         mHandler.sendMessage(msg);
     }
+
     private void processRCCStateChange(String callingPackageName, int isFocussed, int isAvailable) {
         if (DEBUG) Log.v(TAG, "processRCCStateChange");
         boolean available = false;
@@ -1182,6 +1272,7 @@ final class Avrcp {
             }
         }
     }
+
     private void processRegisterNotification(int eventId, int param) {
         switch (eventId) {
             case EVT_PLAY_STATUS_CHANGED:
@@ -1242,6 +1333,22 @@ final class Avrcp {
             case AVRC_ID_FAST_FOR:
                 fastForward(keyState);
                 break;
+        }
+    }
+
+    private void handlePassthroughRsp(int id, int keyState) {
+        switch (id) {
+            case AVRC_ID_VOL_UP:
+            case AVRC_ID_VOL_DOWN:
+            case AVRC_ID_PLAY:
+            case AVRC_ID_PAUSE:
+            case AVRC_ID_STOP:
+                Log.v(TAG, "passthrough response received as: key: "
+                                        + id + " state: " + keyState);
+                break;
+            default:
+                Log.e(TAG, "Error: unhandled passthrough response received as: key: "
+                                        + id + " state: " + keyState);
         }
     }
 
@@ -1421,7 +1528,25 @@ final class Avrcp {
         mHandler.removeMessages(MESSAGE_ADJUST_VOLUME);
         Message msg = mHandler.obtainMessage(MESSAGE_SET_ABSOLUTE_VOLUME, avrcpVolume, 0);
         mHandler.sendMessage(msg);
+    }
 
+    public void sendPassThroughCmd(int keyCode, int keyState) {
+        Log.v(TAG, "sendPassThroughCmd");
+        Log.v(TAG, "keyCode: " + keyCode + " keyState: " + keyState);
+        Message msg = mHandler.obtainMessage(MESSAGE_SEND_PASS_THROUGH_CMD, keyCode, keyState);
+        mHandler.sendMessage(msg);
+    }
+
+    public boolean isAvrcpConnected(BluetoothDevice device) {
+        Log.v(TAG, "isAvrcpConnected: " + device.getAddress());
+        if (device.equals(mDevice)) {
+            if (mIsConnected == AVRCP_CONNECTED) {
+                Log.v(TAG, "Connected: true");
+                return true;
+            }
+        }
+        Log.v(TAG, "Connected: false");
+        return false;
     }
 
     /* Called in the native layer as a btrc_callback to return the volume set on the carkit in the
@@ -1933,6 +2058,7 @@ private void updateLocalPlayerSettings( byte[] data) {
     private native boolean registerNotificationRspTrackChangeNative(int type, byte[] track);
     private native boolean registerNotificationRspPlayPosNative(int type, int playPos);
     private native boolean setVolumeNative(int volume);
+    private native boolean sendPassThroughCommandNative(int keyCode, int keyState);
     private native boolean registerNotificationRspAddressedPlayerChangedNative(int type, int playerId);
     private native boolean registerNotificationRspAvailablePlayersChangedNative (int type);
     private native boolean setAdressedPlayerRspNative(byte statusCode);
@@ -2002,18 +2128,20 @@ private void updateLocalPlayerSettings( byte[] data) {
                 DISPLAYABLE_NAME_LENGTH_FIELD_LENGTH + FEATURE_BITMASK_FIELD_LENGTH);
             mEntryLength = (short)(mItemLength + /* ITEM_LENGTH_LENGTH +*/ ITEM_TYPE_LENGTH);
             if (DEBUG) {
-                Log.v(TAG, "MediaPlayerInfo: mPlayerId=" + mPlayerId);
-                Log.v(TAG, "mMajorPlayerType=" + mMajorPlayerType + " mPlayerSubType=" + mPlayerSubType);
-                Log.v(TAG, "mPlayState=" + mPlayState + " mCharsetId=" + mCharsetId);
-                Log.v(TAG, "mPlayerPackageName=" + mPlayerPackageName + " mDisplayableNameLength=" + mDisplayableNameLength);
-                Log.v(TAG, "mItemLength=" + mItemLength + "mEntryLength=" + mEntryLength);
-                Log.v(TAG, "mFeatureMask=");
+                Log.v(TAG, "MediaPlayerInfo: mPlayerId = " + mPlayerId);
+                Log.v(TAG, "mMajorPlayerType = " + mMajorPlayerType + " mPlayerSubType = "
+                                                                        + mPlayerSubType);
+                Log.v(TAG, "mPlayState = " + mPlayState + " mCharsetId = " + mCharsetId);
+                Log.v(TAG, "mPlayerPackageName = " + mPlayerPackageName +
+                            " mDisplayableNameLength = " + mDisplayableNameLength);
+                Log.v(TAG, "mItemLength = " + mItemLength + " mEntryLength = " + mEntryLength);
+                Log.v(TAG, "mFeatureMask = ");
                 for (int count = 0; count < FEATURE_BITMASK_FIELD_LENGTH; count ++) {
-                    Log.v(TAG, "" + mFeatureMask[count]);
+                    Log.v(TAG, "mFeatureMask[" + count + "] = " + mFeatureMask[count]);
                 }
                 Log.v(TAG, "mDisplayableName=");
                 for (int count = 0; count < mDisplayableNameLength; count ++) {
-                    Log.v(TAG, "" + mDisplayableName[count]);
+                    Log.v(TAG, "mDisplayableName[" + count + "] = " + mDisplayableName[count]);
                 }
             }
         }
