@@ -105,7 +105,7 @@ public class QAdapterService extends Service {
         classInitNative();
     }
 
-    private static AdapterService mAdapterService;
+    private static AdapterService mAdapterService = AdapterService.getAdapterService();
     private static QAdapterService mQAdapterService;
     private LeExtendedScanSession mLeExtendedScanSession = null;
 
@@ -459,6 +459,27 @@ public class QAdapterService extends Service {
               Log.d(TAG,"sendLEConnUpdate() in Adapterservice:");
               return service.sendLEConnUpdate(device, interval_min, interval_max, latency, supervisionTimeout);
            }
+
+          public void onServiceUp() {
+               Log.e(TAG, "onServiceUp");
+               mAdapterService = AdapterService.getAdapterService();
+
+               if (mAdapterService != null) {
+                   Log.e(TAG, "calling onQBluetoothInitialized");
+                   mAdapterService.onQBluetoothInitialized();
+               }
+          }
+
+          public void onBrEdrDown() {
+               Log.e(TAG, "onBrEdrDown");
+               mAdapterService = AdapterService.getAdapterService();
+
+               if (mAdapterService != null) {
+                   Log.e(TAG, "calling onBrEdrDestroyed");
+                   mAdapterService.onBrEdrDestroyed();
+               }
+          }
+
      }
 
 

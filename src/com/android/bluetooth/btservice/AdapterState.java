@@ -17,6 +17,7 @@
 package com.android.bluetooth.btservice;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.QBluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Message;
@@ -39,44 +40,69 @@ import java.lang.RuntimeException;
 
 final class AdapterState extends StateMachine {
     private static final boolean DBG = true;
-    private static final boolean VDBG = false;
+    private static final boolean VDBG = true;
     private static final String TAG = "BluetoothAdapterState";
 
+    static final int BLE_TURN_ON = 0;
     static final int USER_TURN_ON = 1;
-    static final int STARTED=2;
+
+
+    static final int BREDR_STARTED=2;
     static final int ENABLED_READY = 3;
+    static final int BLE_STARTED=4;
 
     static final int USER_TURN_OFF = 20;
     static final int BEGIN_DISABLE = 21;
     static final int ALL_DEVICES_DISCONNECTED = 22;
+    static final int BLE_TURN_OFF = 23;
 
     static final int DISABLED = 24;
-    static final int STOPPED=25;
+    static final int BLE_STOPPED=25;
+    static final int BREDR_STOPPED = 26;
 
-    static final int START_TIMEOUT = 100;
+    static final int BREDR_START_TIMEOUT = 100;
     static final int ENABLE_TIMEOUT = 101;
     static final int DISABLE_TIMEOUT = 103;
-    static final int STOP_TIMEOUT = 104;
+    static final int BLE_STOP_TIMEOUT = 104;
     static final int SET_SCAN_MODE_TIMEOUT = 105;
+    static final int BLE_START_TIMEOUT = 106;
+    static final int BREDR_STOP_TIMEOUT = 107;
 
     static final int USER_TURN_OFF_DELAY_MS=500;
 
     //TODO: tune me
     private static final int ENABLE_TIMEOUT_DELAY = 8000;
     private static final int DISABLE_TIMEOUT_DELAY = 8000;
-    private static final int START_TIMEOUT_DELAY = 5000;
-    private static final int STOP_TIMEOUT_DELAY = 5000;
+    private static final int BREDR_START_TIMEOUT_DELAY = 4000;
+    //BLE_START_TIMEOUT can happen quickly as it just a start gattservice
+    private static final int BLE_START_TIMEOUT_DELAY = 2000;
+    private static final int BLE_STOP_TIMEOUT_DELAY = 2000;
+    //BREDR_STOP_TIMEOUT can < STOP_TIMEOUT
+    private static final int BREDR_STOP_TIMEOUT_DELAY = 4000;
     private static final int PROPERTY_OP_DELAY =2000;
     private AdapterService mAdapterService;
     private AdapterProperties mAdapterProperties;
     private PendingCommandState mPendingCommandState = new PendingCommandState();
     private OnState mOnState = new OnState();
     private OffState mOffState = new OffState();
+    private BleOnState mBleOnState = new BleOnState();
 
     public boolean isTurningOn() {
         boolean isTurningOn=  mPendingCommandState.isTurningOn();
         if (VDBG) Log.d(TAG,"isTurningOn()=" + isTurningOn);
         return isTurningOn;
+    }
+
+    public boolean isBleTurningOn() {
+        boolean isBleTurningOn=  mPendingCommandState.isBleTurningOn();
+        if (VDBG) Log.d(TAG,"isBleTurningOn()=" + isBleTurningOn);
+        return isBleTurningOn;
+    }
+
+    public boolean isBleTurningOff() {
+        boolean isBleTurningOff =  mPendingCommandState.isBleTurningOff();
+        if (VDBG) Log.d(TAG,"isBleTurningOff()=" + isBleTurningOff);
+        return isBleTurningOff;
     }
 
     public boolean isTurningOff() {
@@ -88,6 +114,7 @@ final class AdapterState extends StateMachine {
     private AdapterState(AdapterService service, AdapterProperties adapterProperties) {
         super("BluetoothAdapterState:");
         addState(mOnState);
+        addState(mBleOnState);
         addState(mOffState);
         addState(mPendingCommandState);
         mAdapterService = service;
@@ -128,13 +155,13 @@ final class AdapterState extends StateMachine {
                 return false;
             }
             switch(msg.what) {
-               case USER_TURN_ON:
-                   if (DBG) Log.d(TAG,"CURRENT_STATE=OFF, MESSAGE = USER_TURN_ON");
-                   notifyAdapterStateChange(BluetoothAdapter.STATE_TURNING_ON);
-                   mPendingCommandState.setTurningOn(true);
+               case BLE_TURN_ON:
+                   if (DBG) Log.d(TAG,"CURRENT_STATE=OFF, MESSAGE = BLE_TURN_ON");
+                   notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_TURNING_ON);
+                   mPendingCommandState.setBleTurningOn(true);
                    transitionTo(mPendingCommandState);
-                   sendMessageDelayed(START_TIMEOUT, START_TIMEOUT_DELAY);
-                   adapterService.processStart();
+                   sendMessageDelayed(BLE_START_TIMEOUT, BLE_START_TIMEOUT_DELAY);
+                   adapterService.BleOnProcessStart();
                    break;
                case USER_TURN_OFF:
                    if (DBG) Log.d(TAG,"CURRENT_STATE=OFF, MESSAGE = USER_TURN_OFF");
@@ -142,6 +169,56 @@ final class AdapterState extends StateMachine {
                    break;
                default:
                    if (DBG) Log.d(TAG,"ERROR: UNEXPECTED MESSAGE: CURRENT_STATE=OFF, MESSAGE = " + msg.what );
+                   return false;
+            }
+            return true;
+        }
+    }
+
+    private class BleOnState extends State {
+        @Override
+        public void enter() {
+            infoLog("Entering BleOnState");
+        }
+
+        @Override
+        public boolean processMessage(Message msg) {
+
+            AdapterService adapterService = mAdapterService;
+            AdapterProperties adapterProperties = mAdapterProperties;
+            if ((adapterService == null) || (adapterProperties == null)) {
+                Log.e(TAG,"receive message at Pending State after cleanup:" +
+                          msg.what);
+                return false;
+            }
+
+            switch(msg.what) {
+               case USER_TURN_ON:
+                   if (DBG) Log.d(TAG,"CURRENT_STATE=BLE_ON, MESSAGE = USER_TURN_ON");
+                   notifyAdapterStateChange(BluetoothAdapter.STATE_TURNING_ON);
+                   mPendingCommandState.setTurningOn(true);
+                   transitionTo(mPendingCommandState);
+                   sendMessageDelayed(BREDR_START_TIMEOUT, BREDR_START_TIMEOUT_DELAY);
+                   adapterService.startCoreServices();
+                   break;
+               case USER_TURN_OFF:
+                   if (DBG) Log.d(TAG,"CURRENT_STATE=BLE_ON, MESSAGE = USER_TURN_OFF");
+                   notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_TURNING_OFF);
+                   mPendingCommandState.setBleTurningOff(true);
+                   adapterProperties.onBleDisable();
+                   transitionTo(mPendingCommandState);
+                   sendMessageDelayed(DISABLE_TIMEOUT, DISABLE_TIMEOUT_DELAY);
+                   boolean ret = adapterService.disableNative();
+                   if (!ret) {
+                        removeMessages(DISABLE_TIMEOUT);
+                        Log.e(TAG, "Error while calling disableNative");
+                        //FIXME: what about post enable services
+                        mPendingCommandState.setBleTurningOff(false);
+                        notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_ON);
+                   }
+                   break;
+               default:
+                   if (DBG) Log.d(TAG,"ERROR: UNEXPECTED MESSAGE: CURRENT_STATE=BLE_ON, MESSAGE = " + msg.what );
                    return false;
             }
             return true;
@@ -170,8 +247,8 @@ final class AdapterState extends StateMachine {
             }
 
             switch(msg.what) {
-               case USER_TURN_OFF:
-                   if (DBG) Log.d(TAG,"CURRENT_STATE=ON, MESSAGE = USER_TURN_OFF");
+               case BLE_TURN_OFF:
+                   if (DBG) Log.d(TAG,"CURRENT_STATE=ON, MESSAGE = BLE_TURN_OFF");
                    notifyAdapterStateChange(BluetoothAdapter.STATE_TURNING_OFF);
                    mPendingCommandState.setTurningOff(true);
                    transitionTo(mPendingCommandState);
@@ -197,10 +274,14 @@ final class AdapterState extends StateMachine {
 
     private class PendingCommandState extends State {
         private boolean mIsTurningOn;
+        private boolean mIsBleTurningOn;
+        private boolean mIsBleTurningOff;
         private boolean mIsTurningOff;
 
         public void enter() {
-            infoLog("Entering PendingCommandState State: isTurningOn()=" + isTurningOn() + ", isTurningOff()=" + isTurningOff());
+            infoLog("Entering PendingCommandState State: isTurningOn()=" +
+                isTurningOn() + ", isTurningOff()=" + isTurningOff() + ", isBleTurningOn()=" +
+                isBleTurningOn() + ", isBleTurningOff()=" + isTurningOff());
         }
 
         public void setTurningOn(boolean isTurningOn) {
@@ -209,6 +290,22 @@ final class AdapterState extends StateMachine {
 
         public boolean isTurningOn() {
             return mIsTurningOn;
+        }
+
+        public void setBleTurningOn(boolean isBleTurningOn) {
+            mIsBleTurningOn = isBleTurningOn;
+        }
+
+        public boolean isBleTurningOn() {
+            return mIsBleTurningOn;
+        }
+
+        public void setBleTurningOff(boolean isBleTurningOff) {
+            mIsBleTurningOff = isBleTurningOff;
+        }
+
+        public boolean isBleTurningOff() {
+            return mIsBleTurningOff;
         }
 
         public void setTurningOff(boolean isTurningOff) {
@@ -224,6 +321,8 @@ final class AdapterState extends StateMachine {
 
             boolean isTurningOn= isTurningOn();
             boolean isTurningOff = isTurningOff();
+            boolean isBleTurningOn = isBleTurningOn();
+            boolean isBleTurningOff = isBleTurningOff();
 
             AdapterService adapterService = mAdapterService;
             AdapterProperties adapterProperties = mAdapterProperties;
@@ -235,29 +334,57 @@ final class AdapterState extends StateMachine {
 
             switch (msg.what) {
                 case USER_TURN_ON:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = USER_TURN_ON"
-                            + ", isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
-                    if (isTurningOn) {
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = USER_TURN_ON, isTurningOn="
+                                     + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn=" + isBleTurningOn() + "isBleTurningOff="
+                                     + isBleTurningOff());
+                    if (isTurningOn || isBleTurningOn) {
                         Log.i(TAG,"CURRENT_STATE=PENDING: Alreadying turning on bluetooth... Ignoring USER_TURN_ON...");
-                    } else {
+                    } else if(isBleTurningOff || isTurningOff){
                         Log.i(TAG,"CURRENT_STATE=PENDING: Deferring request USER_TURN_ON");
                         deferMessage(msg);
                     }
                     break;
                 case USER_TURN_OFF:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = USER_TURN_ON"
-                            + ", isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
-                    if (isTurningOff) {
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = USER_TURN_OFF, isTurningOn="
+                                     + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn" + isBleTurningOn() + "isBleTurningOff="
+                                     + isBleTurningOff());
+                    if (isTurningOff || isBleTurningOff) {
                         Log.i(TAG,"CURRENT_STATE=PENDING: Alreadying turning off bluetooth... Ignoring USER_TURN_OFF...");
-                    } else {
+                    } else if (isTurningOn || isBleTurningOn){
                         Log.i(TAG,"CURRENT_STATE=PENDING: Deferring request USER_TURN_OFF");
                         deferMessage(msg);
                     }
                     break;
-                case STARTED:   {
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = STARTED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
+                case BLE_TURN_ON:
+                   if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BLE_TURN_ON, isTurningOn="
+                                     + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn=" + isBleTurningOn() + "isBleTurningOff="
+                                     + isBleTurningOff());
+                    if (isTurningOn || isBleTurningOn) {
+                        Log.i(TAG,"CURRENT_STATE=PENDING: Alreadying ble turning on .. Ignoring BLE_TURN_ON...");
+                    } else if(isTurningOff || isBleTurningOff) {
+                        Log.i(TAG,"CURRENT_STATE=PENDING: Deferring request BLE_TURN_ON");
+                        deferMessage(msg);
+                    }
+                    break;
+                case BLE_TURN_OFF:
+                   if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BLE_TURN_OFF, isTurningOn="
+                                     + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn=" + isBleTurningOn() + "isBleTurningOff="
+                                     + isBleTurningOff());
+                    if (isTurningOff || isBleTurningOff) {
+                        Log.i(TAG,"CURRENT_STATE=PENDING: Alreadying ble turning on .. Ignoring BLE_TURN_ON...");
+                    } else if(isTurningOn || isBleTurningOn) {
+                        Log.i(TAG,"CURRENT_STATE=PENDING: Deferring request BLE_TURN_ON");
+                        deferMessage(msg);
+                    }
+                    break;
+                 case BLE_STARTED:   {
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BLE_STARTED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
                     //Remove start timeout
-                    removeMessages(START_TIMEOUT);
+                    removeMessages(BLE_START_TIMEOUT);
 
                     //Enable
                     boolean ret = adapterService.enableNative();
@@ -270,14 +397,23 @@ final class AdapterState extends StateMachine {
                     }
                 }
                     break;
-
-                case ENABLED_READY:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = ENABLE_READY, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
-                    removeMessages(ENABLE_TIMEOUT);
+                case BREDR_STARTED: {
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BREDR_STARTED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
+                    //Remove start timeout
+                    removeMessages(BREDR_START_TIMEOUT);
                     adapterProperties.onBluetoothReady();
                     mPendingCommandState.setTurningOn(false);
                     transitionTo(mOnState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_ON);
+                } break;
+                case ENABLED_READY:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = ENABLE_READY, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
+                    removeMessages(ENABLE_TIMEOUT);
+                    mPendingCommandState.setBleTurningOn(false);
+                    transitionTo(mBleOnState);
+                    notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_ON);
                     break;
 
                 case SET_SCAN_MODE_TIMEOUT:
@@ -286,6 +422,7 @@ final class AdapterState extends StateMachine {
                 case BEGIN_DISABLE: {
                     if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BEGIN_DISABLE, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
                     removeMessages(SET_SCAN_MODE_TIMEOUT);
+                    /*
                     sendMessageDelayed(DISABLE_TIMEOUT, DISABLE_TIMEOUT_DELAY);
                     boolean ret = adapterService.disableNative();
                     if (!ret) {
@@ -294,12 +431,18 @@ final class AdapterState extends StateMachine {
                         //FIXME: what about post enable services
                         mPendingCommandState.setTurningOff(false);
                         notifyAdapterStateChange(BluetoothAdapter.STATE_ON);
+                    }*/
+                    sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
+                    if (adapterService.stopProfileServices()) {
+                        Log.d(TAG,"Stopping profile services that were post enabled");
+                        break;
                     }
                 }
                     break;
                 case DISABLED:
                     if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = DISABLED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
                     if (isTurningOn) {
+                        /*Bhaktha: Is this needed*/
                         removeMessages(ENABLE_TIMEOUT);
                         errorLog("Error enabling Bluetooth - hardware init failed");
                         mPendingCommandState.setTurningOn(false);
@@ -309,35 +452,61 @@ final class AdapterState extends StateMachine {
                         break;
                     }
                     removeMessages(DISABLE_TIMEOUT);
-                    sendMessageDelayed(STOP_TIMEOUT, STOP_TIMEOUT_DELAY);
-                    if (adapterService.stopProfileServices()) {
-                        Log.d(TAG,"Stopping profile services that were post enabled");
+                    sendMessageDelayed(BLE_STOP_TIMEOUT, BLE_STOP_TIMEOUT_DELAY);
+                    if (adapterService.stopGattProfileService()) {
+                        Log.d(TAG,"Stopping Gatt profile services that were post enabled");
                         break;
                     }
                     //Fall through if no services or services already stopped
-                case STOPPED:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = STOPPED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
-                    removeMessages(STOP_TIMEOUT);
-                    setTurningOff(false);
+                case BLE_STOPPED:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BLE_STOPPED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
+                    removeMessages(BLE_STOP_TIMEOUT);
+                    setBleTurningOff(false);
                     transitionTo(mOffState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
                     break;
-                case START_TIMEOUT:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = START_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
+                case BREDR_STOPPED:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BREDR_STOPPED, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
+                    removeMessages(BREDR_STOP_TIMEOUT);
+                    setTurningOff(false);
+                    transitionTo(mBleOnState);
+                    notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_ON);
+                    break;
+                case BLE_START_TIMEOUT:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BLE_START_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
                     errorLog("Error enabling Bluetooth");
-                    mPendingCommandState.setTurningOn(false);
+                    mPendingCommandState.setBleTurningOn(false);
                     transitionTo(mOffState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
+                    break;
+                case BREDR_START_TIMEOUT:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BREDR_START_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
+                    errorLog("Error enabling Bluetooth");
+                    mPendingCommandState.setTurningOn(false);
+                    transitionTo(mBleOnState);
+                    notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_ON);
                     break;
                 case ENABLE_TIMEOUT:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = ENABLE_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = ENABLE_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
                     errorLog("Error enabling Bluetooth");
-                    mPendingCommandState.setTurningOn(false);
+                    mPendingCommandState.setBleTurningOn(false);
                     transitionTo(mOffState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
                     break;
-                case STOP_TIMEOUT:
-                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = STOP_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
+                case BREDR_STOP_TIMEOUT:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BREDR_STOP_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
+                    errorLog("Error stopping Bluetooth profiles");
+                    mPendingCommandState.setTurningOff(false);
+                    transitionTo(mBleOnState);
+                    notifyAdapterStateChange(QBluetoothAdapter.STATE_BLE_ON);
+                    break;
+                case BLE_STOP_TIMEOUT:
+                    if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = BLE_STOP_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff
+                                     + "isBleTurningOn()=" + isBleTurningOn() + "isBleTurningOff=" + isBleTurningOff());
                     errorLog("Error stopping Bluetooth profiles");
                     mPendingCommandState.setTurningOff(false);
                     transitionTo(mOffState);
