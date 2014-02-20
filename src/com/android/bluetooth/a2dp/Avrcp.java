@@ -1079,7 +1079,7 @@ final class Avrcp {
         }
     }
     private void getFolderItems(byte scope, int start, int end, int attrCnt) {
-        if (DEBUG) Log.v(TAG, "getFolderItems");
+        if (DEBUG) Log.v(TAG, "getFolderItems:start " + start + " end: " + end);
         if (scope == 0x00) { // populate mediaplayer item list here
             byte[] folderItems = new byte[attrCnt]; // this value needs to be configured as per the Max pckt size received in request frame from stack
             int[] folderItemLengths = new int[32]; // need to check if we can configure this dynamically
@@ -1091,13 +1091,17 @@ final class Avrcp {
                 while (rccIterator.hasNext()) {
                     final MediaPlayerInfo di = rccIterator.next();
                     if (di.GetPlayerAvailablility()) {
-                        byte[] playerEntry = di.RetrievePlayerItemEntry();
-                        int length = di.RetrievePlayerEntryLength();
-                        folderItemLengths[availableMediaPlayers ++] = length;
-                        for (count = 0; count < length; count ++) {
-                            folderItems[positionItemStart + count] = playerEntry[count];
+                        if (start == 0) {
+                            byte[] playerEntry = di.RetrievePlayerItemEntry();
+                            int length = di.RetrievePlayerEntryLength();
+                            folderItemLengths[availableMediaPlayers ++] = length;
+                            for (count = 0; count < length; count ++) {
+                                folderItems[positionItemStart + count] = playerEntry[count];
+                            }
+                            positionItemStart += length; // move start to next item start
+                        } else if (start > 0) {
+                            --start;
                         }
-                        positionItemStart += length; // move start to next item start
                     }
                 }
             }
