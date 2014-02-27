@@ -73,6 +73,8 @@ final class A2dpStateMachine extends StateMachine {
 
     private static final int IS_INVALID_DEVICE = 0;
     private static final int IS_VALID_DEVICE = 1;
+    /* by default we keep sink as enabled */
+    private static boolean isSinkEnabled = true;
 
     private Disconnected mDisconnected;
     private Pending mPending;
@@ -92,7 +94,8 @@ final class A2dpStateMachine extends StateMachine {
     private static final int AUDIO_FOCUS_LOSS_TRANSIENT = 2;
 
     private static final ParcelUuid[] A2DP_UUIDS = {
-        BluetoothUuid.AudioSink
+        BluetoothUuid.AudioSink,
+        BluetoothUuid.AudioSource
     };
 
     // mCurrentDevice is the device connected before the state changes
@@ -207,7 +210,7 @@ final class A2dpStateMachine extends StateMachine {
                     broadcastConnectionState(device, BluetoothProfile.STATE_CONNECTING,
                                    BluetoothProfile.STATE_DISCONNECTED);
 
-                    if (!connectA2dpNative(getByteAddress(device)) ) {
+                    if (!connectA2DPProfile(getByteAddress(device)) ) {
                         broadcastConnectionState(device, BluetoothProfile.STATE_DISCONNECTED,
                                        BluetoothProfile.STATE_CONNECTING);
                         break;
@@ -381,7 +384,7 @@ final class A2dpStateMachine extends StateMachine {
                         }
 
                         if (mTargetDevice != null) {
-                            if (!connectA2dpNative(getByteAddress(mTargetDevice))) {
+                            if (!connectA2DPProfile(getByteAddress(mTargetDevice))) {
                                 broadcastConnectionState(mTargetDevice,
                                                          BluetoothProfile.STATE_DISCONNECTED,
                                                          BluetoothProfile.STATE_CONNECTING);
@@ -687,7 +690,39 @@ final class A2dpStateMachine extends StateMachine {
         }
     }
 
-    // true if peer device is source
+    boolean connectA2DPProfile(byte[] address) {
+        BluetoothDevice device = getDevice(address);
+        boolean peer_has_sink, peer_has_src;
+        peer_has_sink = (BluetoothUuid.isUuidPresent(device.getUuids(), BluetoothUuid.AudioSink));
+        peer_has_src = (BluetoothUuid.isUuidPresent(device.getUuids(), BluetoothUuid.AudioSource));
+        log(" Sink Enabled: " + isSinkEnabled);
+        if ((peer_has_sink) && (!peer_has_src)) {
+            log("connectA2DPProfile  A2DPSrcNative");
+            return connectA2dpSrcNative(address);
+        }
+        else if ((peer_has_src) && (!peer_has_sink) && (isSinkEnabled)) {
+            log("connectA2DPProfile  A2DPSinkNative");
+            return connectA2dpSinkNative(address);
+        }
+        if ((peer_has_sink) && (peer_has_src)) {
+            log("connectA2DPProfile  both sink/src profile on peer");
+             /* Peer supports both sink and source connection
+              * Connect to Last connected profile
+              * If not found connect to Sink on peer.*/
+             int connectedSepType = mService.getLastConnectedA2dpSepType(device);
+             if ((BluetoothProfile.PROFILE_A2DP_SNK == connectedSepType) ||
+                 (BluetoothProfile.PROFILE_A2DP_UNDEFINED == connectedSepType)) {
+                 log("connectA2DPProfile  A2DPSrcNative");
+                 return connectA2dpSrcNative(address);
+             }
+             if ((BluetoothProfile.PROFILE_A2DP_SRC == connectedSepType) && (isSinkEnabled)) {
+                 log("connectA2DPProfile  A2DPSinkNative");
+                 return connectA2dpSinkNative(address);
+             }
+         }
+        return false;
+     }
+
     boolean isConnectedSrc(BluetoothDevice device)
     {
         if (mService.getLastConnectedA2dpSepType(device)
@@ -749,10 +784,11 @@ final class A2dpStateMachine extends StateMachine {
     }
 
     void activateSink(boolean isEnable) {
-        if (isEnable) {
+        if ((isEnable) && (!isSinkEnabled)) {
+            isSinkEnabled = true;
             activateA2dpSinkNative(1);
-        }
-        else {
+        } else if (isSinkEnabled) {
+            isSinkEnabled = false;
             activateA2dpSinkNative(0);
         }
     }
@@ -1038,7 +1074,8 @@ final class A2dpStateMachine extends StateMachine {
     private native static void classInitNative();
     private native void initNative();
     private native void cleanupNative();
-    private native boolean connectA2dpNative(byte[] address);
+    private native boolean connectA2dpSrcNative(byte[] address);
+    private native boolean connectA2dpSinkNative(byte[] address);
     private native boolean disconnectA2dpNative(byte[] address);
     private native void allowConnectionNative(int isValid);
     private native int isSrcNative(byte[] address);
