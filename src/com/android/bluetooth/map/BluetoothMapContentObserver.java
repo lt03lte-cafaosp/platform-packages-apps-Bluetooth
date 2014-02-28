@@ -1182,7 +1182,7 @@ public class BluetoothMapContentObserver {
             Cursor cursor = mResolver.query(msgInfo.uri, ID_PROJECTION, null, null, null);
 
             try {
-                if (cursor.moveToFirst()) {
+                if (cursor != null && cursor.moveToFirst()) {
                     int messageId = cursor.getInt(0);
 
                     Uri updateUri = ContentUris.withAppendedId(UPDATE_STATUS_URI, messageId);
@@ -1200,7 +1200,8 @@ public class BluetoothMapContentObserver {
                     Log.d(TAG, "Can't find message for status update: " + messageUri);
                 }
             } finally {
-                cursor.close();
+                if (cursor != null)
+                    cursor.close();
             }
 
             if (status == 0) {

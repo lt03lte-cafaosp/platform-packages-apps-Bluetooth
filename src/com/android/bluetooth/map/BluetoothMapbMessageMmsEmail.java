@@ -87,11 +87,13 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
 
         public void encodePlainText(StringBuilder sb) throws UnsupportedEncodingException {
             if(contentType != null && contentType.toUpperCase().contains("TEXT")) {
-                sb.append(contentType).append("\r\n");
-                sb.append("Content-Transfer-Encoding: 8bit").append("\r\n");
-                sb.append("Content-Disposition:inline").append("\r\n")
-                        .append("\r\n");
-                sb.append(new String(data,"UTF-8")).append("\r\n");
+                if(data != null) {
+                   sb.append(contentType).append("\r\n");
+                   sb.append("Content-Transfer-Encoding: 8bit").append("\r\n");
+                   sb.append("Content-Disposition:inline").append("\r\n")
+                           .append("\r\n");
+                   sb.append(new String(data,"UTF-8")).append("\r\n");
+                }
             } else if(contentType != null && contentType.toUpperCase().contains("/SMIL")) {
                 /* Skip the smil.xml, as no-one knows what it is. */
             } else {
@@ -398,19 +400,25 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
         sb.append("--"+boundary).append("\r\n");
 
         Log.v(TAG, "after encode header sb is "+ sb.toString());
-        if(getIncludeAttachments() == false) {
-            for(MimePart part : parts) {
-                part.encodePlainText(sb); /* We call encode on all parts, to include a tag, where an attachment is missing. */
-                sb.append("--"+boundary+"--").append("\r\n");
-            }
+
+        if (parts != null) {
+            if(getIncludeAttachments() == false) {
+               for(MimePart part : parts) {
+                   part.encodePlainText(sb); /* We call encode on all parts, to include a tag, where an attachment is missing. */
+                   sb.append("--"+boundary+"--").append("\r\n");
+               }
+           } else {
+               for(MimePart part : parts) {
+                   count++;
+                   part.encode(sb, getBoundary(), (count == parts.size()));
+               }
+           }
         } else {
-            for(MimePart part : parts) {
-                count++;
-                part.encode(sb, getBoundary(), (count == parts.size()));
-            }
+               Log.e(TAG, " parts is null.");
         }
 
         emailBody = sb.toString();
+        if (V) Log.v(TAG, "emailBody is "+emailBody);
 
         if(emailBody != null) {
             String tmpBody = emailBody.replaceAll("END:MSG", "/END\\:MSG"); // Replace any occurrences of END:MSG with \END:MSG

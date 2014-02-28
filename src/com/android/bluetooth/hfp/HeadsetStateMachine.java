@@ -780,10 +780,6 @@ final class HeadsetStateMachine extends StateMachine {
                 transitionTo(mConnected);
                 int deviceSize = mConnectedDevicesList.size();
                 mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
-                log("Pending state: processMultiHFConnected ," +
-                               "fake broadcasting for new mCurrentDevice");
-                broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
-                                             BluetoothProfile.STATE_DISCONNECTED);
             } else {
                 // The disconnected device is not current active device
                 if (mAudioState == BluetoothHeadset.STATE_AUDIO_CONNECTED)
@@ -792,6 +788,10 @@ final class HeadsetStateMachine extends StateMachine {
             }
             log("processMultiHFConnected , the latest mCurrentDevice is:"
                                              + mCurrentDevice);
+            log("Pending state: processMultiHFConnected ," +
+                           "fake broadcasting for mCurrentDevice");
+            broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
+                                         BluetoothProfile.STATE_DISCONNECTED);
         }
     }
 
@@ -1179,22 +1179,26 @@ final class HeadsetStateMachine extends StateMachine {
 
         private void processMultiHFConnected(BluetoothDevice device) {
             log("Connect state: processMultiHFConnected");
+            if (mActiveScoDevice != null && mActiveScoDevice.equals(device)) {
+                log ("mActiveScoDevice is disconnected, setting it to null");
+                mActiveScoDevice = null;
+            }
             /* Assign the current activedevice again if the disconnected
                          device equals to the current active device */
             if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
                 transitionTo(mConnected);
                 int deviceSize = mConnectedDevicesList.size();
                 mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
-                log("Connect state: processMultiHFConnected ," +
-                           "fake broadcasting for new mCurrentDevice");
-                broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
-                                BluetoothProfile.STATE_DISCONNECTED);
             } else {
                 // The disconnected device is not current active device
                 transitionTo(mConnected);
             }
             log("processMultiHFConnected , the latest mCurrentDevice is:" +
                                      mCurrentDevice);
+            log("Connect state: processMultiHFConnected ," +
+                       "fake broadcasting for mCurrentDevice");
+            broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
+                            BluetoothProfile.STATE_DISCONNECTED);
         }
     }
 
@@ -1497,7 +1501,8 @@ final class HeadsetStateMachine extends StateMachine {
                             mHeadsetBrsf.remove(device);
                             Log.d(TAG, "device " + device.getAddress() +
                                            " is removed in AudioOn state");
-
+                            broadcastConnectionState(device, BluetoothProfile.STATE_DISCONNECTED,
+                                                     BluetoothProfile.STATE_CONNECTED);
                             if (mConnectedDevicesList.size() == 0) {
                                 transitionTo(mDisconnected);
                             }
@@ -1505,8 +1510,6 @@ final class HeadsetStateMachine extends StateMachine {
                                 processMultiHFConnected(device);
                             }
                         }
-                        broadcastConnectionState(device, BluetoothProfile.STATE_DISCONNECTED,
-                                                 BluetoothProfile.STATE_CONNECTED);
                     } else {
                         Log.e(TAG, "Disconnected from unknown device: " + device);
                     }
@@ -1633,16 +1636,16 @@ final class HeadsetStateMachine extends StateMachine {
             if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
                 int deviceSize = mConnectedDevicesList.size();
                 mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
-                log("AudioOn state: processMultiHFConnected ," +
-                           "fake broadcasting for new mCurrentDevice");
-                broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
-                                BluetoothProfile.STATE_DISCONNECTED);
             }
             if (mAudioState != BluetoothHeadset.STATE_AUDIO_CONNECTED)
                 transitionTo(mConnected);
 
             log("processMultiHFConnected , the latest mCurrentDevice is:"
                                       + mCurrentDevice);
+            log("AudioOn state: processMultiHFConnected ," +
+                       "fake broadcasting for mCurrentDevice");
+            broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
+                            BluetoothProfile.STATE_DISCONNECTED);
         }
     }
 
@@ -1859,6 +1862,9 @@ final class HeadsetStateMachine extends StateMachine {
                               mHeadsetBrsf.remove(device);
                               Log.d(TAG, "device " + device.getAddress() +
                                       " is removed in MultiHFPending state");
+                              broadcastConnectionState(device,
+                                        BluetoothProfile.STATE_DISCONNECTED,
+                                        BluetoothProfile.STATE_DISCONNECTING);
                           }
 
                           if (mTargetDevice != null) {
@@ -1891,9 +1897,6 @@ final class HeadsetStateMachine extends StateMachine {
                                   }
                               }
                            }
-                           broadcastConnectionState(device,
-                                     BluetoothProfile.STATE_DISCONNECTED,
-                                     BluetoothProfile.STATE_DISCONNECTING);
                         } else {
                             /* Another HF disconnected when one HF is connecting */
                             synchronized (HeadsetStateMachine.this) {
@@ -2065,24 +2068,26 @@ final class HeadsetStateMachine extends StateMachine {
 
         private void processMultiHFConnected(BluetoothDevice device) {
             log("MultiHFPending state: processMultiHFConnected");
+            if (mActiveScoDevice != null && mActiveScoDevice.equals(device)) {
+                log ("mActiveScoDevice is disconnected, setting it to null");
+                mActiveScoDevice = null;
+            }
             /* Assign the current activedevice again if the disconnected
                device equals to the current active device */
             if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
-                transitionTo(mConnected);
                 int deviceSize = mConnectedDevicesList.size();
                 mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
-                log("MultiHFPending state: processMultiHFConnected ," +
-                             "fake broadcasting for new mCurrentDevice");
-                broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
-                                BluetoothProfile.STATE_DISCONNECTED);
-            } else {
-                // The disconnected device is not current active device
-                if (mAudioState == BluetoothHeadset.STATE_AUDIO_CONNECTED)
-                    transitionTo(mAudioOn);
-                else transitionTo(mConnected);
             }
+            // The disconnected device is not current active device
+            if (mAudioState == BluetoothHeadset.STATE_AUDIO_CONNECTED)
+                transitionTo(mAudioOn);
+            else transitionTo(mConnected);
             log("processMultiHFConnected , the latest mCurrentDevice is:"
                                             + mCurrentDevice);
+            log("MultiHFPending state: processMultiHFConnected ," +
+                         "fake broadcasting for mCurrentDevice");
+            broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
+                            BluetoothProfile.STATE_DISCONNECTED);
         }
 
     }
@@ -2762,7 +2767,7 @@ final class HeadsetStateMachine extends StateMachine {
         //          Get call started indication from bluetooth phone
         mDialingOut = true;
         Message m = obtainMessage(DIALING_OUT_TIMEOUT);
-        m.obj = device;
+        m.obj = getMatchingDevice(device);
         sendMessageDelayed(m, DIALING_OUT_TIMEOUT_VALUE);
     }
 
@@ -2815,6 +2820,9 @@ final class HeadsetStateMachine extends StateMachine {
             if (callState.mCallState ==
                 HeadsetHalConstants.CALL_STATE_DIALING) {
                 BluetoothDevice device = getDeviceForMessage(DIALING_OUT_TIMEOUT);
+                if (device == null) {
+                    return;
+                }
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK,
                                                        0, getByteAddress(device));
                 removeMessages(DIALING_OUT_TIMEOUT);
@@ -3345,6 +3353,9 @@ final class HeadsetStateMachine extends StateMachine {
 
     private void processSendClccResponse(HeadsetClccResponse clcc) {
         BluetoothDevice device = getDeviceForMessage(CLCC_RSP_TIMEOUT);
+        if (device == null) {
+            return;
+        }
         if (clcc.mIndex == 0) {
             removeMessages(CLCC_RSP_TIMEOUT);
         }
