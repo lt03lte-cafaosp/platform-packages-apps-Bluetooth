@@ -369,6 +369,8 @@ final class HeadsetStateMachine extends StateMachine {
                                 ", size: " + mConnectedDevicesList.size());
             mPhonebook.resetAtState();
             mPhoneState.listenForPhoneState(false);
+            mVoiceRecognitionStarted = false;
+            mWaitingForVoiceRecognition = false;
         }
 
         @Override
