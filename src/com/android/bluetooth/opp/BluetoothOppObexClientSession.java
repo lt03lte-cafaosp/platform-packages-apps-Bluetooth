@@ -295,8 +295,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                 mCs = new ClientSession(mTransport1);
                 mConnected = true;
                 oppmanager = BluetoothOppManager.getInstance(mContext1);
-                if ((oppmanager != null) && (oppmanager.isA2DPPlaying
-                    || oppmanager.isScoConnected)) {
+                if ((oppmanager != null) && oppmanager.isA2DPPlaying) {
                     mCs.reduceMTU(true);
                     if (V) Log.v(TAG, "Reducing Obex MTU to 8k as A2DP or SCO in progress");
                 }
@@ -680,8 +679,6 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
         private void handleSendException(String exception) {
             Log.e(TAG, "Error when sending file: " + exception);
-            int status = BluetoothShare.STATUS_OBEX_DATA_ERROR;
-            Constants.updateShareStatus(mContext1, mInfo.mId, status);
             mCallback.removeMessages(BluetoothOppObexSession.MSG_CONNECT_TIMEOUT);
         }
 

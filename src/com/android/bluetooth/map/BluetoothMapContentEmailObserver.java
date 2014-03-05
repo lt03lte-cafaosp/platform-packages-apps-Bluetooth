@@ -44,6 +44,7 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.Message;
 import android.provider.BaseColumns;
 import android.provider.Telephony;
 import android.provider.Telephony.Mms;
@@ -60,7 +61,6 @@ import android.util.Log;
 import android.util.Xml;
 import android.os.Looper;
 import com.android.emailcommon.provider.EmailContent;
-import com.android.emailcommon.provider.EmailContent.Message;
 import com.android.emailcommon.provider.EmailContent.MessageColumns;
 import com.android.emailcommon.provider.EmailContent.SyncColumns;
 import com.android.emailcommon.provider.Mailbox;
@@ -118,6 +118,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
     public static final int TYPE_DELETED = 6;
 
     private long mAccountKey;
+    private Handler mCallback = null;
     private static final int UPDATE = 0;
     private static final int THRESHOLD = 3000;  // 3 sec
 
@@ -140,9 +141,27 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
     public long id;
     public String folderName;
 
-    public BluetoothMapContentEmailObserver(final Context context ) {
+    public BluetoothMapContentEmailObserver(final Context context, Handler callback ) {
         super(context);
+        mCallback =callback;
     }
+
+    private final ContentObserver mEmailAccountObserver = new ContentObserver(null) {
+        @Override
+        public void onChange(boolean selfChange) {
+           if (V) Log.v(TAG, "onChange on thread");
+           if (BluetoothMapUtils.getEmailAccountId(mContext) == -1) {
+               if (mCallback != null) {
+                   Message msg = Message.obtain(mCallback);
+                   msg.what = BluetoothMapService.MSG_SERVERSESSION_CLOSE;
+                   msg.arg1 = 1;
+                   msg.sendToTarget();
+                   if (D) Log.d(TAG, "onClose(): msg MSG_SERVERSESSION_CLOSE sent out.");
+               }
+           }
+           super.onChange(selfChange);
+        }
+    };
 
     private final ContentObserver mObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
         @Override
@@ -388,6 +407,26 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
        }
     }
 
+    public void onConnect() {
+        if (V) Log.v(TAG, "onConnect() registering email account content observer");
+        try {
+            mResolver.registerContentObserver(
+                EMAIL_ACCOUNT_URI, true, mEmailAccountObserver);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
+
+    }
+
+    public void onDisconnect() {
+        if (V) Log.v(TAG, "onDisconnect() unregistering email account content observer");
+        try {
+            mResolver.unregisterContentObserver(mEmailAccountObserver);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
+    }
+
     @Override
     public void unregisterObserver() {
         if (D) Log.d(TAG, "unregisterObserver");
@@ -397,24 +436,35 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
 
  @Override
     public boolean setMessageStatusDeleted(long handle, TYPE type, int statusValue) {
-        boolean res = true;
+        boolean res = false;
+        long accountId = BluetoothMapUtils.getEmailAccountId(mContext);
+        Uri uri = Uri.parse("content://com.android.email.provider/message/"+handle);
+        Cursor crEmail = mResolver.query(uri, null, null, null, null);
 
-         long accountId = BluetoothMapUtils.getEmailAccountId(mContext);
-        if (D) Log.d(TAG, "setMessageStatusDeleted: EMAIL handle " + handle
-            + " type " + type + " value " + statusValue + "accountId: "+accountId);
-         Intent emailIn = new Intent();
-         if(statusValue == 1){
-             addMceInitiatedOperation(Long.toString(handle));
-             emailIn.setAction("org.codeaurora.email.intent.action.MAIL_SERVICE_DELETE_MESSAGE");
-         }else {
-             emailIn.setAction("org.codeaurora.email.intent.action.MAIL_SERVICE_MOVE_MESSAGE");
+        if(crEmail != null && crEmail.moveToFirst()) {
+           if (D) Log.d(TAG, "setMessageStatusDeleted: EMAIL handle " + handle
+               + " type " + type + " value " + statusValue + "accountId: "+accountId);
+           Intent emailIn = new Intent();
+           if(statusValue == 1){
+              addMceInitiatedOperation(Long.toString(handle));
+              emailIn.setAction("org.codeaurora.email.intent.action.MAIL_SERVICE_DELETE_MESSAGE");
+           }else {
+              emailIn.setAction("org.codeaurora.email.intent.action.MAIL_SERVICE_MOVE_MESSAGE");
               emailIn.putExtra("org.codeaurora.email.intent.extra.MESSAGE_INFO", Mailbox.TYPE_INBOX);
-         }
+           }
 
-         emailIn.putExtra("com.android.email.intent.extra.ACCOUNT", accountId);
-         emailIn.putExtra("org.codeaurora.email.intent.extra.MESSAGE_ID", handle);
-         mContext.startService(emailIn);
+           emailIn.putExtra("com.android.email.intent.extra.ACCOUNT", accountId);
+           emailIn.putExtra("org.codeaurora.email.intent.extra.MESSAGE_ID", handle);
+           mContext.startService(emailIn);
+           res = true;
+        } else {
+           if(V) Log.v(TAG,"Returning from setMessage Status Deleted");
+        }
+        if (crEmail != null) {
+            crEmail.close();
+        }
         return res;
+
     }
 
     @Override
@@ -588,9 +638,12 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
     @Override
     public void init() {
         Log.d(TAG, "init ");
+        onConnect();
     }
     @Override
     public void deinit() {
-        Log.d(TAG, "init ");
+        Log.d(TAG, "deinit ");
+        onDisconnect();
     }
+
 }
