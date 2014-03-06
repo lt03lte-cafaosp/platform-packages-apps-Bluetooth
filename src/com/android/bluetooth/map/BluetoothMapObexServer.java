@@ -433,10 +433,6 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
         if (D) Log.d(TAG, "onSetPath name is " + folderName + " backup: " + backup
                      + "create: " + create);
 
-        if(folderName.equalsIgnoreCase("draft") && mMasId ==1) {
-           folderName="Drafts";
-        }
-
         if(backup == true){
             if(mCurrentFolder.getParent() != null)
                 mCurrentFolder = mCurrentFolder.getParent();
@@ -449,6 +445,9 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
                 mCurrentFolder = mCurrentFolder.getRoot();
         }
         else {
+            if(folderName.equalsIgnoreCase("draft") && mMasId ==1) {
+               folderName="Drafts";
+            }
             folder = mCurrentFolder.getSubFolder(folderName);
             if(folder != null)
                 mCurrentFolder = folder;
@@ -571,7 +570,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
         HeaderSet replyHeaders = new HeaderSet();
         BluetoothMapAppParams outAppParams = new BluetoothMapAppParams();
         BluetoothMapMessageListing outList;
-        if(folderName == null) {
+        if(folderName == null || folderName.length() == 0 ) {
             folderName = mCurrentFolder.getName();
         } else if(folderName.equalsIgnoreCase("draft") && mMasId ==1) {
             folderName="Drafts";
@@ -853,7 +852,9 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
             Log.w(TAG,"sendGetMessageRsp: IOException - sending OBEX_HTTP_BAD_REQUEST", e);
             return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         } catch (IllegalArgumentException e) {
-            Log.w(TAG,"sendGetMessageRsp: IllegalArgumentException (e.g. invalid handle) - sending OBEX_HTTP_BAD_REQUEST", e);
+            Log.w(TAG,
+                     "sendGetMessageRsp: IllegalArgumentException (e.g. invalid handle or charset) - sending OBEX_HTTP_BAD_REQUEST"
+                         , e);
             return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
 

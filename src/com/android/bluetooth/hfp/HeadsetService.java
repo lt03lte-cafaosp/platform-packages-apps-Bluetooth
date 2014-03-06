@@ -81,7 +81,9 @@ public class HeadsetService extends ProfileService {
         } catch (Exception e) {
             Log.w(TAG,"Unable to unregister headset receiver",e);
         }
-        mStateMachine.doQuit();
+        if (mStateMachine != null) {
+            mStateMachine.doQuit();
+        }
         return true;
     }
 
@@ -393,8 +395,9 @@ public class HeadsetService extends ProfileService {
     boolean startVoiceRecognition(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         int connectionState = mStateMachine.getConnectionState(device);
-        if (connectionState != BluetoothProfile.STATE_CONNECTED &&
-            connectionState != BluetoothProfile.STATE_CONNECTING) {
+        if ((connectionState != BluetoothProfile.STATE_CONNECTED &&
+            connectionState != BluetoothProfile.STATE_CONNECTING)  ||
+            !mStateMachine.isBluetoothVoiceDialingEnabled()) {
             return false;
         }
         mStateMachine.sendMessage(HeadsetStateMachine.VOICE_RECOGNITION_START);

@@ -150,6 +150,7 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CODEC_MSBC = 2;
 
     private int mLocalBrsf = 0;
+    private int mRemoteBrsf = 0;
     private int mCodec = CODEC_NONE;
 
     private static final ParcelUuid[] HEADSET_UUIDS = {
@@ -862,6 +863,8 @@ final class HeadsetStateMachine extends StateMachine {
                     }
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_SLC_CONNECTED:
+                    mRemoteBrsf = getRemoteFeaturesNative();
+                    Log.e(TAG, "Remote Brsf: " + mRemoteBrsf);
                     processSlcConnected();
                     break;
               default:
@@ -1251,6 +1254,12 @@ final class HeadsetStateMachine extends StateMachine {
             }
         }
         return false;
+    }
+
+    public boolean isBluetoothVoiceDialingEnabled() {
+        Log.d(TAG, "isBluetoothVoiceDialingEnabled mRemoteBrsf: " + mRemoteBrsf +
+                    "supported: " + (mRemoteBrsf & BRSF_HF_VOICE_REG_ACT));
+        return ((mRemoteBrsf & BRSF_HF_VOICE_REG_ACT) != 0x0) ? true : false;
     }
 
     int getAudioState(BluetoothDevice device) {
@@ -1758,11 +1767,16 @@ final class HeadsetStateMachine extends StateMachine {
         mPhoneState.setCallState(callState.mCallState);
         mPhoneState.setNumber(callState.mNumber);
         mPhoneState.setType(callState.mType);
-        if (mDialingOut && callState.mCallState ==
-            HeadsetHalConstants.CALL_STATE_DIALING) {
+        if (mDialingOut) {
+            if (callState.mCallState ==
+                HeadsetHalConstants.CALL_STATE_DIALING) {
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK, 0);
                 removeMessages(DIALING_OUT_TIMEOUT);
+            } else if (callState.mCallState ==
+                HeadsetHalConstants.CALL_STATE_ACTIVE || callState.mCallState
+                == HeadsetHalConstants.CALL_STATE_IDLE) {
                 mDialingOut = false;
+            }
         }
         log("mNumActive: " + callState.mNumActive + " mNumHeld: " +
             callState.mNumHeld +" mCallState: " + callState.mCallState);
@@ -2373,4 +2387,5 @@ final class HeadsetStateMachine extends StateMachine {
 
     private native boolean phoneStateChangeNative(int numActive, int numHeld, int callState,
                                                   String number, int type);
+    private native int getRemoteFeaturesNative();
 }
