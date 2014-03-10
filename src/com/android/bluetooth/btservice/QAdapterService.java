@@ -448,6 +448,16 @@ public class QAdapterService extends Service {
               if (service == null) return;
               service.enableRssiMonitor(address, enable);
           }
+          public boolean sendLEConnUpdate(BluetoothDevice device, int interval_min, int interval_max, int latency, int supervisionTimeout) {
+              if (!Utils.checkCaller()) {
+                  Log.w(TAG,"sendLEConnUpdate(): not allowed for non-active user");
+                  return false;
+              }
+              QAdapterService service = getService();
+              if (service == null) return false;
+              Log.d(TAG,"sendLEConnUpdate() in Adapterservice:");
+              return service.sendLEConnUpdate(device, interval_min, interval_max, latency, supervisionTimeout);
+           }
      }
 
 
@@ -637,6 +647,15 @@ public class QAdapterService extends Service {
              }
          }
      }
+     boolean sendLEConnUpdate(BluetoothDevice device, int interval_min, int interval_max, int latency, int supervisionTimeout){
+         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+
+         debugLog("in AdapterService, calling the native fn for sendLEConnUpdate"+device.getAddress());
+         byte[] addr = Utils.getBytesFromAddress(device.getAddress());
+
+         return sendLEConnUpdateNative(addr, interval_min, interval_max, latency, supervisionTimeout);
+      }
+
 
      private static final class LeExtendedScanSession {
          public final int mScanToken;
@@ -676,6 +695,9 @@ public class QAdapterService extends Service {
     private native void btLeLppEnableRssiMonitorNative(String address, boolean enable);
 
     private native void btLeLppReadRssiThresholdNative(String address);
+
+    private native boolean sendLEConnUpdateNative(byte[] address, int interval_min,
+            int interval_max, int latency, int supervisionTimeout);
 
 
     protected void finalize() {
