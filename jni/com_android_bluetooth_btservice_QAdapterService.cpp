@@ -450,6 +450,18 @@ static void btLeLppReadRssiThresholdNative(JNIEnv* env, jobject object,
     qBluetoothInterface->le_lpp_read_rssi_threshold(&bda);
 }
 
+static jboolean sendLEConnUpdateNative(JNIEnv *env, jobject obj,  jbyteArray address, jint interval_min, jint interval_max,
+        jint latency, jint supervision_timeout){
+    ALOGV("%s:",__FUNCTION__);
+    jbyte *addr=NULL;
+    jboolean result = JNI_FALSE;
+    addr = env->GetByteArrayElements(address, NULL);
+    if (!qBluetoothInterface) return result;
+    int ret = qBluetoothInterface->le_send_conn_update((bt_bdaddr_t *)addr, interval_min, interval_max, latency, supervision_timeout);
+    result = (ret == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+    return result;
+}
+
 static JNINativeMethod qMethods[] = {
     /* name, signature, funcPtr */
     {"classInitNative", "()V", (void *) classInitNative},
@@ -465,7 +477,7 @@ static JNINativeMethod qMethods[] = {
     {"btLeLppWriteRssiThresholdNative", "(Ljava/lang/String;BB)V", (void*)btLeLppWriteRssiThresholdNative},
     {"btLeLppEnableRssiMonitorNative", "(Ljava/lang/String;Z)V", (void*)btLeLppEnableRssiMonitorNative},
     {"btLeLppReadRssiThresholdNative", "(Ljava/lang/String;)V", (void*)btLeLppReadRssiThresholdNative},
-
+    {"sendLEConnUpdateNative","([BIIII)Z",(void*) sendLEConnUpdateNative},
 };
 
 int register_com_android_bluetooth_btservice_QAdapterService(JNIEnv* env)
