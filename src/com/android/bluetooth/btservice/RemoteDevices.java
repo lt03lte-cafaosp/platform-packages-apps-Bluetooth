@@ -30,6 +30,7 @@ import android.util.Log;
 import android.os.PowerManager;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.RemoteDevices.DeviceProperties;
+import android.bluetooth.QBluetoothAdapter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -520,6 +521,27 @@ final class RemoteDevices {
         }
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+        mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_PERM);
+    }
+
+    void bleConnParamsCallback(int status, byte[] address, int connIntervalMin, int connIntervalMax, int connLatency,
+            int supervisionTimeout, int evt) {
+        BluetoothDevice device =  mAdapter.getRemoteDevice(Utils.getAddressStringFromByte(address));
+        if (device == null) {
+            errorLog("bleConnParamsCallback: Device is NULL");
+            return;
+        }
+
+        Intent intent = null;
+        intent = new Intent(QBluetoothAdapter.ACTION_BLE_CONN_PARAMS);
+        Log.e(TAG,"bleConnParamsCallback: Conn params changed to Device:" + device);
+        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+        intent.putExtra(QBluetoothAdapter.EXTRA_CONN_INTERVAL_MIN, connIntervalMin);
+        intent.putExtra(QBluetoothAdapter.EXTRA_CONN_INTERVAL_MAX, connIntervalMax);
+        intent.putExtra(QBluetoothAdapter.EXTRA_CONN_LATENCY, connLatency);
+        intent.putExtra(QBluetoothAdapter.EXTRA_SUPERVISION_TIMEOUT, supervisionTimeout);
+        intent.putExtra(QBluetoothAdapter.EXTRA_STATUS, status);
+        intent.putExtra(QBluetoothAdapter.EXTRA_EVENT, evt);
         mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_PERM);
     }
 
