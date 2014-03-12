@@ -247,7 +247,9 @@ bt_callbacks_t sQBluetoothCallbacks = {
     NULL,
     NULL,
     NULL,
-    NULL,
+    NULL
+#ifdef QCOM_BLUETOOTH
+    ,
     NULL,
     NULL,
     le_adv_enable_callbacks,
@@ -257,6 +259,7 @@ bt_callbacks_t sQBluetoothCallbacks = {
     le_lpp_enable_rssi_monitor_callbacks,
     le_lpp_rssi_threshold_evt_callbacks,
     NULL
+#endif
 };
 static void classInitNative(JNIEnv* env, jclass clazz) {
     int err;
