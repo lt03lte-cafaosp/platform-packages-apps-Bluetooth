@@ -1279,7 +1279,7 @@ public class AdapterService extends Service {
         }
         else if((a2dpConnDevList.isEmpty()) &&
             (a2dpService.getPriority(device) >= BluetoothProfile.PRIORITY_ON) &&
-            (a2dpService.getLastConnectedA2dpSepType(device) == BluetoothProfile.PROFILE_A2DP_SNK)&&
+            (a2dpService.getLastConnectedA2dpSepType(device) != BluetoothProfile.PROFILE_A2DP_SRC)&&
             (hsConnected || (hsService.getPriority(device) == BluetoothProfile.PRIORITY_OFF))) {
             a2dpService.connect(device);
         }
@@ -1557,6 +1557,7 @@ public class AdapterService extends Service {
     private native static void classInitNative();
     private native boolean initNative();
     private native void cleanupNative();
+    /*package*/ native void ssrcleanupNative();
     /*package*/ native boolean enableNative();
     /*package*/ native boolean disableNative();
     /*package*/ native boolean setAdapterPropertyNative(int type, byte[] val);
