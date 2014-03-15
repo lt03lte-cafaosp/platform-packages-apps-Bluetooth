@@ -75,6 +75,7 @@ static void btavrcp_remote_features_callback(bt_bdaddr_t* bd_addr, btrc_remote_f
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
     sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getRcFeatures, addr, (jint)features);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(addr);
 }
 
 static void btavrcp_get_play_status_callback() {
@@ -520,7 +521,7 @@ static jboolean SendCurrentPlayerValueRspNative(JNIEnv *env, jobject object ,
     }
     attr = env->GetByteArrayElements(value, NULL);
     if (!attr) {
-        delete[] pAttrs;
+        delete pAttrs;
         jniThrowIOException(env, EINVAL);
         return JNI_FALSE;
     }
@@ -534,7 +535,7 @@ static jboolean SendCurrentPlayerValueRspNative(JNIEnv *env, jobject object ,
                                                                      BT_STATUS_SUCCESS) {
         ALOGE("Failed get_element_attr_rsp, status: %d", status);
     }
-    delete[] pAttrs;
+    delete pAttrs;
     env->ReleaseByteArrayElements(value, attr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
@@ -742,7 +743,7 @@ static jboolean registerNotificationPlayerAppRspNative(JNIEnv *env, jobject obje
     }
     attr = env->GetByteArrayElements(value, NULL);
     if (!attr) {
-        delete[] param;
+        delete param;
         jniThrowIOException(env, EINVAL);
         return JNI_FALSE;
     }
@@ -758,7 +759,7 @@ static jboolean registerNotificationPlayerAppRspNative(JNIEnv *env, jobject obje
                                                                     BT_STATUS_SUCCESS) {
         ALOGE("Failed get_element_attr_rsp, status: %d", status);
     }
-    delete[] param;
+    delete param;
     env->ReleaseByteArrayElements(value, attr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
