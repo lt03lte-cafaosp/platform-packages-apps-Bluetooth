@@ -520,7 +520,7 @@ static jboolean SendCurrentPlayerValueRspNative(JNIEnv *env, jobject object ,
     }
     attr = env->GetByteArrayElements(value, NULL);
     if (!attr) {
-        delete[] pAttrs;
+        delete pAttrs;
         jniThrowIOException(env, EINVAL);
         return JNI_FALSE;
     }
@@ -534,7 +534,7 @@ static jboolean SendCurrentPlayerValueRspNative(JNIEnv *env, jobject object ,
                                                                      BT_STATUS_SUCCESS) {
         ALOGE("Failed get_element_attr_rsp, status: %d", status);
     }
-    delete[] pAttrs;
+    delete pAttrs;
     env->ReleaseByteArrayElements(value, attr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
@@ -742,7 +742,7 @@ static jboolean registerNotificationPlayerAppRspNative(JNIEnv *env, jobject obje
     }
     attr = env->GetByteArrayElements(value, NULL);
     if (!attr) {
-        delete[] param;
+        delete param;
         jniThrowIOException(env, EINVAL);
         return JNI_FALSE;
     }
@@ -758,7 +758,7 @@ static jboolean registerNotificationPlayerAppRspNative(JNIEnv *env, jobject obje
                                                                     BT_STATUS_SUCCESS) {
         ALOGE("Failed get_element_attr_rsp, status: %d", status);
     }
-    delete[] param;
+    delete param;
     env->ReleaseByteArrayElements(value, attr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
