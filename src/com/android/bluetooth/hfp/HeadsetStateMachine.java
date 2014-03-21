@@ -108,6 +108,7 @@ final class HeadsetStateMachine extends StateMachine {
     static final int VIRTUAL_CALL_STOP = 15;
     static final int UPDATE_A2DP_PLAY_STATE = 16;
     static final int UPDATE_A2DP_CONN_STATE = 17;
+    static final int QUERY_PHONE_STATE_AT_SLC = 18;
 
     private static final int STACK_EVENT = 101;
     private static final int DIALING_OUT_TIMEOUT = 102;
@@ -117,6 +118,7 @@ final class HeadsetStateMachine extends StateMachine {
 
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
+    private static final int QUERY_PHONE_STATE_CHANGED_DELAYED = 100;
 
     /* Constants from Bluetooth Specification Hands-Free profile version 1.6 */
     private static final int BRSF_AG_THREE_WAY_CALLING = 1 << 0;
@@ -773,6 +775,14 @@ final class HeadsetStateMachine extends StateMachine {
                         atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR, 0);
                     }
                     break;
+                case QUERY_PHONE_STATE_AT_SLC:
+                    try {
+                       log("Update call states after SLC is up");
+                       mPhoneProxy.queryPhoneState();
+                    } catch (RemoteException e) {
+                       Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                    }
+                    break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
                     if (DBG) {
@@ -895,26 +905,20 @@ final class HeadsetStateMachine extends StateMachine {
 
         private void processSlcConnected() {
             if (mPhoneProxy != null) {
-                try {
-                    // start phone state listener here, instead of on disconnected exit()
-                    // On BT off, exitting SM sends a SM exit() call which incorrectly forces
-                    // a listenForPhoneState(true).
-                    // Additionally, no indicator updates should be sent prior to SLC setup
-                    mPhoneState.listenForPhoneState(true);
-                    mPhoneProxy.queryPhoneState();
-                    mCodec = CODEC_NONE;
-                    mA2dpSuspend = false;/*Reset at SLC*/
-                    mPendingCiev = false;
-                    if ((isInCall()) && (mA2dpState == BluetoothProfile.STATE_CONNECTED)) {
-                        if (DBG) {
-                             log("Headset connected while we are in some call state");
-                             log("Make A2dpSuspended=true here");
-                         }
-                        mAudioManager.setParameters("A2dpSuspended=true");
-                        mA2dpSuspend = true;
-                    }
-                } catch (RemoteException e) {
-                    Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                // start phone state listener here, instead of on disconnected exit()
+                // On BT off, exitting SM sends a SM exit() call which incorrectly forces
+                // a listenForPhoneState(true).
+                // Additionally, no indicator updates should be sent prior to SLC setup
+                mPhoneState.listenForPhoneState(true);
+                sendMessageDelayed(QUERY_PHONE_STATE_AT_SLC, QUERY_PHONE_STATE_CHANGED_DELAYED);
+                mCodec = CODEC_NONE;
+                mA2dpSuspend = false;/*Reset at SLC*/
+                mPendingCiev = false;
+                if ((isInCall()) && (mA2dpState == BluetoothProfile.STATE_CONNECTED)) {
+                    log("Headset connected while we are in some call state");
+                    log("Make A2dpSuspended=true here");
+                    mAudioManager.setParameters("A2dpSuspended=true");
+                    mA2dpSuspend = true;
                 }
             } else {
                 Log.e(TAG, "Handsfree phone proxy null for query phone state");
