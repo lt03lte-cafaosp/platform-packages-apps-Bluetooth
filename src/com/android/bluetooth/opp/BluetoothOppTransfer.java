@@ -70,7 +70,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
     private static final boolean D = Constants.DEBUG;
 
-    private static final boolean V = Constants.VERBOSE;
+    private static final boolean V = Log.isLoggable(Constants.TAG, Log.VERBOSE) ? true : false;
 
     private static final int RFCOMM_ERROR = 10;
 
