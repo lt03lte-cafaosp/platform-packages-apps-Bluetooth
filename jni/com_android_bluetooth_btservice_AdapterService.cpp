@@ -47,6 +47,7 @@ static jmethodID method_aclStateChangeCallback;
 static jmethodID method_discoveryStateChangeCallback;
 static jmethodID method_deviceMasInstancesFoundCallback;
 static jmethodID method_wakeStateChangeCallback;
+static jmethodID method_bleConnParamsCallback;
 
 static const bt_interface_t *sBluetoothInterface = NULL;
 static const btsock_interface_t *sBluetoothSocketInterface = NULL;
@@ -337,6 +338,32 @@ static void acl_state_changed_callback(bt_status_t status, bt_bdaddr_t *bd_addr,
     callbackEnv->DeleteLocalRef(addr);
 }
 
+static void ble_conn_params_callback(uint8_t status, bt_bdaddr_t *bd_addr, uint16_t conn_interval_min,
+        uint16_t conn_interval_max, uint16_t conn_latency, uint16_t supervision_timeout, uint8_t evt)
+{
+    jbyteArray addr;
+    int i;
+    if (!checkCallbackThread()) {
+       ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
+       return;
+    }
+    if (!bd_addr) {
+        ALOGE("Address is null in %s", __FUNCTION__);
+        return;
+    }
+    addr = callbackEnv->NewByteArray(sizeof(bt_bdaddr_t));
+    if (addr == NULL) {
+       ALOGE("Address allocation failed in %s", __FUNCTION__);
+       return;
+    }
+    callbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *)bd_addr);
+
+    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_bleConnParamsCallback, status,
+                                addr, conn_interval_min, conn_interval_max, conn_latency, supervision_timeout, evt);
+    checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
+    callbackEnv->DeleteLocalRef(addr);
+}
+
 static void discovery_state_changed_callback(bt_discovery_state_t state) {
     jbyteArray addr;
     if (!checkCallbackThread()) {
@@ -480,7 +507,8 @@ bt_callbacks_t sBluetoothCallbacks = {
     NULL,
     NULL,
     NULL,
-    NULL
+    NULL,
+    ble_conn_params_callback
 };
 
 static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_addr,
@@ -587,6 +615,8 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_aclStateChangeCallback = env->GetMethodID(jniCallbackClass,
                                                     "aclStateChangeCallback", "(I[BI)V");
+    method_bleConnParamsCallback = env->GetMethodID(jniCallbackClass,
+                                                        "bleConnParamsCallback", "(I[BIIIII)V");
 
     method_deviceMasInstancesFoundCallback = env->GetMethodID(jniCallbackClass,
                                                     "deviceMasInstancesFoundCallback",
@@ -653,6 +683,19 @@ static bool cleanupNative(JNIEnv *env, jobject obj) {
     if (!sBluetoothInterface) return result;
 
     sBluetoothInterface->cleanup();
+    ALOGI("%s: return from cleanup",__FUNCTION__);
+
+    env->DeleteGlobalRef(sJniCallbacksObj);
+    return JNI_TRUE;
+}
+
+static bool ssrcleanupNative(JNIEnv *env, jobject obj) {
+    ALOGV("%s:",__FUNCTION__);
+
+    jboolean result = JNI_FALSE;
+    if (!sBluetoothInterface) return result;
+
+    sBluetoothInterface->ssrcleanup();
     ALOGI("%s: return from cleanup",__FUNCTION__);
 
     env->DeleteGlobalRef(sJniCallbacksObj);
@@ -1121,6 +1164,7 @@ static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
     {"initNative", "()Z", (void *) initNative},
     {"cleanupNative", "()V", (void*) cleanupNative},
+    {"ssrcleanupNative", "()V", (void*) ssrcleanupNative},
     {"enableNative", "()Z",  (void*) enableNative},
     {"disableNative", "()Z",  (void*) disableNative},
     {"setAdapterPropertyNative", "(I[B)Z", (void*) setAdapterPropertyNative},

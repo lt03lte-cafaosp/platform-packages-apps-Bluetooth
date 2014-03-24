@@ -89,4 +89,7 @@ final class JniCallbacks {
             int[] id, int[] msgtype) {
         mRemoteDevices.deviceMasInstancesFoundCallback(status, address, name, scn, id, msgtype);
     }
+    void bleConnParamsCallback(int status, byte[] address, int connIntervalMin, int connIntervalMax, int connLatency, int supervisionTimeout, int evt) {
+        mRemoteDevices.bleConnParamsCallback(status, address, connIntervalMin, connIntervalMax, connLatency, supervisionTimeout, evt);
+    }
 }
