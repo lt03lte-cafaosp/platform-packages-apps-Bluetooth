@@ -69,6 +69,7 @@ import javax.obex.ServerSession;
 
 public class BluetoothPbapService extends Service {
     private static final String TAG = "BluetoothPbapService";
+    public static final String LOG_TAG = "BluetoothPbap";
 
     /**
      * To enable PBAP DEBUG/VERBOSE logging - run below cmd in adb shell, and
@@ -79,7 +80,7 @@ public class BluetoothPbapService extends Service {
 
     public static final boolean DEBUG = true;
 
-    public static final boolean VERBOSE = false;
+    public static boolean VERBOSE;
 
     /**
      * Intent indicating incoming obex authentication request which is from
@@ -338,6 +339,7 @@ public class BluetoothPbapService extends Service {
     }
 
     private void startRfcommSocketListener() {
+        VERBOSE = Log.isLoggable(LOG_TAG, Log.VERBOSE) ? true : false;
         if (VERBOSE) Log.v(TAG, "Pbap Service startRfcommSocketListener");
 
         if (mAcceptThread == null) {
