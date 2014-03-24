@@ -876,12 +876,15 @@ final class Avrcp {
     }
     private void updateAddressedMediaPlayer(int playerId) {
         if (DEBUG) Log.v(TAG, "updateAddressedMediaPlayer");
+        int previousAddressedPlayerId = mAddressedPlayerId;
         if ((mAddressedPlayerChangedNT == NOTIFICATION_TYPE_INTERIM) && (mAddressedPlayerId != playerId)) {
             if (DEBUG) Log.v(TAG, "send AddressedMediaPlayer to stack: playerId" + playerId);
             mAddressedPlayerId = playerId;
             mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
             registerNotificationRspAddressedPlayerChangedNative(mAddressedPlayerChangedNT, mAddressedPlayerId);
-            resetAndSendPlayerStatusReject();
+            if (previousAddressedPlayerId != 0) {
+                resetAndSendPlayerStatusReject();
+            }
         } else {
             mAddressedPlayerId = playerId;
         }
@@ -949,9 +952,6 @@ final class Avrcp {
             while (rccIterator.hasNext()) {
                 final MediaPlayerInfo di = rccIterator.next();
                 if (di.GetPlayerFocus()) {
-                    if (DEBUG) Log.v(TAG, "incrementing TrackNumber:" + mTrackNumber + "by 1");
-                    mTrackNumber = di.GetTrackNumber();
-                    mTrackNumber ++;
                     di.SetTrackNumber(mTrackNumber);
                     break;
                 }
@@ -976,6 +976,7 @@ final class Avrcp {
         mMetadata.trackTitle = getMdString(data, MediaMetadataRetriever.METADATA_KEY_TITLE);
         mMetadata.albumTitle = getMdString(data, MediaMetadataRetriever.METADATA_KEY_ALBUM);
         mMetadata.genre = getMdString(data, MediaMetadataRetriever.METADATA_KEY_GENRE);
+        mTrackNumber = getMdLong(data, MediaMetadataRetriever.METADATA_KEY_NUM_TRACKS);
         mMetadata.tracknum = getMdLong(data, MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER);
 
         Log.v(TAG,"mMetadata.toString() = " + mMetadata.toString());
