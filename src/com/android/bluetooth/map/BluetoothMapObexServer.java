@@ -43,7 +43,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     private static final String TAG = "BluetoothMapObexServer";
 
     private static final boolean D = BluetoothMapService.DEBUG;
-    private static final boolean V = BluetoothMapService.VERBOSE;
+    private static final boolean V = Log.isLoggable(BluetoothMapService.LOG_TAG, Log.VERBOSE) ? true : false;
 
     private static final int UUID_LENGTH = 16;
 
