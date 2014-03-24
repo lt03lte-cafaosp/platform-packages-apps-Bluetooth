@@ -511,7 +511,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                             Log.i(TAG, "Remote reject, Response code is " + responseCode);
                         }
                     }
-
+                    long beginTime = System.currentTimeMillis();
                     while (!mInterrupted && okToProceed && (position != fileInfo.mLength)) {
                         {
                             if (V) timestamp = System.currentTimeMillis();
@@ -589,8 +589,10 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                         Log.i(TAG, "Remote reject file type " + fileInfo.mMimetype);
                         status = BluetoothShare.STATUS_NOT_ACCEPTABLE;
                     } else if (!mInterrupted && position == fileInfo.mLength) {
-                        Log.i(TAG, "SendFile finished send out file " + fileInfo.mFileName
-                                + " length " + fileInfo.mLength);
+                        long endTime = System.currentTimeMillis();
+                        Log.i(TAG, "SendFile finished sending file " + fileInfo.mFileName
+                                + " length " + fileInfo.mLength
+                                + "Bytes in " + (endTime - beginTime) + "ms"  );
                         outputStream.close();
                     } else {
                         error = true;
@@ -602,10 +604,13 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                     }
                 }
             } catch (IOException e) {
+                Log.e(TAG, "IOException", e);
                 handleSendException(e.toString());
             } catch (NullPointerException e) {
+                Log.e(TAG, "NullPointerException", e);
                 handleSendException(e.toString());
             } catch (IndexOutOfBoundsException e) {
+                Log.e(TAG, "IndexOutOfBoundsException", e);
                 handleSendException(e.toString());
             } finally {
                 try {
@@ -664,6 +669,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                         putOperation.close();
                     }
                 } catch (IOException e) {
+                    Log.e(TAG, "IOException", e);
                     Log.e(TAG, "Error when closing stream after send");
                     /* Socket is been closed due to the response timeout in the framework
                      * Hence, mark the transfer as failure
