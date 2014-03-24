@@ -34,7 +34,7 @@ import java.io.IOException;
 
 public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
     private static final boolean D = BluetoothMapService.DEBUG;
-    private static final boolean V = BluetoothMapService.VERBOSE;
+    private static final boolean V = Log.isLoggable(BluetoothMapService.LOG_TAG, Log.VERBOSE) ? true : false;
     protected static String TAG = "BluetoothMapbMessageEmail";
     private static final String CRLF = "\r\n";
 
