@@ -919,8 +919,15 @@ final class A2dpStateMachine extends StateMachine {
                                 == AbstractionLayer.BT_STATUS_SUCCESS) {
                             //Camera Pauses the Playback before starting the Video recording
                             //But it doesn't start the playback once recording is completed.
-                            //Disconnecting the A2dp to move the A2dpSink to proper state.
-                            disconnectA2dpNative(getByteAddress(mCurrentDevice));
+                            if (mService.isAvrcpConnected(mCurrentDevice)) {
+                                mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
+                                        Avrcp.KEY_STATE_PRESSED);
+                                mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
+                                        Avrcp.KEY_STATE_RELEASED);
+                            } else {
+                                disconnectA2dpNative(getByteAddress(mCurrentDevice));
+                                log("AVRCP not connected, disconnecting A2dp");
+                            }
                             // in case PEER DEVICE is A2DP SRC we need to manage audio focus
                             int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                             log("abandonAudioFocus returned" + status);
@@ -942,8 +949,15 @@ final class A2dpStateMachine extends StateMachine {
                     if (mCurrentDevice != null) {
                         if (isSrcNative(getByteAddress(mCurrentDevice))
                                 == AbstractionLayer.BT_STATUS_SUCCESS) {
-                            // in case of perm loss, disconnect the link
-                            disconnectA2dpNative(getByteAddress(mCurrentDevice));
+                            if (mService.isAvrcpConnected(mCurrentDevice)) {
+                                mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
+                                        Avrcp.KEY_STATE_PRESSED);
+                                mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
+                                        Avrcp.KEY_STATE_RELEASED);
+                            } else {
+                                disconnectA2dpNative(getByteAddress(mCurrentDevice));
+                                log("AVRCP not connected, disconnecting A2dp");
+                            }
                             // in case PEER DEVICE is A2DP SRC we need to manage audio focus
                             int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                             log("abandonAudioFocus returned" + status);
@@ -957,8 +971,15 @@ final class A2dpStateMachine extends StateMachine {
                     if ((mCurrentDevice != null) && (getCurrentState() == mConnected) &&
                         (isPlaying(mCurrentDevice))) {
                         informAudioFocusStateNative(AUDIO_FOCUS_LOSS_TRANSIENT);
-                        // we need to send AVDT_SUSPEND from here
-                        suspendA2dpNative();
+                        if (mService.isAvrcpConnected(mCurrentDevice)) {
+                            mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
+                                    Avrcp.KEY_STATE_PRESSED);
+                            mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
+                                    Avrcp.KEY_STATE_RELEASED);
+                        } else {
+                            suspendA2dpNative();
+                            log("AVRCP not connected, suspending A2dp");
+                        }
                     }
                     break;
                 case AudioManager.AUDIOFOCUS_GAIN:
@@ -967,7 +988,15 @@ final class A2dpStateMachine extends StateMachine {
                     informAudioFocusStateNative(AUDIO_FOCUS_GAIN);
                     if ((mCurrentDevice != null) && (getCurrentState() == mConnected) &&
                         (!isPlaying(mCurrentDevice))){
-                        resumeA2dpNative();
+                        if (mService.isAvrcpConnected(mCurrentDevice)) {
+                            mService.sendPassThroughCmd(Avrcp.AVRC_ID_PLAY,
+                                    Avrcp.KEY_STATE_PRESSED);
+                            mService.sendPassThroughCmd(Avrcp.AVRC_ID_PLAY,
+                                    Avrcp.KEY_STATE_RELEASED);
+                        } else {
+                            resumeA2dpNative();
+                            log("AVRCP not connected, resuming A2dp");
+                        }
                     }
                     break;
                 default:
