@@ -2921,6 +2921,10 @@ final class HeadsetStateMachine extends StateMachine {
                                              ",,4", getByteAddress(device));
                     atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK,
                                                  0, getByteAddress(device));
+                } else {
+                    log("number is null");
+                    atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK, 0,
+                            getByteAddress(device));
                 }
             } catch (RemoteException e) {
                 Log.e(TAG, Log.getStackTraceString(new Throwable()));
