@@ -1902,6 +1902,9 @@ final class HeadsetStateMachine extends StateMachine {
                     atResponseStringNative("+CNUM: ,\"" + number + "\"," +
                                            PhoneNumberUtils.toaFromString(number) + ",,4");
                     atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK, 0);
+                } else {
+                    log("number is null");
+                    atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK, 0);
                 }
             } catch (RemoteException e) {
                 Log.e(TAG, Log.getStackTraceString(new Throwable()));
