@@ -65,6 +65,7 @@ import com.android.internal.util.IState;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import android.os.SystemProperties;
@@ -118,6 +119,9 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
 
+    // Hash for storing the connection retry attempts from application
+    private HashMap<BluetoothDevice, Integer> mRetryConnect =
+                                            new HashMap<BluetoothDevice, Integer>();
     /* Constants from Bluetooth Specification Hands-Free profile version 1.6 */
     private static final int BRSF_AG_THREE_WAY_CALLING = 1 << 0;
     private static final int BRSF_AG_EC_NR = 1 << 1;
@@ -336,29 +340,46 @@ final class HeadsetStateMachine extends StateMachine {
             switch(message.what) {
                 case CONNECT:
                     BluetoothDevice device = (BluetoothDevice) message.obj;
-                    broadcastConnectionState(device, BluetoothProfile.STATE_CONNECTING,
+                    if (!mRetryConnect.containsKey(device)) {
+                        Log.d(TAG, "Make conn retry entry for device " + device);
+                        mRetryConnect.put(device, 0);
+                    }
+                    int mRetryConn = mRetryConnect.get(device);
+                    Log.d(TAG, "mRetryConn = " + mRetryConn);
+
+                    if (mRetryConn < 2) {
+                        broadcastConnectionState(device, BluetoothProfile.STATE_CONNECTING,
                                    BluetoothProfile.STATE_DISCONNECTED);
 
-                    if (!connectHfpNative(getByteAddress(device)) ) {
-                        broadcastConnectionState(device, BluetoothProfile.STATE_DISCONNECTED,
+                        if (!connectHfpNative(getByteAddress(device)) ) {
+                            broadcastConnectionState(device,
+                                       BluetoothProfile.STATE_DISCONNECTED,
                                        BluetoothProfile.STATE_CONNECTING);
-                        break;
-                    }
-                    if (mPhoneProxy != null) {
-                        try {
-                            log("Query the phonestates");
-                            mPhoneProxy.queryPhoneState();
-                        } catch (RemoteException e) {
-                            Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                            break;
                         }
-                    } else Log.e(TAG, "Phone proxy null for query phone state");
-                    synchronized (HeadsetStateMachine.this) {
-                        mTargetDevice = device;
-                        transitionTo(mPending);
+                        mRetryConn = mRetryConn + 1;
+                        mRetryConnect.put(device, mRetryConn);
+                        if (mPhoneProxy != null) {
+                            try {
+                                log("Query the phonestates");
+                                mPhoneProxy.queryPhoneState();
+                            } catch (RemoteException e) {
+                                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                            }
+                        } else Log.e(TAG, "Phone proxy null for query phone state");
+                        synchronized (HeadsetStateMachine.this) {
+                            mTargetDevice = device;
+                            transitionTo(mPending);
+                        }
+                        // TODO(BT) remove CONNECT_TIMEOUT when the stack
+                        //          sends back events consistently
+                        sendMessageDelayed(CONNECT_TIMEOUT, 30000);
+                    } else {
+                        if (mRetryConnect.containsKey(device)) {
+                            Log.d(TAG, "Removing device entry since mRetryConn = " + mRetryConn);
+                            mRetryConnect.remove(device);
+                        }
                     }
-                    // TODO(BT) remove CONNECT_TIMEOUT when the stack
-                    //          sends back events consistently
-                    sendMessageDelayed(CONNECT_TIMEOUT, 30000);
                     break;
                 case DISCONNECT:
                     // ignore
@@ -552,6 +573,11 @@ final class HeadsetStateMachine extends StateMachine {
                                     mTargetDevice = null;
                                     transitionTo(mDisconnected);
                                 }
+                            } else {
+                                if (!mRetryConnect.containsKey(mTargetDevice)) {
+                                    Log.d(TAG, "Adding entry for target device: " + mTargetDevice);
+                                    mRetryConnect.put(mTargetDevice, 1);
+                                }
                             }
                         } else {
                             synchronized (HeadsetStateMachine.this) {
@@ -561,6 +587,10 @@ final class HeadsetStateMachine extends StateMachine {
                         }
                     } else if (mTargetDevice != null && mTargetDevice.equals(device)) {
                         // outgoing connection failed
+                        if (mRetryConnect.containsKey(mTargetDevice)) {
+                            Log.d(TAG, "Removing entry for device = " + mTargetDevice);
+                            mRetryConnect.remove(mTargetDevice);
+                        }
                         broadcastConnectionState(mTargetDevice, BluetoothProfile.STATE_DISCONNECTED,
                                                  BluetoothProfile.STATE_CONNECTING);
                         synchronized (HeadsetStateMachine.this) {
@@ -856,6 +886,10 @@ final class HeadsetStateMachine extends StateMachine {
                     }
                     break;
                 case HeadsetHalConstants.CONNECTION_STATE_SLC_CONNECTED:
+                    if (mRetryConnect.containsKey(device)) {
+                        Log.d(TAG, "Removing device" + device + " entry since we got SLC");
+                        mRetryConnect.remove(device);
+                    }
                     processSlcConnected();
                     break;
               default:
