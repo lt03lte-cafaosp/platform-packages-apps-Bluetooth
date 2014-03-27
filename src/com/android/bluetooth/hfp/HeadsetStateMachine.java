@@ -75,7 +75,7 @@ import android.os.SystemProperties;
 
 final class HeadsetStateMachine extends StateMachine {
     private static final String TAG = "HeadsetStateMachine";
-    private static final boolean DBG = false;
+    private static final boolean DBG = Log.isLoggable("Handsfree", Log.VERBOSE);
     //For Debugging only
     private static int sRefCount=0;
 
@@ -3410,7 +3410,7 @@ final class HeadsetStateMachine extends StateMachine {
 
     @Override
     protected void log(String msg) {
-        if (Log.isLoggable("Handsfree", Log.VERBOSE)) {
+        if (DBG) {
             super.log(msg);
         }
     }
