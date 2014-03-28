@@ -73,7 +73,7 @@ import android.text.format.Time;
 public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserver {
     private static final String TAG = "BluetoothMapContentEmailObserver";
     private static final boolean D = BluetoothMapService.DEBUG;
-    private static final boolean V = BluetoothMapService.VERBOSE;
+    private static final boolean V = Log.isLoggable(BluetoothMapService.LOG_TAG, Log.VERBOSE) ? true : false;
 
     private HashMap<Long, EmailBox> mEmailBoxList = new HashMap<Long, EmailBox>();
     private HashMap<Long, EmailMessage> mEmailList = new HashMap<Long, EmailMessage>();
