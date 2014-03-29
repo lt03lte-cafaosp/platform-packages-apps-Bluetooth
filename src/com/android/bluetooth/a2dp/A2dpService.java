@@ -37,7 +37,7 @@ import java.util.Map;
  * @hide
  */
 public class A2dpService extends ProfileService {
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
     private static final String TAG="A2dpService";
 
     private A2dpStateMachine mStateMachine;
@@ -243,6 +243,25 @@ public class A2dpService extends ProfileService {
         return mStateMachine.isPlaying(device);
     }
 
+    synchronized public void sendPassThroughCmd(int keyCode, int keyState) {
+        if (DBG) Log.d(TAG, "sendPassThroughCmd");
+        if (mAvrcp != null) {
+            mAvrcp.sendPassThroughCmd(keyCode, keyState);
+        } else {
+            Log.e(TAG,"mAvrcp is null");
+        }
+    }
+
+    synchronized boolean isAvrcpConnected(BluetoothDevice device) {
+        if (DBG) Log.d(TAG, "isAvrcpConnected");
+        if (mAvrcp != null) {
+            return mAvrcp.isAvrcpConnected(device);
+        } else {
+            Log.e(TAG,"mAvrcp is null");
+            return false;
+        }
+    }
+
     //Binder object: Must be static class or memory leak may occur 
     private static class BluetoothA2dpBinder extends IBluetoothA2dp.Stub 
         implements IProfileServiceBinder {
@@ -333,6 +352,20 @@ public class A2dpService extends ProfileService {
             A2dpService service = getService();
             if (service == null) return false;
             return service.isA2dpPlaying(device);
+        }
+
+        public boolean isAvrcpConnected(BluetoothDevice device) {
+            Log.v(TAG,"Binder Call: isAvrcpConnected: " + device.getAddress());
+            A2dpService service = getService();
+            if (service == null) return false;
+            return service.isAvrcpConnected(device);
+        }
+
+        public void sendPassThroughCmd(int keyCode, int keyState) {
+            Log.v(TAG,"Binder Call: sendPassThroughCmd");
+            A2dpService service = getService();
+            if (service == null) return;
+            service.sendPassThroughCmd(keyCode, keyState);
         }
     };
 }
