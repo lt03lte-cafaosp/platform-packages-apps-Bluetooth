@@ -58,6 +58,7 @@ import com.android.bluetooth.btservice.ProfileService.IProfileServiceBinder;
 
 public class BluetoothMapService extends ProfileService {
     private static final String TAG = "BluetoothMapService";
+    public static final String LOG_TAG = "BluetoothMap";
 
     /**
      * To enable MAP DEBUG/VERBOSE logging - run below cmd in adb shell, and
@@ -66,7 +67,7 @@ public class BluetoothMapService extends ProfileService {
      * DEBUG log: "setprop log.tag.BluetoothMapService VERBOSE"
      */
     public static final boolean DEBUG = true;
-    public static final boolean VERBOSE = false;
+    public static boolean VERBOSE;
 
     /**
      * Intent indicating incoming obex authentication request which is from
@@ -325,6 +326,8 @@ public class BluetoothMapService extends ProfileService {
     @Override
     protected boolean start() {
         if (DEBUG) Log.d(TAG, "start()");
+        VERBOSE = Log.isLoggable(LOG_TAG, Log.VERBOSE) ? true : false;
+        if (VERBOSE) Log.v(TAG, "verbose logging is enabled");
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);

@@ -73,7 +73,7 @@ import android.bluetooth.BluetoothProfile;
 
 public class BluetoothOppService extends Service {
     private static final boolean D = Constants.DEBUG;
-    private static final boolean V = Constants.VERBOSE;
+    private static boolean V;
 
     private boolean userAccepted = false;
 
@@ -207,6 +207,8 @@ public class BluetoothOppService extends Service {
     }
 
     private void startListener() {
+        V = Log.isLoggable(Constants.TAG, Log.VERBOSE) ? true : false;
+        if (V) Log.v(TAG, "startListener");
         if (!mListenStarted) {
             if (mAdapter.isEnabled()) {
                 if (V) Log.v(TAG, "Starting RfcommListener");
