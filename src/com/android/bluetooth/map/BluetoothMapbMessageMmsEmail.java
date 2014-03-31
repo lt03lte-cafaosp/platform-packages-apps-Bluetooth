@@ -473,17 +473,19 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
         encoding = "8BIT"; // The encoding used
 
         encodeHeaders(sb);
-        if(getIncludeAttachments() == false) {
-            for(MimePart part : parts) {
-                part.encodePlainText(sb); /* We call encode on all parts, to include a tag, where an attachment is missing. */
-            }
-        } else {
-            for(MimePart part : parts) {
-                count++;
-                part.encode(sb, getBoundary(), (count == parts.size()));
+
+        if(parts != null) {
+            if(getIncludeAttachments() == false) {
+                for(MimePart part : parts) {
+                    part.encodePlainText(sb); /* We call encode on all parts, to include a tag, where an attachment is missing. */
+                }
+            } else {
+                for(MimePart part : parts) {
+                    count++;
+                    part.encode(sb, getBoundary(), (count == parts.size()));
+                }
             }
         }
-
         mmsBody = sb.toString();
 
         if(mmsBody != null) {
