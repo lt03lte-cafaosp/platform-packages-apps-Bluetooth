@@ -284,7 +284,8 @@ final class HeadsetStateMachine extends StateMachine {
         mLocalBrsf = BRSF_AG_THREE_WAY_CALLING |
                      BRSF_AG_EC_NR |
                      BRSF_AG_REJECT_CALL |
-                     BRSF_AG_ENHANCED_CALL_STATUS;
+                     BRSF_AG_ENHANCED_CALL_STATUS |
+                     BRSF_AG_ENHANCED_ERR_RESULT_CODES;
 
         mDisconnected = new Disconnected();
         mPending = new Pending();
