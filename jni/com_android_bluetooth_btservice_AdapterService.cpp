@@ -651,7 +651,7 @@ static bool initNative(JNIEnv* env, jobject obj) {
 
     if (sBluetoothInterface) {
         int ret = sBluetoothInterface->init(&sBluetoothCallbacks);
-        if (ret != BT_STATUS_SUCCESS) {
+        if (ret != BT_STATUS_SUCCESS && ret != BT_STATUS_DONE) {
             ALOGE("Error while setting the callbacks \n");
             sBluetoothInterface = NULL;
             return JNI_FALSE;
