@@ -66,6 +66,8 @@ final class A2dpStateMachine extends StateMachine {
 
     static final int CONNECT = 1;
     static final int DISCONNECT = 2;
+    static final int ACTIVATE_SINK = 3;
+    static final int DEACTIVATE_SINK = 4;
     private static final int STACK_EVENT = 101;
     private static final int CONNECT_TIMEOUT = 201;
 
@@ -222,6 +224,12 @@ final class A2dpStateMachine extends StateMachine {
                 case DISCONNECT:
                     // ignore
                     break;
+                case ACTIVATE_SINK:
+                    activateSink(true);
+                    break;
+                case DEACTIVATE_SINK:
+                    activateSink(false);
+                    break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
                     log("Stack Event: " + event.type);
@@ -349,6 +357,10 @@ final class A2dpStateMachine extends StateMachine {
                             loge("Unexpected stack event: " + event.type);
                             break;
                     }
+                    break;
+                case ACTIVATE_SINK:
+                case DEACTIVATE_SINK:
+                    deferMessage(message);
                     break;
                 default:
                     return NOT_HANDLED;
@@ -736,6 +748,15 @@ final class A2dpStateMachine extends StateMachine {
         return false;
     }
 
+    void activateSink(boolean isEnable) {
+        if (isEnable) {
+            activateA2dpSinkNative(1);
+        }
+        else {
+            activateA2dpSinkNative(0);
+        }
+    }
+
     boolean okToConnect(BluetoothDevice device) {
         AdapterService adapterService = AdapterService.getAdapterService();
         int priority = mService.getPriority(device);
@@ -1053,4 +1074,5 @@ final class A2dpStateMachine extends StateMachine {
     private native void suspendA2dpNative();
     private native void resumeA2dpNative();
     private native void informAudioFocusStateNative(int state);
+    private native void activateA2dpSinkNative(int isEnable);
 }
