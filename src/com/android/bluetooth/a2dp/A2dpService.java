@@ -132,10 +132,13 @@ public class A2dpService extends ProfileService {
         if (getPriority(device) == BluetoothProfile.PRIORITY_OFF) {
             return false;
         }
-        ParcelUuid[] featureUuids = device.getUuids();
-        if ((BluetoothUuid.containsAnyUuid(featureUuids, A2DP_SOURCE_UUID)) &&
-            !(BluetoothUuid.containsAllUuids(featureUuids ,A2DP_SOURCE_SINK_UUIDS))) {
-            Log.e(TAG,"Remote does not have A2dp Sink UUID");
+
+        if ((BluetoothUuid.isUuidPresent(device.getUuids(), BluetoothUuid.AudioSink)) ||
+            (BluetoothUuid.isUuidPresent(device.getUuids(), BluetoothUuid.AudioSource))) {
+            Log.d(TAG, " Audio UUIDS are present we can connect ");
+        }
+        else {
+            Log.d(TAG, " Audio UUIDS are not present ignoring ");
             return false;
         }
 
@@ -201,11 +204,6 @@ public class A2dpService extends ProfileService {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                        "Need BLUETOOTH_ADMIN permission");
 
-        if ((mStateMachine.isConnectedSrc(device)) &&
-            (priority == BluetoothProfile.PRIORITY_AUTO_CONNECT)) {
-            if (DBG) Log.d(TAG,"Peer Device is SRC Ignore AutoConnect");
-            return false;
-        }
         Settings.Global.putInt(getContentResolver(),
             Settings.Global.getBluetoothA2dpSinkPriorityKey(device.getAddress()),
             priority);
