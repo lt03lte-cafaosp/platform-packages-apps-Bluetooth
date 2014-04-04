@@ -73,8 +73,7 @@ final class RemoteDevices {
                        | PowerManager.ON_AFTER_RELEASE, TAG);
         mWakeLock.setReferenceCounted(false);
         //WakeLock instantiation in RemoteDevices class
-        mWakeLock_stack = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP
-                       | PowerManager.ON_AFTER_RELEASE, TAG);
+        mWakeLock_stack = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
         mWakeLock_stack.setReferenceCounted(false);
 
     }
