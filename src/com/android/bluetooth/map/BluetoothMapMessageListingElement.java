@@ -21,7 +21,16 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import org.xmlpull.v1.XmlSerializer;
-
+import android.telephony.PhoneNumberUtils;
+import android.util.Log;
+import android.util.Xml;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
+import java.io.BufferedReader;
+import java.io.StringWriter;
+import java.util.List;
+import java.nio.charset.Charset;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
 import android.util.Xml;
@@ -224,14 +233,32 @@ public class BluetoothMapMessageListingElement
     {
             Log.d(TAG, "Inside encode");
             // contruct the XML tag for a single msg in the msglisting
+            String sender_name = "qcafortest@gmail.com";
             xmlMsgElement.startTag(null, "msg");
             xmlMsgElement.attribute(null, "handle", mapHandle);
-            if(subject != null)
-                xmlMsgElement.attribute(null, "subject", subject);
+            if(subject != null) {
+               InputStreamReader isr = new InputStreamReader(new ByteArrayInputStream(subject.getBytes(Charset.forName("UTF-8"))), Charset.forName("UTF-8"));
+               BufferedReader reader = new BufferedReader(isr);
+               StringBuilder sb = new StringBuilder();
+               String line = null;
+               while ((line = reader.readLine()) != null) {
+                     sb.append(line);
+               }
+               xmlMsgElement.attribute(null, "subject", sb.toString());
+            }
+
             if(dateTime != 0)
                 xmlMsgElement.attribute(null, "datetime", this.getDateTimeString());
-            if(senderName != null)
-                xmlMsgElement.attribute(null, "sender_name", senderName);
+            if(senderName != null) {
+               InputStreamReader isr = new InputStreamReader(new ByteArrayInputStream(senderName.getBytes(Charset.forName("UTF-8"))), Charset.forName("UTF-8"));
+               BufferedReader reader = new BufferedReader(isr);
+               StringBuilder sb = new StringBuilder();
+               String line = null;
+               while ((line = reader.readLine()) != null) {
+                     sb.append(line);
+               }
+               xmlMsgElement.attribute(null, "sender_name", sb.toString());
+            }
             if(senderAddressing != null)
                 xmlMsgElement.attribute(null, "sender_addressing", senderAddressing);
             if(replytoAddressing != null)
