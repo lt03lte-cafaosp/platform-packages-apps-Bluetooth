@@ -260,7 +260,7 @@ public class BluetoothMapContent {
             selection,
             null, null);
 
-        if (c.moveToFirst()) {
+        if (c !=null && c.moveToFirst()) {
             do {
                 String add = c.getString(c.getColumnIndex("address"));
                 Integer type = c.getInt(c.getColumnIndex("type"));
@@ -309,7 +309,7 @@ public class BluetoothMapContent {
             null, null);
 
         if (D) Log.d(TAG, "   parts:");
-        if (c.moveToFirst()) {
+        if (c !=null && c.moveToFirst()) {
             do {
                 Long partid = c.getLong(c.getColumnIndex(BaseColumns._ID));
                 String ct = c.getString(c.getColumnIndex("ct"));
@@ -353,9 +353,9 @@ public class BluetoothMapContent {
                 printMmsAddr(id);
                 printMmsParts(id);
             }
+            c.close();
         } else {
             Log.d(TAG, "query failed");
-            c.close();
         }
     }
 
@@ -370,9 +370,9 @@ public class BluetoothMapContent {
             while (c.moveToNext()) {
                 printSms(c);
             }
+            c.close();
         } else {
             Log.d(TAG, "query failed");
-            c.close();
         }
 
     }
@@ -605,7 +605,7 @@ public class BluetoothMapContent {
             } else {
                 int toIndex = c.getColumnIndex(MessageColumns.TO_LIST);
                 address = c.getString(toIndex);
-                if (address.contains("")) {
+                if (address != null && address.contains("")) {
                     String[] recepientAddrStr = address.split("");
                     if (recepientAddrStr !=null && recepientAddrStr.length > 0) {
                         if (V){
@@ -894,7 +894,9 @@ public class BluetoothMapContent {
             name = c.getString(c.getColumnIndex(Contacts.DISPLAY_NAME));
         }
 
-        c.close();
+        if (c != null) {
+           c.close();
+        }
         return name;
     }
 
@@ -1309,9 +1311,13 @@ public class BluetoothMapContent {
             if (!c.isLast()) {
                 where += " OR ";
             }
-            p.close();
+            if (p != null) {
+               p.close();
+            }
         }
-        c.close();
+        if (c != null) {
+           c.close();
+        }
 
         if (str != null && str.length() > 0) {
             if (where.length() > 0) {
@@ -2135,7 +2141,8 @@ public class BluetoothMapContent {
             contactId = p.getString(p.getColumnIndex(Contacts._ID));
             contactName = p.getString(p.getColumnIndex(Contacts.DISPLAY_NAME));
         }
-        p.close();
+        if (p != null)
+           p.close();
 
         // Bail out if we are unable to find a contact, based on the phone number
         if(contactId == null) {
@@ -2250,7 +2257,7 @@ public class BluetoothMapContent {
             selection,
             null, null);
         /* TODO: Change the setVCard...() to return the vCard, and use the name in message.addXxx() */
-        if (c.moveToFirst()) {
+        if (c != null && c.moveToFirst()) {
             do {
                 String address = c.getString(c.getColumnIndex("address"));
                 Integer type = c.getInt(c.getColumnIndex("type"));
@@ -2331,7 +2338,7 @@ public class BluetoothMapContent {
             selection,
             null, null);
 
-        if (c.moveToFirst()) {
+        if (c != null && c.moveToFirst()) {
             do {
                 Long partId = c.getLong(c.getColumnIndex(BaseColumns._ID));
                 String contentType = c.getString(c.getColumnIndex("ct"));
