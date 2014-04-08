@@ -305,7 +305,7 @@ final class RemoteDevices {
                     BluetoothDevice.PAIRING_VARIANT_DISPLAY_PIN);
         // Make intent as foreground
         intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-        mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
+        mAdapterService.sendOrderedBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
     }
@@ -441,7 +441,7 @@ final class RemoteDevices {
         intent.putExtra(BluetoothDevice.EXTRA_SECURE_PAIRING, secure);
         //Make intent as foreground
         intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-        mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
+        mAdapterService.sendOrderedBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
         return;
@@ -490,7 +490,7 @@ final class RemoteDevices {
             intent.putExtra(BluetoothDevice.EXTRA_PAIRING_KEY, passkey);
         }
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, variant);
-        mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
+        mAdapterService.sendOrderedBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
 
