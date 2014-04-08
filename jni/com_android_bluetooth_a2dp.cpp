@@ -243,7 +243,7 @@ static void cleanupNative(JNIEnv *env, jobject object) {
     }
 }
 
-static jboolean connectA2dpNative(JNIEnv *env, jobject object, jbyteArray address) {
+static jboolean connectA2dpSrcNative(JNIEnv *env, jobject object, jbyteArray address) {
     jbyte *addr;
     bt_bdaddr_t * btAddr;
     bt_status_t status;
@@ -258,8 +258,31 @@ static jboolean connectA2dpNative(JNIEnv *env, jobject object, jbyteArray addres
         return JNI_FALSE;
     }
 
-    if ((status = sBluetoothA2dpInterface->connect((bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed HF connection, status: %d", status);
+    if ((status = sBluetoothA2dpInterface->connect_src((bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
+        ALOGE("Failed A2dpSrc connection, status: %d", status);
+    }
+    env->ReleaseByteArrayElements(address, addr, 0);
+    return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+}
+
+static jboolean connectA2dpSinkNative(JNIEnv *env, jobject object, jbyteArray address) {
+    jbyte *addr;
+    bt_bdaddr_t * btAddr;
+    bt_status_t status;
+
+    ALOGI("%s: sBluetoothA2dpInterface: %p", __FUNCTION__, sBluetoothA2dpInterface);
+    if (!sBluetoothA2dpInterface) return JNI_FALSE;
+
+    addr = env->GetByteArrayElements(address, NULL);
+    btAddr = (bt_bdaddr_t *) addr;
+    if (!addr) {
+        jniThrowIOException(env, EINVAL);
+        return JNI_FALSE;
+    }
+
+    if ((status = sBluetoothA2dpInterface->connect_sink((bt_bdaddr_t *)addr))
+                                                        != BT_STATUS_SUCCESS) {
+        ALOGE("Failed A2DPSink connection, status: %d", status);
     }
     env->ReleaseByteArrayElements(address, addr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
@@ -292,6 +315,17 @@ static void allowConnectionNative(JNIEnv *env, jobject object, int is_valid) {
     }
 
     sBluetoothA2dpInterface->allow_connection(is_valid);
+
+}
+
+static void activateA2dpSinkNative(JNIEnv *env, jobject object, int is_enable) {
+
+    if (!sBluetoothA2dpInterface) {
+        ALOGE("sBluetoothA2dpInterface is NULL ");
+        return;
+    }
+
+    sBluetoothA2dpInterface->activate_sink(is_enable);
 
 }
 
@@ -350,13 +384,15 @@ static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
     {"initNative", "()V", (void *) initNative},
     {"cleanupNative", "()V", (void *) cleanupNative},
-    {"connectA2dpNative", "([B)Z", (void *) connectA2dpNative},
+    {"connectA2dpSrcNative", "([B)Z", (void *) connectA2dpSrcNative},
+    {"connectA2dpSinkNative", "([B)Z", (void *) connectA2dpSinkNative},
     {"disconnectA2dpNative", "([B)Z", (void *) disconnectA2dpNative},
     {"allowConnectionNative", "(I)V", (void *) allowConnectionNative},
     {"isSrcNative", "([B)I", (void *) isSrcNative},
     {"suspendA2dpNative", "()V", (void *) suspendA2dpNative},
     {"resumeA2dpNative", "()V", (void *) resumeA2dpNative},
     {"informAudioFocusStateNative", "(I)V", (void *) informAudioFocusStateNative},
+    {"activateA2dpSinkNative", "(I)V", (void *) activateA2dpSinkNative},
 };
 
 int register_com_android_bluetooth_a2dp(JNIEnv* env)
