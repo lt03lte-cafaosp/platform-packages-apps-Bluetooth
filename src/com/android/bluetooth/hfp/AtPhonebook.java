@@ -218,7 +218,7 @@ public class AtPhonebook {
                                              getByteAddress(device));
                     mStateMachine.atResponseCodeNative(atCommandResult,
                          atCommandErrorCode, getByteAddress(device));
-                    break;
+                    return;
                 }
                 PhonebookResult pbr = getPhonebookResult(mCurrentPhonebook, true);
                 if (pbr == null) {
