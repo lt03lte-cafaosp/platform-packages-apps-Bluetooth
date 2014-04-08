@@ -724,7 +724,7 @@ public class BluetoothMapContent {
                         e.setRecipientAddressing(recepientAddrStr[0].trim());                    }
                 } else {
                     if (D) Log.d(TAG, "setRecipientAddressing: " + address);
-                    e.setRecipientAddressing(address.trim());
+                    e.setRecipientAddressing(address);
                 }
                 return;
             }
@@ -870,28 +870,30 @@ public class BluetoothMapContent {
 
     private void setDateTime(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
-        long date = 0;
-        int timeStamp = 0;
+        if ((ap.getParameterMask() & MASK_DATETIME) != 0) {
+            long date = 0;
+            int timeStamp = 0;
 
-        if (fi.msgType == FilterInfo.TYPE_SMS) {
-            date = c.getLong(c.getColumnIndex(Sms.DATE));
-        } else if (fi.msgType == FilterInfo.TYPE_MMS) {
-            /* Use Mms.DATE for all messages. Although contract class states */
-            /* Mms.DATE_SENT are for outgoing messages. But that is not working. */
-            date = c.getLong(c.getColumnIndex(Mms.DATE)) * 1000L;
+            if (fi.msgType == FilterInfo.TYPE_SMS) {
+                date = c.getLong(c.getColumnIndex(Sms.DATE));
+            } else if (fi.msgType == FilterInfo.TYPE_MMS) {
+                /* Use Mms.DATE for all messages. Although contract class states */
+                /* Mms.DATE_SENT are for outgoing messages. But that is not working. */
+                date = c.getLong(c.getColumnIndex(Mms.DATE)) * 1000L;
 
-            /* int msgBox = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX)); */
-            /* if (msgBox == Mms.MESSAGE_BOX_INBOX) { */
-            /*     date = c.getLong(c.getColumnIndex(Mms.DATE)) * 1000L; */
-            /* } else { */
-            /*     date = c.getLong(c.getColumnIndex(Mms.DATE_SENT)) * 1000L; */
-            /* } */
-        } else {
-            timeStamp = c.getColumnIndex(MessageColumns.TIMESTAMP);
-            String timestamp = c.getString(timeStamp);
-            date =Long.valueOf(timestamp);
+                /* int msgBox = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX)); */
+                /* if (msgBox == Mms.MESSAGE_BOX_INBOX) { */
+                /*     date = c.getLong(c.getColumnIndex(Mms.DATE)) * 1000L; */
+                /* } else { */
+                /*     date = c.getLong(c.getColumnIndex(Mms.DATE_SENT)) * 1000L; */
+                /* } */
+            } else {
+                timeStamp = c.getColumnIndex(MessageColumns.TIMESTAMP);
+                String timestamp = c.getString(timeStamp);
+                date =Long.valueOf(timestamp);
+            }
+            e.setDateTime(date);
         }
-        e.setDateTime(date);
     }
 
     private String getTextPartsMms(long id) {
@@ -1764,7 +1766,7 @@ public class BluetoothMapContent {
                             message.addTo(multiRecepients.trim(), multiRecepients.trim());
                       }
                 } else if(recipientName.contains(",")){
-                      multiRecepients = recipientName.replace(',', ';');
+                      multiRecepients = recipientName.replace(", \"", "; \"");
                       if(multiRecepients != null){
                          if (V){
                              Log.v(TAG, "Setting ::Recepient name :: " + multiRecepients.trim());
@@ -1782,7 +1784,56 @@ public class BluetoothMapContent {
                       message.addTo(null, recipientName.trim());
                  }
              }
-         }
+
+            recipientName = null;
+            multiRecepients = null;
+            if((recipientName = c.getString(c.getColumnIndex(MessageColumns.CC_LIST))) != null){
+                if(V) Log.v(TAG, " recipientName " + recipientName);
+                if(recipientName.contains("^B")){
+                   String[] recepientStr = recipientName.split("^B");
+                   if(recepientStr !=null && recepientStr.length > 0){
+                      if (V){
+                          Log.v(TAG, " recepientStr[1] " + recepientStr[1].trim());
+                          Log.v(TAG, " recepientStr[0] " + recepientStr[0].trim());
+                      }
+                } else if(recipientName.contains("")){
+                      multiRecepients = recipientName.replace('', ';');
+                      setVCardFromEmailAddress(message, recepientStr[1].trim(), false);
+                      message.addCc(recepientStr[1].trim(), recepientStr[0].trim());
+                   }
+                      if(multiRecepients != null){
+                         if (V){
+                             Log.v(TAG, " Setting ::Recepient name :: " + multiRecepients.trim());
+                         }
+                         emailId = new StringTokenizer(multiRecepients.trim(),";");
+                         do {
+                            setVCardFromEmailAddress(message, emailId.nextElement().toString(), false);
+                         } while(emailId.hasMoreElements());
+
+                            message.addCc(multiRecepients.trim(), multiRecepients.trim());
+                      }
+                } else if(recipientName.contains(",")){
+                      multiRecepients = recipientName.replace(", \"", "; \"");
+if(V) Log.v(TAG, " After replacing  " + multiRecepients);
+
+                      if(multiRecepients != null){
+                         if (V){
+                             Log.v(TAG, "Setting ::Recepient name :: " + multiRecepients.trim());
+                         }
+                         emailId = new StringTokenizer(multiRecepients.trim(),";");
+                         do {
+                            tempEmail = emailId.nextElement().toString();
+                            setVCardFromEmailAddress(message, tempEmail, false);
+                            message.addCc(null, tempEmail);
+                         } while(emailId.hasMoreElements());
+                      }
+                } else {
+                      Log.v(TAG, " Setting ::Recepient name :: " + recipientName.trim());
+                      setVCardFromEmailAddress(message, recipientName.trim(), false);
+                      message.addCc(null, recipientName.trim());
+                 }
+             }
+        }
     }
 
     /**
@@ -2238,7 +2289,7 @@ public class BluetoothMapContent {
     private void setVCardFromEmailAddress(BluetoothMapbMessage message, String emailAddr, boolean incoming) {
         if(D) Log.d(TAG, "setVCardFromEmailAddress, emailAdress is " +emailAddr);
         String contactId = null, contactName = null;
-        String[] phoneNumbers = null;
+        String[] phoneNumbers = {""};
         String[] emailAddresses = new String[1];
         StringTokenizer emailId;
         Cursor p;
