@@ -10,7 +10,9 @@ LOCAL_PACKAGE_NAME := Bluetooth
 LOCAL_CERTIFICATE := platform
 
 LOCAL_JNI_SHARED_LIBRARIES := libbluetooth_jni
-LOCAL_JAVA_LIBRARIES := javax.obex telephony-common mms-common
+LOCAL_JAVA_LIBRARIES := javax.btobex
+LOCAL_JAVA_LIBRARIES += telephony-common
+LOCAL_JAVA_LIBRARIES += mms-common
 LOCAL_STATIC_JAVA_LIBRARIES := com.android.vcard
 LOCAL_STATIC_JAVA_LIBRARIES += com.android.emailcommon
 
