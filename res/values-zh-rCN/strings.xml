@@ -114,4 +114,5 @@
     <string name="transfer_menu_open" msgid="3368984869083107200">"打开"</string>
     <string name="transfer_menu_clear" msgid="5854038118831427492">"从列表中清除"</string>
     <string name="transfer_clear_dlg_title" msgid="2953444575556460386">"清除"</string>
+    <string name="upload_fail_waiting">正在进行数据准备，稍后自动重发</string>
 </resources>

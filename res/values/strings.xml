@@ -233,4 +233,5 @@
     <!-- Do not translate. android:process of this application. -->
     <string name="process" translate="false"><xliff:g id="x" /></string>
 
+    <string name="upload_fail_waiting">Ongoing send file preparation, automatic retransmission later</string>
 </resources>
