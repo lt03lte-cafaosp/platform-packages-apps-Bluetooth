@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.HashMap;
 
-import javax.obex.ServerSession;
+import javax.btobex.ServerSession;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;

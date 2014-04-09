@@ -22,10 +22,10 @@ import java.util.Arrays;
 import java.util.Calendar;
 import android.os.PowerManager;
 
-import javax.obex.HeaderSet;
-import javax.obex.Operation;
-import javax.obex.ResponseCodes;
-import javax.obex.ServerRequestHandler;
+import javax.btobex.HeaderSet;
+import javax.btobex.Operation;
+import javax.btobex.ResponseCodes;
+import javax.btobex.ServerRequestHandler;
 
 import com.android.bluetooth.map.BluetoothMapUtils;
 import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
