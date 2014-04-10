@@ -86,6 +86,7 @@ import android.content.pm.PackageManager;
 import android.os.ServiceManager;
 import android.os.PowerManager;
 import android.content.Context;
+import android.os.SystemProperties;
 
 public class QAdapterService extends Service {
     private static final String TAG = "QBluetoothAdapterService";
@@ -464,12 +465,22 @@ public class QAdapterService extends Service {
     //----API Methods--------
      int getLEAdvMode() {
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "getLEAdvMode, peripheral mode not supported");
+             return QBluetoothAdapter.ADV_MODE_NONE;
+         }
 
          return mAdapterProperties.getLEAdvMode();
      }
 
      boolean setLEAdvParams(int min_int, int max_int, String address, int ad_type){
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "setLEAdvParams, peripheral mode not supported");
+             return false;
+         }
 
          byte[] addr = Utils.getBytesFromAddress(address);
          debugLog("in QAdapterService, calling the native fn");
@@ -477,6 +488,11 @@ public class QAdapterService extends Service {
      }
      boolean setLEAdvMode(int mode) {
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "setLEAdvMode, peripheral mode not supported");
+             return false;
+         }
 
          int newMode = convertAdvModeToHal(mode);
          return mAdapterProperties.setLEAdvMode(newMode);
@@ -484,6 +500,11 @@ public class QAdapterService extends Service {
 
      boolean setLEManuData(byte[] manuData){
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "setLEManuData, peripheral mode not supported");
+             return false;
+         }
 
          debugLog("in AdapterService, calling the native fn for manudata");
          return setLEManuDataNative(manuData);
@@ -491,6 +512,11 @@ public class QAdapterService extends Service {
 
      boolean setLEServiceData(byte[] serviceData){
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "setLEServiceData, peripheral mode not supported");
+             return false;
+         }
 
         debugLog("in AdapterService, calling the native fn for serviceData");
         return setLEServiceDataNative(serviceData);
@@ -498,16 +524,22 @@ public class QAdapterService extends Service {
 
      boolean setLEAdvMask(boolean bLocalName, boolean bServices, boolean bTxPower, boolean bManuData, boolean ServiceData){
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "setLEAdvMask, peripheral mode not supported");
+             return false;
+         }
          int dMask=0;
-        if(bLocalName)
+         if(bLocalName)
              dMask|=AbstractionLayer.BTM_BLE_AD_BIT_DEV_NAME;
-        if(bServices)
+         if(bServices)
              dMask|=AbstractionLayer.BTM_BLE_AD_BIT_SERVICE;
-        if(bTxPower)
+         if(bTxPower)
              dMask|=AbstractionLayer.BTM_BLE_AD_BIT_TX_PWR;
-        if(bManuData)
+         if(bManuData)
              dMask|=AbstractionLayer.BTM_BLE_AD_BIT_MANU;
-        if(ServiceData)
+         if(ServiceData)
              dMask|=AbstractionLayer.BTM_BLE_AD_BIT_SERVICE_DATA;
          debugLog("in AdapterService, calling the native fn for adv data mask" + dMask);
          return setLEadvMaskNative(dMask);
@@ -515,6 +547,11 @@ public class QAdapterService extends Service {
 
      boolean setLEScanRespMask(boolean bLocalName, boolean bServices, boolean bTxPower,boolean bManuData){
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "setLEScanRespMask, peripheral mode not supported");
+             return false;
+         }
          int dMask=0;
          if(bLocalName)
              dMask|=AbstractionLayer.BTM_BLE_AD_BIT_DEV_NAME;
@@ -555,6 +592,17 @@ public class QAdapterService extends Service {
          }
          return -1;
      }
+
+    static boolean isAdvSupported() {
+        if(SystemProperties.getBoolean("ro.bluetooth.advertisement", false) == true) {
+            return true;
+        }
+        else
+        {
+            Log.v(TAG, "isAdvSupported: false");
+            return false;
+        }
+    }
 
      int startLeExtendedScan(BluetoothLEServiceUuid[] services, IQBluetoothAdapterCallback callback) {
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
