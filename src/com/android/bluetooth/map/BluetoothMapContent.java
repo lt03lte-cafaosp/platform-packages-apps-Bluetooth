@@ -2287,7 +2287,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
     private void setVCardFromEmailAddress(BluetoothMapbMessage message, String emailAddr, boolean incoming) {
         if(D) Log.d(TAG, "setVCardFromEmailAddress, emailAdress is " +emailAddr);
         String contactId = null, contactName = null;
-        String[] phoneNumbers = null;
+        String[] phoneNumbers = {""};
         String[] emailAddresses = new String[1];
         StringTokenizer emailId;
         Cursor p;
@@ -2485,17 +2485,26 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
         try {
             is = mResolver.openInputStream(uriAddress);
             int len = 0;
-            while ((len = is.read(buffer)) != -1) {
-              os.write(buffer, 0, len); // We need to specify the len, as it can be != bufferSize
+            if (is != null) {
+             while ((len = is.read(buffer)) != -1) {
+              if (os != null) {
+               os.write(buffer, 0, len); // We need to specify the len, as it can be != bufferSize
+              }
+             }
             }
-            retVal = os.toByteArray();
+            if (os != null) {
+             retVal = os.toByteArray();
+
+            }
         } catch (IOException e) {
             // do nothing for now
             Log.w(TAG,"Error reading part data",e);
         } finally {
             try {
-                os.close();
-                is.close();
+                if (os !=null)
+                 os.close();
+                if (is!=null)
+                 is.close();
             } catch (IOException e) {
             }
         }
