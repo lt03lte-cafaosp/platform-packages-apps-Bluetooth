@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2010, 2014, The Linux Foundation. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
- *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,18 +39,18 @@ import java.net.Socket;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.bluetooth.BluetoothUuid;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.util.Log;
+import android.bluetooth.BluetoothUuid;
 
-/**
- * This class listens on OPUSH channel for incoming connection
- */
-public class BluetoothOppRfcommListener {
-    private static final String TAG = "BtOppRfcommListener";
+public class BluetoothOppL2capListener {
+    private static final String TAG = "BtOppL2CapListener";
 
-    private static final boolean V = Log.isLoggable(Constants.TAG, Log.VERBOSE) ? true : false;
+    private static final boolean D = Constants.DEBUG;
+
+    private static final boolean V = Constants.VERBOSE;
 
     public static final int MSG_INCOMING_BTOPP_CONNECTION = 100;
 
@@ -60,7 +60,13 @@ public class BluetoothOppRfcommListener {
 
     private Handler mCallback;
 
+    /* Debugging hooks to control AMP-related operations */
+    private static final String DEBUG_L2CAP_SRV_PSM = "debug.bt.opp.server.l2cap_psm";
+
     private static final int CREATE_RETRY_TIME = 10;
+
+    private static final int DEFAULT_OPP_PSM = 5255;
+
 
     private final BluetoothAdapter mAdapter;
 
@@ -68,7 +74,7 @@ public class BluetoothOppRfcommListener {
 
     private ServerSocket mTcpServerSocket = null;
 
-    public BluetoothOppRfcommListener(BluetoothAdapter adapter) {
+    public BluetoothOppL2capListener(BluetoothAdapter adapter) {
         mAdapter = adapter;
     }
 
@@ -85,7 +91,7 @@ public class BluetoothOppRfcommListener {
                             if (V) Log.v(TAG, "Create TCP ServerSocket");
                             mTcpServerSocket = new ServerSocket(Constants.TCP_DEBUG_PORT, 1);
                         } catch (IOException e) {
-                            Log.e(TAG, "Error listing on port" + Constants.TCP_DEBUG_PORT);
+                            Log.e(TAG, "Error listening on port" + Constants.TCP_DEBUG_PORT);
                             mInterrupted = true;
                         }
                         while (!mInterrupted) {
@@ -110,23 +116,23 @@ public class BluetoothOppRfcommListener {
 
                         /*
                          * it's possible that create will fail in some cases.
-                         * retry for 10 times
+                         * retry for CREATE_RETRY_TIME times
                          */
-                        for (int i = 0; i < CREATE_RETRY_TIME && !mInterrupted; i++) {
+                        int i = 0;
+                        for (i = 0; i < CREATE_RETRY_TIME && !mInterrupted; i++) {
                             try {
-                                if (V) Log.v(TAG, "Starting RFCOMM listener....");
-                                mBtServerSocket = mAdapter.listenUsingInsecureRfcommWithServiceRecord("OBEX Object Push", BluetoothUuid.ObexObjectPush.getUuid());
-                                if (V) Log.v(TAG, "Started RFCOMM listener....");
+                                if (V) Log.v(TAG, "Starting L2cap listener....");
+                                mBtServerSocket = mAdapter.listenUsingInsecureL2capWithServiceRecord("OBEX Object Push", BluetoothUuid.ObexObjectPush.getUuid());
+                                if (V) Log.v(TAG, "Started L2Cap listener....");
                             } catch (IOException e1) {
-                                Log.e(TAG, "Error create RfcommServerSocket " + e1);
+                                Log.e(TAG, "Error create L2capServerSocket " + e1);
                                 serverOK = false;
                             }
-
                             if (!serverOK) {
                                 synchronized (this) {
                                     try {
-                                        if (V) Log.v(TAG, "Wait 300 ms");
-                                        Thread.sleep(300);
+                                        if (V) Log.v(TAG, "wait 3 seconds");
+                                        Thread.sleep(3000);
                                     } catch (InterruptedException e) {
                                         Log.e(TAG, "socketAcceptThread thread was interrupted (3)");
                                         mInterrupted = true;
@@ -137,34 +143,35 @@ public class BluetoothOppRfcommListener {
                             }
                         }
                         if (!serverOK) {
-                            Log.e(TAG, "Error start listening after " + CREATE_RETRY_TIME + " try");
+                            Log.e(TAG, "Error start listening after " +
+                                Integer.toString(i) + " try");
                             mInterrupted = true;
                         }
                         if (!mInterrupted) {
-                            Log.i(TAG, "Accept thread started.");
+                            Log.i(TAG, "Accept thread started ");
                         }
                         BluetoothSocket clientSocket;
                         while (!mInterrupted) {
                             try {
                                 if (V) Log.v(TAG, "Accepting connection...");
                                 if (mBtServerSocket == null) {
-                                    
                                 }
                                 BluetoothServerSocket sSocket = mBtServerSocket;
                                 if (sSocket ==null) {
                                     mInterrupted = true;
-                                    
                                 } else {
                                     clientSocket = sSocket.accept();
-                                    if (V) Log.v(TAG, "Accepted connection from "
+                                Log.i(TAG, "Accepted connection from "
                                         + clientSocket.getRemoteDevice());
-                                BluetoothOppTransport transport = new BluetoothOppTransport(
-                                        clientSocket, BluetoothOppTransport.TYPE_RFCOMM);
-                                    Message msg = Message.obtain();
-                                    msg.setTarget(mCallback);
-                                    msg.what = MSG_INCOMING_BTOPP_CONNECTION;
-                                    msg.obj = transport;
-                                    msg.sendToTarget();
+
+
+                                BluetoothOppTransport transport
+                                    = new BluetoothOppTransport(clientSocket, BluetoothOppTransport.TYPE_L2CAP);
+                                Message msg = Message.obtain();
+                                msg.setTarget(mCallback);
+                                msg.what = MSG_INCOMING_BTOPP_CONNECTION;
+                                msg.obj = transport;
+                                msg.sendToTarget();
                                 }
                             } catch (IOException e) {
                                 Log.e(TAG, "Error accept connection " + e);
@@ -173,7 +180,7 @@ public class BluetoothOppRfcommListener {
                                 } catch (InterruptedException ie) {}
                             }
                         }
-                        Log.i(TAG, "BluetoothSocket listen thread finished");
+                        Log.i(TAG, "BluetoothL2CAPSocket listen thread finished");
                     }
                 }
             };
@@ -190,18 +197,17 @@ public class BluetoothOppRfcommListener {
             Log.i(TAG, "stopping Accept Thread");
 
             mInterrupted = true;
-             if (Constants.USE_TCP_DEBUG) {
+            if (Constants.USE_TCP_DEBUG) {
                 if (V) Log.v(TAG, "close mTcpServerSocket");
                 if (mTcpServerSocket != null) {
                     try {
                         mTcpServerSocket.close();
-                        mTcpServerSocket = null;
                     } catch (IOException e) {
                         Log.e(TAG, "Error close mTcpServerSocket");
                     }
                 }
             } else {
-                if (V) Log.v(TAG, "close mBtServerSocket");
+                if (V) Log.v(TAG, "close L2CAP mBtServerSocket");
 
                 if (mBtServerSocket != null) {
                     try {
@@ -215,7 +221,6 @@ public class BluetoothOppRfcommListener {
             try {
                 mSocketAcceptThread.interrupt();
                 if (V) Log.v(TAG, "waiting for thread to terminate");
-                //mSocketAcceptThread.join(JOIN_TIMEOUT_MS);
                 mSocketAcceptThread.join();
                 if (V) Log.v(TAG, "done waiting for thread to terminate");
                 mSocketAcceptThread = null;
@@ -225,4 +230,5 @@ public class BluetoothOppRfcommListener {
             }
         }
     }
+
 }
