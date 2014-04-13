@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2008-2009, Motorola, Inc.
  * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * All rights reserved.
  *
@@ -126,6 +127,11 @@ public class BluetoothOppSendFileInfo {
             } catch (CursorWindowAllocationException e) {
                 metadataCursor = null;
                 Log.e(TAG, "generateFileInfo: " + e);
+            } catch (SecurityException e) {
+                metadataCursor = null;
+                fileName = uri.getLastPathSegment();
+                Log.e(TAG, "generateFileInfo: " + e);
+                return new BluetoothOppSendFileInfo(fileName, contentType, length, null, 0);
             }
             if (metadataCursor != null) {
                 try {
