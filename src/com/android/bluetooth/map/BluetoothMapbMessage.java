@@ -34,7 +34,7 @@ public abstract class BluetoothMapbMessage {
 
     protected static String TAG = "BluetoothMapbMessage";
     protected static final boolean D = BluetoothMapService.DEBUG;
-    protected static final boolean V = BluetoothMapService.VERBOSE;
+    protected static final boolean V = Log.isLoggable(BluetoothMapService.LOG_TAG, Log.VERBOSE) ? true : false;
     private static final String VERSION = "VERSION:1.0";
 
     public static int INVALID_VALUE = -1;
