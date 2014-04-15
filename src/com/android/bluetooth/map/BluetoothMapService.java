@@ -810,39 +810,26 @@ public class BluetoothMapService extends ProfileService {
                       }
 
                       mConnectionManager.addToMapClientList(mRemoteDevice.getAddress(), mMasId);
-                      boolean trust = mRemoteDevice.getTrustState();
-                      if (DEBUG) Log.d(TAG, "GetTrustState() = " + trust);
 
-                      if (trust) {
-                         try {
-                            if (DEBUG) Log.d(TAG, "incoming connection accepted from: "
-                                + sRemoteDeviceName + " automatically as trusted device");
-                            startObexServerSession(mRemoteDevice);
-                        } catch (IOException ex) {
-                            Log.e(TAG, "catch exception starting obex server session"
-                                    + ex.toString());
-                        }
-                     } else {
-                        mConnectionManager.setWaitingForConfirmation(mMasId);
-                        Intent intent = new
-                            Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
-                        intent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
-                        intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
-                                        BluetoothDevice.REQUEST_TYPE_MESSAGE_ACCESS);
-                        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
-                        sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
-                        isWaitingAuthorization = true;
+                      mConnectionManager.setWaitingForConfirmation(mMasId);
+                      Intent intent = new
+                          Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
+                      intent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
+                      intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                                      BluetoothDevice.REQUEST_TYPE_MESSAGE_ACCESS);
+                      intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
+                      sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                      isWaitingAuthorization = true;
 
-                        if (DEBUG) Log.d(TAG, "waiting for authorization for connection from: "
-                                + sRemoteDeviceName);
+                      if (DEBUG) Log.d(TAG, "waiting for authorization for connection from: "
+                              + sRemoteDeviceName);
 
-                        //Queue USER_TIMEOUT to disconnect MAP OBEX session. If user doesn't
-                        //accept or reject authorization request.
-                        removeTimeoutMsg = true;
-                        mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
-                            .obtainMessage(USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
-                    }
-                    stopped = true; // job done ,close this thread;
+                      //Queue USER_TIMEOUT to disconnect MAP OBEX session. If user doesn't
+                      //accept or reject authorization request.
+                      removeTimeoutMsg = true;
+                      mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
+                          .obtainMessage(USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
+                      stopped = true; // job done ,close this thread;
                     } catch (IOException ex) {
                        stopped=true;
                        if (DEBUG) Log.v(TAG, "Accept exception: " + ex.toString());
@@ -913,10 +900,6 @@ public class BluetoothMapService extends ProfileService {
                                        BluetoothDevice.CONNECTION_ACCESS_NO) ==
                     BluetoothDevice.CONNECTION_ACCESS_YES) {
                        //bluetooth connection accepted by user
-                       if (intent.getBooleanExtra(BluetoothDevice.EXTRA_ALWAYS_ALLOWED, false)) {
-                            boolean result = mRemoteDevice.setTrust(true);
-                            if (DEBUG) Log.d(TAG, "setTrust() result=" + result);
-                       }
 
                     if(mIsEmailEnabled) {
                       //  todo updateEmailAccount();
