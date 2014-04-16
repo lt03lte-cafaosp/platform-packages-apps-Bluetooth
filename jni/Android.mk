@@ -28,7 +28,9 @@ LOCAL_SHARED_LIBRARIES := \
     libhardware
 
 #LOCAL_CFLAGS += -O0 -g
-
+ifeq ($(BOARD_HAVE_BLUETOOTH_QCOM),true)
+LOCAL_CFLAGS += -DQCOM_BLUETOOTH
+endif
 LOCAL_MODULE := libbluetooth_jni
 LOCAL_MODULE_TAGS := optional
 
