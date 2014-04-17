@@ -394,7 +394,11 @@ static void wake_state_changed_callback(bt_state_t state) {
 
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
 }
+#ifdef QCOM_BLUETOOTH
 static void pin_request_callback(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t cod, uint8_t secure) {
+#else
+static void pin_request_callback(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t cod) {
+#endif
     jbyteArray addr, devname;
     if (!checkCallbackThread()) {
        ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
@@ -413,9 +417,11 @@ static void pin_request_callback(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint
     if (devname == NULL) goto Fail;
 
     callbackEnv->SetByteArrayRegion(devname, 0, sizeof(bt_bdname_t), (jbyte*)bdname);
-
+#ifdef QCOM_BLUETOOTH
     callbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback, addr, devname, cod, secure);
-
+#else
+    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback, addr, devname, cod, 0);
+#endif
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(addr);
     callbackEnv->DeleteLocalRef(devname);
@@ -495,15 +501,17 @@ bt_callbacks_t sBluetoothCallbacks = {
     remote_device_properties_callback,
     device_found_callback,
     discovery_state_changed_callback,
-    wake_state_changed_callback,
     pin_request_callback,
     ssp_request_callback,
     bond_state_changed_callback,
     acl_state_changed_callback,
     callback_thread_event,
     dut_mode_recv_callback,
+    le_test_mode_recv_callback
+#ifdef QCOM_BLUETOOTH
+    ,
+    wake_state_changed_callback,
     NULL,
-    le_test_mode_recv_callback,
     NULL,
     NULL,
     NULL,
@@ -511,6 +519,7 @@ bt_callbacks_t sBluetoothCallbacks = {
     NULL,
     NULL,
     ble_conn_params_callback
+#endif
 };
 
 static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_addr,
