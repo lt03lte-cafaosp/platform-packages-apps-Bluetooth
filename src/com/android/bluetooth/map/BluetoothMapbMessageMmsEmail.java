@@ -700,7 +700,6 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
     }
     @Override
     public void parseBodyEmail(String body) throws IllegalArgumentException {
-
     int beginVersionPos = -1;
     int rfc822Flag = 0;
     int mimeFlag = 0;
@@ -722,8 +721,8 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
     int contentIndex = body.indexOf("Content-Type",pos1);
     if(contentIndex > 0) {
        contentType = parseContentTypeEmail(body, boundary);
-      if(contentType != null && contentType.trim().equalsIgnoreCase("message/rfc822")){
-         rfc822Flag = 1;
+       if(contentType != null && contentType.trim().equalsIgnoreCase("message/rfc822")){
+          rfc822Flag = 1;
       }
     }
     int pos = body.indexOf(CRLF, pos1) + CRLF.length();
@@ -740,7 +739,7 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
                if (beginMsg == -1) {
                    throw new IllegalArgumentException("Ill-formatted bMessage, no BEGIN:MSG");
                }
-               int endMsg = body.indexOf("END:MSG", beginMsg);
+               int endMsg = body.lastIndexOf("END:MSG", beginMsg);
                if (endMsg == -1) {
                    throw new IllegalArgumentException("Ill-formatted bMessage, no END:MSG");
                }
@@ -755,7 +754,7 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
        int endVersionPos;
        if(rfc822Flag == 0){
           if(mimeFlag == 0) {
-             endVersionPos = body.indexOf("END:MSG", beginVersionPos) ;
+             endVersionPos = body.lastIndexOf("END:MSG", beginVersionPos) ;
              if (endVersionPos != -1) {
                  setEmailBody(body.substring(beginVersionPos, (endVersionPos - CRLF.length())));
              } else {
