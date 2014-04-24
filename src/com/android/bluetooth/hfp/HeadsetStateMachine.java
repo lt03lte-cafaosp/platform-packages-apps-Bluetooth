@@ -1554,9 +1554,8 @@ final class HeadsetStateMachine extends StateMachine {
             switch (state) {
                 case HeadsetHalConstants.CONNECTION_STATE_DISCONNECTED:
                     if (mConnectedDevicesList.contains(device)) {
-                        if (mActiveScoDevice != null
-                            && mActiveScoDevice.equals(device)&& mAudioState
-                            != BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
+                        if (((mActiveScoDevice == null) || (mActiveScoDevice.equals(device)))
+                             && (mAudioState != BluetoothHeadset.STATE_AUDIO_DISCONNECTED)) {
                             processAudioEvent(
                                 HeadsetHalConstants.AUDIO_STATE_DISCONNECTED, device);
                         }
