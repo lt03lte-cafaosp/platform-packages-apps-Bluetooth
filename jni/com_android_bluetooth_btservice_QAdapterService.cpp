@@ -246,10 +246,6 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     hw_module_t* module;
 
     ALOGV("%s:",__FUNCTION__);
-    if((qcBluetoothInterface=getBluetoothInterface())==NULL){
-        ALOGE("Bluetooth module is not loaded");
-        return;
-    }
 
     jclass jniCallbackClass =
         env->FindClass("com/android/bluetooth/btservice/QJniCallbacks");
@@ -268,6 +264,10 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 static bool initNative(JNIEnv* env, jobject obj) {
     ALOGV("%s:",__FUNCTION__);
 
+    if((qcBluetoothInterface=getBluetoothInterface())==NULL){
+        ALOGE("Bluetooth module is not loaded");
+        return JNI_FALSE;
+    }
     qcJniCallbacksObj = env->NewGlobalRef(env->GetObjectField(obj, qcJniCallbacksField));
 
     if (qcBluetoothInterface) {
