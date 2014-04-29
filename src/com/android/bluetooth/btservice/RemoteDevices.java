@@ -525,6 +525,11 @@ final class RemoteDevices {
 
     void bleConnParamsCallback(int status, byte[] address, int connIntervalMin, int connIntervalMax, int connLatency,
             int supervisionTimeout, int evt) {
+        if(!QAdapterService.isAdvSupported())
+        {
+            Log.e(TAG, "bleConnParamsCallback, peripheral mode not supported");
+            return;
+        }
         BluetoothDevice device =  mAdapter.getRemoteDevice(Utils.getAddressStringFromByte(address));
         if (device == null) {
             errorLog("bleConnParamsCallback: Device is NULL");

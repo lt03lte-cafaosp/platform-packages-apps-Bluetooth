@@ -698,6 +698,11 @@ public class QAdapterService extends Service {
      boolean sendLEConnUpdate(BluetoothDevice device, int interval_min, int interval_max, int latency, int supervisionTimeout){
          enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
+         if(!isAdvSupported())
+         {
+             Log.e(TAG, "sendLEConnUpdate, peripheral mode not supported");
+             return false;
+         }
          debugLog("in AdapterService, calling the native fn for sendLEConnUpdate"+device.getAddress());
          byte[] addr = Utils.getBytesFromAddress(device.getAddress());
 
