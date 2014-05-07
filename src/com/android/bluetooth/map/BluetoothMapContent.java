@@ -816,8 +816,13 @@ public class BluetoothMapContent {
                          e.setEmailSenderAddressing(senderAddrStr[0].trim());
                       }
                    } else{
-                         if (D) Log.d(TAG, "setSenderAddressing: " + address);
-                         e.setEmailSenderAddressing(address.trim());
+                         if(address.indexOf('<') != -1 && address.indexOf('>') != -1) {
+                            if (D) Log.d(TAG, "setSenderAddressing: " + address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
+                            e.setEmailSenderAddressing(address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
+                         } else {
+                            if (D) Log.d(TAG, "setSenderAddressing: " + address);
+                            e.setEmailSenderAddressing(address.trim());
+                         }
                    }
                 }
                 return;
@@ -1730,12 +1735,22 @@ public class BluetoothMapContent {
                       if(V) Log.v(TAG, " senderStr[1] " + senderStr[1].trim());
                       if(V) Log.v(TAG, " senderStr[0] " + senderStr[0].trim());
                       setVCardFromEmailAddress(message, senderStr[1].trim(), true);
-                      message.addFrom(null, senderStr[0].trim());
+                       if(senderStr[0].indexOf('<') != -1 && senderStr[0].indexOf('>') != -1) {
+                         if(V) Log.v(TAG, "from addressing is " + senderName.substring(senderStr[0].indexOf('<')+1, senderStr[0].lastIndexOf('>')));
+                         message.addFrom(null, senderStr[0].substring(senderStr[0].indexOf('<')+1, senderStr[0].lastIndexOf('>')));
+                       } else{
+                         message.addFrom(null, senderStr[0].trim());
+                      }
                    }
                 } else {
                        if(V) Log.v(TAG, " senderStr is" + senderName.trim());
                        setVCardFromEmailAddress(message, senderName.trim(), true);
-                        message.addFrom(null, senderName.trim());
+                       if(senderName.indexOf('<') != -1 && senderName.indexOf('>') != -1) {
+                         if(V) Log.v(TAG, "from addressing is " + senderName.substring(senderName.indexOf('<')+1, senderName.lastIndexOf('>')));
+                         message.addFrom(null, senderName.substring(senderName.indexOf('<')+1, senderName.lastIndexOf('>')));
+                       } else{
+                         message.addFrom(null, senderName.trim());
+                      }
                 }
             }
             String recipientName = null;
