@@ -28,7 +28,7 @@ public class BluetoothMapbMessageSms extends BluetoothMapbMessage {
 
     private ArrayList<SmsPdu> smsBodyPdus = null;
     private String smsBody = null;
-
+    private String PCM_CARKIT = "9C:DF:03";
     public void setSmsBodyPdus(ArrayList<SmsPdu> smsBodyPdus) {
         this.smsBodyPdus = smsBodyPdus;
         this.charset = null;
@@ -79,6 +79,14 @@ public class BluetoothMapbMessageSms extends BluetoothMapbMessage {
          */
         if(smsBody != null) {
             String tmpBody = smsBody.replaceAll("END:MSG", "/END\\:MSG"); // Replace any occurrences of END:MSG with \END:MSG
+            if(V) Log.v(TAG,"smsBody is" +smsBody);
+
+            /* fix iot issue with PCM carkit where carkit is unable to parse
+               message if carriage return is present in it */
+            if(BluetoothMapService.getRemoteDevice().getAddress().startsWith(PCM_CARKIT)) {
+               tmpBody = tmpBody.replaceAll("\r", "");
+            }
+
             bodyFragments.add(tmpBody.getBytes("UTF-8"));
         }else if (smsBodyPdus != null && smsBodyPdus.size() > 0) {
             for (SmsPdu pdu : smsBodyPdus) {
