@@ -163,23 +163,23 @@ public abstract class BluetoothMapbMessage {
             return envLevel;
         }
 
-        public void encode(StringBuilder sb)
+        public void encode(StringBuilder sb) throws UnsupportedEncodingException
         {
             sb.append("BEGIN:VCARD").append("\r\n");
             sb.append("VERSION:").append(version).append("\r\n");
             if(version.equals("3.0") && formattedName != null)
             {
-                sb.append("FN:").append(formattedName).append("\r\n");
+                sb.append("FN:").append(new String(formattedName.getBytes("UTF-8"),"UTF-8")).append("\r\n");
             }
             if (name != null)
-                sb.append("N:").append(name).append("\r\n");
+                sb.append("N:").append(new String(name.getBytes("UTF-8"),"UTF-8")).append("\r\n");
             for(String phoneNumber : phoneNumbers)
             {
                 sb.append("TEL:").append(phoneNumber).append("\r\n");
             }
             for(String emailAddress : emailAddresses)
             {
-                sb.append("EMAIL:").append(emailAddress).append("\r\n");
+                sb.append("EMAIL:").append(new String(emailAddress.getBytes("UTF-8"),"UTF-8")).append("\r\n");
             }
             sb.append("END:VCARD").append("\r\n");
         }
