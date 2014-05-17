@@ -56,6 +56,11 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothA2dp;
+import android.provider.MediaStore;
+import android.content.ContentResolver;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteException;
+import android.net.Uri;
 
 /**
  * support Bluetooth AVRCP profile.
@@ -135,17 +140,23 @@ final class Avrcp {
     private static final int MESSAGE_FF_REW_TIMEOUT = 12;
 
     private static final int MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT = 13;
-    private static final int SET_ADDR_PLAYER_TIMEOUT = 2000;
+    private static final int AVRCP_BR_RSP_TIMEOUT = 2000;
     private static final int MESSAGE_SEND_PASS_THROUGH_CMD = 2001;
     private static final int MESSAGE_SET_ADDR_PLAYER = 2002;
     private static final int MESSAGE_GET_FOLDER_ITEMS = 2003;
+    private static final int MESSAGE_SET_BROWSED_PLAYER = 2004;
+    private static final int MESSAGE_CHANGE_PATH = 2005;
+    private static final int MESSAGE_PLAY_ITEM = 2006;
+    private static final int MESSAGE_GET_ITEM_ATTRS = 2007;
 
     private int mAddressedPlayerChangedNT;
     private int mAvailablePlayersChangedNT;
+    private int mNowPlayingContentChangedNT;
     private int mAddressedPlayerId;
     private String mRequestedAddressedPlayerPackageName;
     private BluetoothDevice mDevice;
     private int mIsConnected;
+    private CachedRequest mCachedRequest = null;
 
     private static final int MESSAGE_CHANGE_PLAY_POS = 12;
     private static final int MSG_UPDATE_STATE = 100;
@@ -156,6 +167,11 @@ final class Avrcp {
     private static final int MSG_UPDATE_AVAILABLE_PLAYERS = 201;
     private static final int MSG_UPDATE_ADDRESSED_PLAYER = 202;
     private static final int MSG_UPDATE_RCC_CHANGE = 203;
+    private static final int MSG_UPDATE_BROWSED_PLAYER_FOLDER = 204;
+    private static final int MSG_UPDATE_NOW_PLAYING_CONTENT_CHANGED = 205;
+    private static final int MSG_PLAY_ITEM_RESPONSE = 206;
+    private static final int MSG_NOW_PLAYING_ENTRIES_RECEIVED = 207;
+
     private MediaPlayerInfo mediaPlayerInfo1;
     private MediaPlayerInfo mediaPlayerInfo2;
 
@@ -179,6 +195,53 @@ final class Avrcp {
     private static final int AVRCP_CONNECTED = 1;
     public  static final int KEY_STATE_PRESSED = 0;
     public  static final int KEY_STATE_RELEASED = 1;
+
+    private String mCurrentPath;
+    private String mCurrentPathUid;
+    private static Uri mMediaUri;
+
+    private final static int TYPE_MEDIA_PLAYER_ITEM = 0x01;
+    private final static int TYPE_FOLDER_ITEM = 0x02;
+    private final static int TYPE_MEDIA_ELEMENT_ITEM = 0x03;
+
+    private final static int FOLDER_UP = 0x00;
+    private final static int FOLDER_DOWN = 0x01;
+
+    private static final String PATH_INVALID = "invalid";
+    private static final String PATH_ROOT = "root";
+    private static final String PATH_TITLES = "titles";
+    private static final String PATH_ALBUMS = "albums";
+    private static final String PATH_ARTISTS = "artists";
+    private static final String PATH_PLAYLISTS = "playlists";
+
+    private final static long UID_TITLES = 0x01;
+    private final static long UID_ALBUM = 0x02;
+    private final static long UID_ARTIST = 0x03;
+    private final static long UID_PLAYLIST = 0x04;
+    private final static int NUM_ROOT_ELEMENTS = 0x04;
+
+    private static final int INVALID_DIRECTION = 0x07;
+    private static final int NOT_A_DIRECTORY = 0x08;
+    private static final int DOES_NOT_EXIST = 0x09;
+    private static final int UID_A_DIRECTORY = 0x0c;
+    private static final int MEDIA_IN_USE = 0x0d;
+    private static final int INVALID_SCOPE = 0x0a;
+    private static final int RANGE_OUT_OF_BOUNDS = 0x0b;
+    private static final int INTERNAL_ERROR = 0x03;
+    private static final int OPERATION_SUCCESSFUL = 0x04;
+
+    private static final int FOLDER_TYPE_MIXED = 0x00;
+    private static final int FOLDER_TYPE_TITLES = 0x01;
+    private static final int FOLDER_TYPE_ALBUMS = 0x02;
+    private static final int FOLDER_TYPE_ARTISTS = 0x03;
+    private static final int FOLDER_TYPE_GENRES = 0x04;
+    private static final int FOLDER_TYPE_PLAYLISTS = 0x05;
+
+    private static final int MEDIA_TYPE_AUDIO = 0X00;
+    private static final int MEDIA_TYPE_VIDEO = 0X01;
+
+    private static final int MAX_BROWSE_ITEM_TO_SEND = 0x03;
+    private static final int MAX_ATTRIB_COUNT = 0x07;
 
     //Intents for PlayerApplication Settings
     private static final String PLAYERSETTINGS_REQUEST = "org.codeaurora.music.playersettingsrequest";
@@ -263,6 +326,7 @@ final class Avrcp {
         mPlayerStatusChangeNT = NOTIFICATION_TYPE_CHANGED;
         mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
         mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
+        mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
         mTrackNumber = -1L;
         mCurrentPosMs = 0L;
         mPlayStartTimeMs = -1L;
@@ -279,6 +343,9 @@ final class Avrcp {
         keyPressState = KEY_STATE_RELEASE; //Key release state
         mContext = context;
         mIsConnected = 0;
+        mCurrentPath = PATH_INVALID;
+        mCurrentPathUid = null;
+        mMediaUri = Uri.EMPTY;
 
         initNative();
 
@@ -298,6 +365,9 @@ final class Avrcp {
         mAudioManager.remoteControlDisplayWantsPlaybackPositionSync(
                       mRemoteControlDisplay, true);
         mPendingCmds = new ArrayList<Integer>();
+        mCurrentPath = PATH_INVALID;
+        mCurrentPathUid = null;
+        mMediaUri = Uri.EMPTY;
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(AudioManager.RCC_CHANGED_ACTION);
         intentFilter.addAction(PLAYERSETTINGS_RESPONSE);
@@ -398,15 +468,28 @@ final class Avrcp {
         byte[] playerName1 = {0x4d, 0x75, 0x73, 0x69, 0x63}/*Music*/;
         byte[] playerName2 = {0x4d, 0x75, 0x73, 0x69, 0x63, 0x32}/*Music2*/;
 
-        featureMasks[FEATURE_MASK_PLAY_OFFSET] = featureMasks[FEATURE_MASK_PLAY_OFFSET] | FEATURE_MASK_PLAY_MASK;
-        featureMasks[FEATURE_MASK_PAUSE_OFFSET] = featureMasks[FEATURE_MASK_PAUSE_OFFSET] | FEATURE_MASK_PAUSE_MASK;
-        featureMasks[FEATURE_MASK_STOP_OFFSET] = featureMasks[FEATURE_MASK_STOP_OFFSET] | FEATURE_MASK_STOP_MASK;
-        featureMasks[FEATURE_MASK_PAGE_UP_OFFSET] = featureMasks[FEATURE_MASK_PAGE_UP_OFFSET] | FEATURE_MASK_PAGE_UP_MASK;
-        featureMasks[FEATURE_MASK_PAGE_DOWN_OFFSET] = featureMasks[FEATURE_MASK_PAGE_DOWN_OFFSET] | FEATURE_MASK_PAGE_DOWN_MASK;
-        featureMasks[FEATURE_MASK_REWIND_OFFSET] = featureMasks[FEATURE_MASK_REWIND_OFFSET] | FEATURE_MASK_REWIND_MASK;
-        featureMasks[FEATURE_MASK_FAST_FWD_OFFSET] = featureMasks[FEATURE_MASK_FAST_FWD_OFFSET] | FEATURE_MASK_FAST_FWD_MASK;
-        featureMasks[FEATURE_MASK_VENDOR_OFFSET] = featureMasks[FEATURE_MASK_VENDOR_OFFSET] | FEATURE_MASK_VENDOR_MASK;
-        featureMasks[FEATURE_MASK_ADV_CTRL_OFFSET] = featureMasks[FEATURE_MASK_ADV_CTRL_OFFSET] | FEATURE_MASK_ADV_CTRL_MASK;
+        featureMasks[FEATURE_MASK_PLAY_OFFSET] =
+            featureMasks[FEATURE_MASK_PLAY_OFFSET] | FEATURE_MASK_PLAY_MASK;
+        featureMasks[FEATURE_MASK_PAUSE_OFFSET] =
+            featureMasks[FEATURE_MASK_PAUSE_OFFSET] | FEATURE_MASK_PAUSE_MASK;
+        featureMasks[FEATURE_MASK_STOP_OFFSET] =
+            featureMasks[FEATURE_MASK_STOP_OFFSET] | FEATURE_MASK_STOP_MASK;
+        featureMasks[FEATURE_MASK_PAGE_UP_OFFSET] =
+            featureMasks[FEATURE_MASK_PAGE_UP_OFFSET] | FEATURE_MASK_PAGE_UP_MASK;
+        featureMasks[FEATURE_MASK_PAGE_DOWN_OFFSET] =
+            featureMasks[FEATURE_MASK_PAGE_DOWN_OFFSET] | FEATURE_MASK_PAGE_DOWN_MASK;
+        featureMasks[FEATURE_MASK_REWIND_OFFSET] =
+            featureMasks[FEATURE_MASK_REWIND_OFFSET] | FEATURE_MASK_REWIND_MASK;
+        featureMasks[FEATURE_MASK_FAST_FWD_OFFSET] =
+            featureMasks[FEATURE_MASK_FAST_FWD_OFFSET] | FEATURE_MASK_FAST_FWD_MASK;
+        featureMasks[FEATURE_MASK_VENDOR_OFFSET] =
+            featureMasks[FEATURE_MASK_VENDOR_OFFSET] | FEATURE_MASK_VENDOR_MASK;
+        featureMasks[FEATURE_MASK_ADV_CTRL_OFFSET] =
+            featureMasks[FEATURE_MASK_ADV_CTRL_OFFSET] | FEATURE_MASK_ADV_CTRL_MASK;
+        featureMasks[FEATURE_MASK_BROWSE_OFFSET] =
+            featureMasks[FEATURE_MASK_BROWSE_OFFSET] | FEATURE_MASK_BROWSE_MASK;
+        featureMasks[FEATURE_MASK_NOW_PLAY_OFFSET] =
+            featureMasks[FEATURE_MASK_NOW_PLAY_OFFSET] | FEATURE_MASK_NOW_PLAY_MASK;
 
         mediaPlayerInfo1 = new MediaPlayerInfo ((short)0x0001,
                     MAJOR_TYPE_AUDIO,
@@ -459,6 +542,9 @@ final class Avrcp {
             if (DEBUG) Log.v(TAG, "Addressed player message cleanup as part of doQuit");
         }
         keyPressState = KEY_STATE_RELEASE; //Key release state
+        mCurrentPath = PATH_INVALID;
+        mMediaUri = Uri.EMPTY;
+        mCurrentPathUid = null;
     }
 
     public void cleanup() {
@@ -501,6 +587,70 @@ final class Avrcp {
 
         @Override
         public void setArtwork(int generationId, Bitmap bitmap) {
+        }
+
+        @Override
+        public void updateFolderInfoBrowsedPlayer(String stringUri) {
+            Log.v(TAG, "updateFolderInfoBrowsedPlayer: stringUri: " + stringUri);
+            Handler handler = mLocalHandler.get();
+            if (stringUri != null) {
+                String[] ExternalPath = stringUri.split("/");
+                if (ExternalPath.length < 4) {
+                    Log.d(TAG, "Wrong entries.");
+                    handler.obtainMessage(MSG_UPDATE_BROWSED_PLAYER_FOLDER, 0, 0, null)
+                                                                        .sendToTarget();
+                    return;
+                }
+                Uri uri = Uri.parse(stringUri);
+                Log.v(TAG, "URI received: " + uri);
+                String[] SplitPath = new String[ExternalPath.length - 3];
+                for (int count = 2; count < (ExternalPath.length - 1); count++) {
+                    SplitPath[count - 2] = ExternalPath[count];
+                    Log.d(TAG, "SplitPath[" + (count - 2) + "] = " + SplitPath[count - 2]);
+                }
+                Log.v(TAG, "folderDepth: " + SplitPath.length);
+                for (int count = 0; count < SplitPath.length; count++) {
+                    Log.v(TAG, "folderName: " + SplitPath[count]);
+                }
+                mMediaUri = uri;
+                if (handler != null) {
+                    handler.obtainMessage(MSG_UPDATE_BROWSED_PLAYER_FOLDER, NUM_ROOT_ELEMENTS,
+                                                SplitPath.length, SplitPath).sendToTarget();
+                }
+            } else {
+                handler.obtainMessage(MSG_UPDATE_BROWSED_PLAYER_FOLDER, 0, 0, null)
+                                                                    .sendToTarget();
+            }
+        }
+
+        @Override
+        public void updateNowPlayingEntries(long[] playList) {
+            Log.v(TAG, "updateNowPlayingEntries");
+            Handler handler = mLocalHandler.get();
+            if (handler != null) {
+                handler.obtainMessage(MSG_NOW_PLAYING_ENTRIES_RECEIVED, 0, 0,
+                                                            playList).sendToTarget();
+            }
+        }
+
+
+        @Override
+        public void updateNowPlayingContentChange() {
+            Log.v(TAG, "updateNowPlayingContentChange");
+            Handler handler = mLocalHandler.get();
+            if (handler != null) {
+                handler.obtainMessage(MSG_UPDATE_NOW_PLAYING_CONTENT_CHANGED).sendToTarget();
+            }
+        }
+
+        @Override
+        public void playItemResponse(boolean success) {
+            Log.v(TAG, "playItemResponse");
+            Handler handler = mLocalHandler.get();
+            if (handler != null) {
+                handler.obtainMessage(MSG_PLAY_ITEM_RESPONSE, 0, 0, new Boolean(success))
+                                                                            .sendToTarget();
+            }
         }
 
         @Override
@@ -613,6 +763,28 @@ final class Avrcp {
 
             case MSG_UPDATE_ADDRESSED_PLAYER:
                 updateAddressedMediaPlayer(msg.arg1);
+                break;
+
+            case MSG_UPDATE_BROWSED_PLAYER_FOLDER:
+                Log.v(TAG, "MSG_UPDATE_BROWSED_PLAYER_FOLDER");
+                updateBrowsedPlayerFolder(msg.arg1, msg.arg2, (String [])msg.obj);
+                break;
+
+            case MSG_UPDATE_NOW_PLAYING_CONTENT_CHANGED:
+                Log.v(TAG, "MSG_UPDATE_NOW_PLAYING_CONTENT_CHANGED");
+                updateNowPlayingContentChanged();
+                break;
+
+            case MSG_PLAY_ITEM_RESPONSE:
+                Log.v(TAG, "MSG_PLAY_ITEM_RESPONSE");
+                boolean success = ((Boolean)msg.obj).booleanValue();
+                Log.v(TAG, "success: " + success);
+                updatePlayItemResponse(success);
+                break;
+
+            case MSG_NOW_PLAYING_ENTRIES_RECEIVED:
+                Log.v(TAG, "MSG_NOW_PLAYING_ENTRIES_RECEIVED");
+                updateNowPlayingEntriesReceived((long [])msg.obj);
                 break;
 
             case MSG_SET_TRANSPORT_CONTROLS:
@@ -809,11 +981,33 @@ final class Avrcp {
             case MESSAGE_SET_ADDR_PLAYER:
                 processSetAddressedPlayer(msg.arg1);
                 break;
-
+            case MESSAGE_SET_BROWSED_PLAYER:
+                processSetBrowsedPlayer(msg.arg1);
+                break;
+            case MESSAGE_CHANGE_PATH:
+                processChangePath(msg.arg1, ((Long)msg.obj).longValue());
+                break;
+            case MESSAGE_PLAY_ITEM:
+                processPlayItem(msg.arg1, ((Long)msg.obj).longValue());
+                break;
+            case MESSAGE_GET_ITEM_ATTRS:
+                int[] attrIds;
+                ItemAttr itemAttr = (ItemAttr)msg.obj;
+                attrIds = new int[msg.arg1];
+                for (int i = 0; i < msg.arg1; ++i) {
+                    attrIds[i] = itemAttr.mAttrList.get(i).intValue();
+                }
+                processGetItemAttr((byte)msg.arg2, itemAttr.mUid, (byte)msg.arg1, attrIds);
+                break;
             case MESSAGE_GET_FOLDER_ITEMS:
                 FolderListEntries folderListEntries = (FolderListEntries)msg.obj;
+                attrIds = new int[folderListEntries.mNumAttr];
+                for (int i = 0; i < folderListEntries.mNumAttr; ++i) {
+                    attrIds[i] = folderListEntries.mAttrList.get(i).intValue();
+                }
                 processGetFolderItems(folderListEntries.mScope, folderListEntries.mStart,
-                    folderListEntries.mEnd, folderListEntries.mAttrCnt);
+                    folderListEntries.mEnd, folderListEntries.mAttrCnt,
+                    folderListEntries.mNumAttr, attrIds);
                 break;
             }
         }
@@ -953,24 +1147,156 @@ final class Avrcp {
         }
     }
 
+    void updateBrowsedPlayerFolder(int numOfItems, int folderDepth, String[] folderNames) {
+        Log.v(TAG, "updateBrowsedPlayerFolder: folderDepth: " + folderDepth);
+        mCurrentPath = PATH_ROOT;
+        mCurrentPathUid = null;
+        if (folderDepth > 0) {
+            setBrowsedPlayerRspNative((byte)OPERATION_SUCCESSFUL, 0x0, numOfItems,
+                                            folderDepth, CHAR_SET_UTF8, folderNames);
+        } else {
+            setBrowsedPlayerRspNative((byte)INTERNAL_ERROR, 0x0, numOfItems,
+                                            folderDepth, CHAR_SET_UTF8, folderNames);
+        }
+    }
+
+    void updateNowPlayingContentChanged() {
+        Log.v(TAG, "updateNowPlayingContentChanged");
+        if (mNowPlayingContentChangedNT == NOTIFICATION_TYPE_INTERIM) {
+            Log.v(TAG, "Notify peer on updateNowPlayingContentChanged");
+            mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
+            registerNotificationRspNowPlayingContentChangedNative(mNowPlayingContentChangedNT);
+        }
+    }
+
+    void updatePlayItemResponse(boolean success) {
+        Log.v(TAG, "updatePlayItemResponse: success: " + success);
+        if (success) {
+            playItemRspNative(OPERATION_SUCCESSFUL);
+        } else {
+            playItemRspNative(INTERNAL_ERROR);
+        }
+    }
+
+    void updateNowPlayingEntriesReceived(long[] playList) {
+        int status = OPERATION_SUCCESSFUL;
+        int numItems = 0;
+        int reqItems = (mCachedRequest.mEnd - mCachedRequest.mStart) + 1;
+        int availableItems = 0;
+        Cursor cursor = null;
+        int[] itemType = new int[MAX_BROWSE_ITEM_TO_SEND];
+        long[] uid = new long[MAX_BROWSE_ITEM_TO_SEND];
+        int[] type = new int[MAX_BROWSE_ITEM_TO_SEND];
+        byte[] playable = new byte[MAX_BROWSE_ITEM_TO_SEND];
+        String[] displayName = new String[MAX_BROWSE_ITEM_TO_SEND];
+        byte[] numAtt = new byte[MAX_BROWSE_ITEM_TO_SEND];
+        String[] attValues = new String[MAX_BROWSE_ITEM_TO_SEND * 7];
+        int[] attIds = new int[MAX_BROWSE_ITEM_TO_SEND * 7];
+        int index;
+
+        Log.v(TAG, "updateNowPlayingEntriesReceived");
+
+        // Item specific attribute's entry starts from index*7, reset all such entries to 0 for now
+        for (int count = 0; count < (MAX_BROWSE_ITEM_TO_SEND * 7); count++) {
+            attValues[count] = "";
+            attIds[count] = 0;
+        }
+
+        availableItems = playList.length;
+        if ((mCachedRequest.mStart + 1) > availableItems) {
+            Log.i(TAG, "startIteam exceeds the available item index");
+            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType, uid, type,
+                                            playable, displayName, numAtt, attValues, attIds);
+            return;
+        }
+
+        if ((mCachedRequest.mStart < 0) || (mCachedRequest.mEnd< 0) ||
+                            (mCachedRequest.mStart > mCachedRequest.mEnd)) {
+            Log.i(TAG, "wrong start / end index");
+            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType, uid, type,
+                                        playable, displayName, numAtt, attValues, attIds);
+            return;
+        }
+
+        availableItems = availableItems - mCachedRequest.mStart;
+        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+        if (reqItems > availableItems)
+            reqItems = availableItems;
+
+        for (index = 0; index < reqItems; index++) {
+            try {
+                cursor = mContext.getContentResolver().query(
+                     mMediaUri, mCursorCols,
+                     MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" +
+                                                playList[index], null, null);
+                if (cursor != null) {
+                    cursor.moveToFirst();
+                    itemType[index] = TYPE_MEDIA_ELEMENT_ITEM;
+                    uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow("_id"));
+                    type[index] = MEDIA_TYPE_AUDIO;
+                    playable[index] = 0;
+                    displayName[index] = cursor.getString(cursor.getColumnIndexOrThrow(
+                                                            MediaStore.Audio.Media.TITLE));
+                    numAtt[index] = mCachedRequest.mAttrCnt;
+                    for (int attIndex = 0; attIndex < mCachedRequest.mAttrCnt; attIndex++) {
+                        int attr = mCachedRequest.mAttrList.get(attIndex).intValue();
+                        attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
+                                                    cursor, attr);
+                        attIds[(7 * index) + attIndex] = attr;
+                    }
+                    cursor.close();
+                }
+            } catch(Exception e) {
+                Log.i(TAG, "Exception e"+ e);
+                cursor.close();
+                getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                            uid, type, playable, displayName, numAtt, attValues, attIds);
+            }
+        }
+        numItems = index;
+        getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
+                        type, playable, displayName, numAtt, attValues, attIds);
+    }
+
+    class CachedRequest {
+        int mStart;
+        int mEnd;
+        byte mAttrCnt;
+        ArrayList<Integer> mAttrList;
+        public CachedRequest(int start, int end, byte attrCnt, int[] attrs) {
+            mStart = start;
+            mEnd = end;
+            mAttrCnt = attrCnt;
+            mAttrList = new ArrayList<Integer>();
+            for (int i = 0; i < attrCnt; ++i) {
+                mAttrList.add(new Integer(attrs[i]));
+            }
+        }
+    }
+
     class FolderListEntries {
         byte mScope;
         int mStart;
         int mEnd;
         int mAttrCnt;
-        public FolderListEntries() {
-            mScope = 0;
-            mStart = 0;
-            mEnd = 0;
-            mAttrCnt = 0;
-        }
-        public FolderListEntries(byte scope, int start, int end, int attrCnt) {
+        int mNumAttr;
+        ArrayList<Integer> mAttrList;
+        public FolderListEntries(byte scope, int start, int end, int attrCnt, int numAttr,
+                                                                                int[] attrs) {
             mScope = scope;
             mStart = start;
             mEnd = end;
             mAttrCnt = attrCnt;
+            mNumAttr = numAttr;
+            int i;
+            mAttrList = new ArrayList<Integer>();
+            for (i = 0; i < numAttr; ++i) {
+                mAttrList.add(new Integer(attrs[i]));
+            }
         }
     }
+
     class Metadata {
         private String artist;
         private String trackTitle;
@@ -1013,6 +1339,7 @@ final class Avrcp {
             }
         }
     }
+
     private void updateMetadata(Bundle data) {
         if (DEBUG) Log.v(TAG, "updateMetadata");
         if (mMediaPlayers.size() > 0) {
@@ -1097,6 +1424,566 @@ final class Avrcp {
         mHandler.sendMessage(msg);
     }
 
+    private void setBrowsedPlayer(int playerId) {
+        if (DEBUG) Log.v(TAG, "setBrowsedPlayer: PlayerID: " + playerId);
+        Message msg = mHandler.obtainMessage(MESSAGE_SET_BROWSED_PLAYER, playerId, 0, 0);
+        mHandler.sendMessage(msg);
+    }
+
+    private void processSetBrowsedPlayer(int playerId) {
+        String packageName = null;
+        if (DEBUG) Log.v(TAG, "processSetBrowsedPlayer: PlayerID: " + playerId);
+        if (mMediaPlayers.size() > 0) {
+            final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
+            while (rccIterator.hasNext()) {
+                final MediaPlayerInfo di = rccIterator.next();
+                if (di.RetrievePlayerId() == playerId) {
+                    if (di.GetPlayerAvailablility()) {
+                        if (DEBUG) Log.v(TAG, "player found and available");
+                        packageName = di.RetrievePlayerPackageName();
+                    }
+                }
+            }
+        }
+        if (packageName != null) {
+            mAudioManager.setRemoteControlClientBrowsedPlayer(packageName);
+        } else {
+            if (DEBUG) Log.v(TAG, "player not available for browse");
+            setBrowsedPlayerRspNative((byte)ERR_INVALID_PLAYER_ID, 0x0, 0, 0, 0, null);
+        }
+    }
+
+    private void changePath(byte direction, long uid) {
+        if (DEBUG) Log.v(TAG, "changePath: direction: " + direction + " uid:" + uid);
+        Message msg = mHandler.obtainMessage(MESSAGE_CHANGE_PATH, direction, 0, uid);
+        mHandler.sendMessage(msg);
+    }
+
+    private void processChangePath(int direction, long folderUid) {
+        if (DEBUG) Log.v(TAG, "processChangePath: direction: " + direction +
+                                                                " uid:" + folderUid);
+        long numberOfItems = 0;
+        int status = OPERATION_SUCCESSFUL;
+        if (mCurrentPath.equals(PATH_ROOT)){
+            switch (direction) {
+                case FOLDER_UP:
+                    status = DOES_NOT_EXIST;
+                    break;
+                case FOLDER_DOWN:
+                    if (folderUid == UID_TITLES) {
+                        mCurrentPath = PATH_TITLES;
+                        numberOfItems = getNumItems(PATH_TITLES,
+                            MediaStore.Audio.Media.TITLE);
+                    } else if (folderUid == UID_ALBUM) {
+                        mCurrentPath = PATH_ALBUMS;
+                        numberOfItems = getNumItems(PATH_ALBUMS,
+                            MediaStore.Audio.Media.ALBUM_ID);
+                    } else if (folderUid == UID_ARTIST) {
+                        mCurrentPath = PATH_ARTISTS;
+                        numberOfItems = getNumItems(PATH_ARTISTS,
+                            MediaStore.Audio.Media.ARTIST_ID);
+                    } else if (folderUid == UID_PLAYLIST) {
+                        mCurrentPath = PATH_PLAYLISTS;
+                        numberOfItems = getNumPlaylistItems();
+                    } else {
+                        status = DOES_NOT_EXIST;
+                    }
+                    break;
+                default:
+                    status = INVALID_DIRECTION;
+                    break;
+            }
+        } else if (mCurrentPath.equals(PATH_TITLES)) {
+            switch (direction) {
+                case FOLDER_UP:
+                    mCurrentPath = PATH_ROOT;
+                    numberOfItems = NUM_ROOT_ELEMENTS;
+                    break;
+                case FOLDER_DOWN:
+                    Cursor cursor = null;
+                    try {
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            new String[] {MediaStore.Audio.Media.TITLE},
+                            MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id="
+                            + folderUid, null, null);
+                        if (cursor != null)
+                            status = NOT_A_DIRECTORY;
+                        else
+                            status = DOES_NOT_EXIST;
+                        cursor.close();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Exception " + e);
+                        cursor.close();
+                        changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                    }
+                    break;
+                default:
+                    status = INVALID_DIRECTION;
+                    break;
+            }
+        } else if (mCurrentPath.equals(PATH_ALBUMS)) {
+            switch (direction) {
+                case FOLDER_UP:
+                    if (mCurrentPathUid == null) { // Path @ Album
+                        mCurrentPath = PATH_ROOT;
+                        numberOfItems = NUM_ROOT_ELEMENTS;
+                    } else { // Path @ individual album id
+                        mCurrentPath = PATH_ALBUMS;
+                        mCurrentPathUid = null;
+                        numberOfItems = getNumItems(PATH_ALBUMS,
+                            MediaStore.Audio.Media.ALBUM_ID);
+                    }
+                    break;
+                case FOLDER_DOWN:
+                    if (mCurrentPathUid == null) { // Path @ Album
+                        Cursor cursor = null;
+                        try {
+                            cursor = mContext.getContentResolver().query(
+                                mMediaUri,
+                                new String[] {MediaStore.Audio.Media.ALBUM},
+                                MediaStore.Audio.Media.IS_MUSIC + "=1 AND " +
+                                MediaStore.Audio.Media.ALBUM_ID + "=" + folderUid,
+                                null, null);
+                            if ((cursor == null) || (cursor.getCount() == 0)) {
+                                status = DOES_NOT_EXIST;
+                            } else{
+                                numberOfItems = cursor.getCount();
+                                mCurrentPathUid = String.valueOf(folderUid);
+                                cursor.close();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Exception " + e);
+                            cursor.close();
+                            changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        }
+                    } else { // Path @ Individual Album id
+                        Cursor cursor = null;
+                        try {
+                            cursor = mContext.getContentResolver().query(
+                                mMediaUri,
+                                new String[] {MediaStore.Audio.Media.TITLE},
+                                MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" + folderUid,
+                                null, null);
+                            // As Individual Album path can not have any folder in it hence return
+                            // the error as applicable, depending on whether uid passed exists.
+                            if (cursor != null)
+                                status = NOT_A_DIRECTORY;
+                            else
+                                status = DOES_NOT_EXIST;
+                            cursor.close();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Exception " + e);
+                            cursor.close();
+                            changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        }
+                    }
+                    break;
+                default:
+                    status = INVALID_DIRECTION;
+                    break;
+            }
+        } else if (mCurrentPath.equals(PATH_ARTISTS)) {
+            switch(direction) {
+                case FOLDER_UP:
+                    if (mCurrentPathUid == null) {
+                        mCurrentPath = PATH_ROOT;
+                        numberOfItems = NUM_ROOT_ELEMENTS;
+                    } else {
+                        mCurrentPath = PATH_ARTISTS;
+                        mCurrentPathUid = null;
+                        numberOfItems = getNumItems(PATH_ARTISTS,
+                            MediaStore.Audio.Media.ARTIST_ID);
+                    }
+                    break;
+                case FOLDER_DOWN:
+                    if (mCurrentPathUid == null) {
+                        Cursor cursor = null;
+                        try {
+                            cursor = mContext.getContentResolver().query(
+                                mMediaUri,
+                                new String[] {MediaStore.Audio.Media.ARTIST},
+                                MediaStore.Audio.Media.IS_MUSIC + "=1 AND " +
+                                MediaStore.Audio.Media.ARTIST_ID + "=" + folderUid,
+                                null, null);
+                            if ((cursor == null) || (cursor.getCount() == 0)) {
+                                status = DOES_NOT_EXIST;
+                            } else{
+                                numberOfItems = cursor.getCount();
+                                mCurrentPathUid = String.valueOf(folderUid);
+                                mCurrentPath = PATH_ARTISTS;
+                                cursor.close();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Exception " + e);
+                            cursor.close();
+                            changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        }
+                    } else {
+                        Cursor cursor = null;
+                        try {
+                            cursor = mContext.getContentResolver().query(
+                                mMediaUri,
+                                new String[] {MediaStore.Audio.Media.TITLE},
+                                MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id="
+                                + folderUid, null, null);
+                            if (cursor != null)
+                                status = NOT_A_DIRECTORY;
+                            else
+                                status = DOES_NOT_EXIST;
+                            cursor.close();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Exception " + e);
+                            cursor.close();
+                            changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        }
+                    }
+                    break;
+                default:
+                    status = INVALID_DIRECTION;
+                    break;
+            }
+        } else if (mCurrentPath.equals(PATH_PLAYLISTS)) {
+            switch(direction) {
+                case FOLDER_UP:
+                    if (mCurrentPathUid == null) {
+                        mCurrentPath = PATH_ROOT;
+                        numberOfItems = NUM_ROOT_ELEMENTS;
+                    } else {
+                        mCurrentPath = PATH_PLAYLISTS;
+                        mCurrentPathUid = null;
+                        numberOfItems = getNumPlaylistItems();
+                    }
+                    break;
+                case FOLDER_DOWN:
+                    if (mCurrentPathUid == null) {
+                        Cursor cursor = null;
+                        try {
+                            String[] cols = new String[] {
+                                MediaStore.Audio.Playlists._ID,
+                                MediaStore.Audio.Playlists.NAME
+                            };
+
+                            StringBuilder where = new StringBuilder();
+                            where.append(MediaStore.Audio.Playlists.NAME + " != ''");
+
+                            cursor = mContext.getContentResolver().query(
+                                mMediaUri,
+                                cols, MediaStore.Audio.Playlists._ID + "=" + folderUid,
+                                null, null);
+
+                            if ((cursor == null) || (cursor.getCount() == 0)) {
+                                status = DOES_NOT_EXIST;
+                            } else{
+                                numberOfItems = cursor.getCount();
+                                mCurrentPathUid = String.valueOf(folderUid);
+                                mCurrentPath = PATH_PLAYLISTS;
+                                cursor.close();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Exception " + e);
+                            cursor.close();
+                            changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        }
+                    } else {
+                        numberOfItems = 0;
+                        status = DOES_NOT_EXIST;
+                    }
+                    break;
+                default:
+                    status = INVALID_DIRECTION;
+                    break;
+            }
+        } else {
+            Log.i(TAG, "Current Path not set");
+            status = DOES_NOT_EXIST;
+        }
+        Log.i(TAG, "Number of items " + numberOfItems + ", status: " + status);
+        changePathRspNative(status, numberOfItems);
+    }
+
+    private long getNumPlaylistItems() {
+        Cursor cursor = null;
+        String[] cols = new String[] {
+                MediaStore.Audio.Playlists._ID,
+                MediaStore.Audio.Playlists.NAME
+        };
+        try {
+            cursor = mContext.getContentResolver().query(
+                MediaStore.Audio.Playlists.EXTERNAL_CONTENT_URI,
+                cols, MediaStore.Audio.Playlists.NAME + " != ''", null,
+                MediaStore.Audio.Playlists.NAME);
+
+            if ((cursor == null) || (cursor.getCount() == 0)) {
+                return 0;
+            } else {
+                long count = cursor.getCount();
+                cursor.close();
+                return count;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception " + e);
+            cursor.close();
+            return 0;
+        }
+    }
+
+    private long getNumItems(String path, String element) {
+        if (path == null || element == null)
+            return 0;
+        Cursor cursor = null;
+        try {
+            cursor = mContext.getContentResolver().query(
+                mMediaUri,
+                new String[] {element},
+                MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                element);
+            if ((cursor == null) || (cursor.getCount() == 0)) {
+                return 0;
+            } else if (path.equals(PATH_TITLES)) {
+                long count = cursor.getCount();
+                cursor.close();
+                return count;
+            } else if (path.equals(PATH_ALBUMS) || path.equals(PATH_ARTISTS)){
+                long elemCount = 0;
+                cursor.moveToFirst();
+                long count = cursor.getCount();
+                long prevElem = 0;
+                long curElem = 0;
+                while (count > 0) {
+                    curElem = cursor.getLong(cursor.getColumnIndexOrThrow(element));
+                    Log.i(TAG, "curElem "+ curElem + "preElem " + prevElem);
+                    if (curElem != prevElem) {
+                        elemCount++;
+                    }
+                    prevElem = curElem;
+                    cursor.moveToNext();
+                    count--;
+                }
+                Log.i(TAG, "element Count is "+ elemCount);
+                cursor.close();
+                return elemCount;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception " + e);
+            cursor.close();
+        }
+        return 0;
+    }
+
+    private void playItem(byte scope, long uid) {
+        if (DEBUG) Log.v(TAG, "playItem: scope: " + scope + " uid:" + uid);
+        Message msg = mHandler.obtainMessage(MESSAGE_PLAY_ITEM, scope, 0, uid);
+        mHandler.sendMessage(msg);
+    }
+
+    private void processPlayItem(int scope, long uid) {
+        if (DEBUG) Log.v(TAG, "processPlayItem: scope: " + scope + " uid:" + uid);
+        if (uid < 0) {
+            Log.i(TAG, "invalid uid");
+            playItemRspNative(DOES_NOT_EXIST);
+        } else if (scope == SCOPE_VIRTUAL_FILE_SYS) {
+            if (mCurrentPath.equals(PATH_ROOT)) {
+                playItemRspNative(UID_A_DIRECTORY);
+            } else if (mCurrentPath.equals(PATH_TITLES)) {
+                Cursor cursor = null;
+                try {
+                    cursor = mContext.getContentResolver().query(
+                        mMediaUri,
+                        new String[] {MediaStore.Audio.Media.TITLE},
+                        MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" + uid,
+                        null, null);
+                    if ((cursor == null) || (cursor.getCount() == 0)) {
+                        Log.i(TAG, "No such track");
+                        playItemRspNative(DOES_NOT_EXIST);
+                    } else {
+                        Log.i(TAG, "Play uid:" + uid);
+                        cursor.close();
+                        mAudioManager.setRemoteControlClientPlayItem(mClientGeneration,
+                                                                            uid, scope);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Exception " + e);
+                    cursor.close();
+                    playItemRspNative(INTERNAL_ERROR);
+                }
+            } else if (mCurrentPath.equals(PATH_ALBUMS)) {
+                if (mCurrentPathUid == null) {
+                    playItemRspNative(UID_A_DIRECTORY);
+                } else {
+                    Cursor cursor = null;
+                    try {
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            new String[] {MediaStore.Audio.Media.TITLE},
+                            MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" + uid + " AND " +
+                            MediaStore.Audio.Media.ALBUM_ID + "=" + mCurrentPathUid,
+                            null, null);
+                        if ((cursor == null) || (cursor.getCount() == 0)) {
+                            Log.i(TAG, "No such track");
+                            playItemRspNative(DOES_NOT_EXIST);
+                        } else {
+                            Log.i(TAG, "Play uid:" + uid);
+                            cursor.close();
+                            mAudioManager.setRemoteControlClientPlayItem(mClientGeneration,
+                                                                                uid, scope);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Exception " + e);
+                        cursor.close();
+                        playItemRspNative(INTERNAL_ERROR);
+                    }
+                }
+            } else if (mCurrentPath.equals(PATH_ARTISTS)) {
+                if (mCurrentPathUid == null) {
+                    playItemRspNative(UID_A_DIRECTORY);
+                } else {
+                    Cursor cursor = null;
+                    try {
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            new String[] {MediaStore.Audio.Media.TITLE},
+                            MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" + uid + " AND " +
+                            MediaStore.Audio.Media.ARTIST_ID + "=" + mCurrentPathUid,
+                            null, null);
+                        if ((cursor == null) || (cursor.getCount() == 0)) {
+                            Log.i(TAG, "No such track");
+                            playItemRspNative(DOES_NOT_EXIST);
+                        } else {
+                            Log.i(TAG, "Play uid:" + uid);
+                            cursor.close();
+                            mAudioManager.setRemoteControlClientPlayItem(mClientGeneration,
+                                                                                uid, scope);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Exception " + e);
+                        cursor.close();
+                        playItemRspNative(INTERNAL_ERROR);
+                    }
+                }
+            } else if (mCurrentPath.equals(PATH_PLAYLISTS)) {
+                if (mCurrentPathUid == null) {
+                    playItemRspNative(UID_A_DIRECTORY);
+                } else {
+                    Cursor cursor = null;
+                    try {
+                        String[] playlistMemberCols = new String[] {
+                                MediaStore.Audio.Playlists.Members._ID,
+                                MediaStore.Audio.Media.TITLE,
+                                MediaStore.Audio.Media.DATA,
+                                MediaStore.Audio.Media.ALBUM,
+                                MediaStore.Audio.Media.ARTIST,
+                                MediaStore.Audio.Media.DURATION,
+                                MediaStore.Audio.Playlists.Members.PLAY_ORDER,
+                                MediaStore.Audio.Playlists.Members.AUDIO_ID,
+                                MediaStore.Audio.Media.IS_MUSIC
+                        };
+                        Uri uri = MediaStore.Audio.Playlists.Members.getContentUri("external",
+                                                                Long.parseLong(mCurrentPathUid));
+                        StringBuilder where = new StringBuilder();
+                        where.append(MediaStore.Audio.Playlists.Members.AUDIO_ID + "=" + uid);
+                        cursor = mContext.getContentResolver().query(uri, playlistMemberCols,
+                                    where.toString(), null, MediaStore.Audio.Playlists.Members.
+                                                                            DEFAULT_SORT_ORDER);
+
+                        if ((cursor == null) || (cursor.getCount() == 0)) {
+                            Log.i(TAG, "No such track");
+                            playItemRspNative(DOES_NOT_EXIST);
+                        } else {
+                            Log.i(TAG, "Play uid:" + uid);
+                            cursor.close();
+                            mAudioManager.setRemoteControlClientPlayItem(mClientGeneration,
+                                                                                uid, scope);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Exception " + e);
+                        cursor.close();
+                        playItemRspNative(INTERNAL_ERROR);
+                    }
+                }
+            } else {
+                playItemRspNative(DOES_NOT_EXIST);
+            }
+        } else if (scope == SCOPE_NOW_PLAYING) {
+            mAudioManager.setRemoteControlClientPlayItem(mClientGeneration, uid, scope);
+        } else {
+            playItemRspNative(DOES_NOT_EXIST);
+        }
+    }
+
+    private void getItemAttr(byte scope, long uid, byte numAttr, int[] attrs) {
+        if (DEBUG) Log.v(TAG, "getItemAttr: scope: " + scope + " uid:" + uid +
+                                                            " numAttr:" + numAttr);
+        int i;
+        ArrayList<Integer> attrList = new ArrayList<Integer>();
+        for (i = 0; i < numAttr; ++i) {
+            attrList.add(attrs[i]);
+            if (DEBUG) Log.v(TAG, "attrs[" + i + "] = " + attrs[i]);
+        }
+        ItemAttr itemAttr = new ItemAttr(attrList, uid);
+        Message msg = mHandler.obtainMessage(MESSAGE_GET_ITEM_ATTRS, (int)numAttr,
+                                                                (int)scope, itemAttr);
+        mHandler.sendMessage(msg);
+    }
+
+    private String[] mCursorCols = new String[] {
+                    "audio._id AS _id",
+                    MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.ALBUM,
+                    MediaStore.Audio.Media.TITLE,
+                    MediaStore.Audio.Media.DURATION,
+                    MediaStore.Audio.Media.DATA,
+                    MediaStore.Audio.Media.MIME_TYPE,
+                    MediaStore.Audio.Media.ALBUM_ID,
+                    MediaStore.Audio.Media.ARTIST_ID,
+                    MediaStore.Audio.Media.IS_PODCAST,
+                    MediaStore.Audio.Media.BOOKMARK
+    };
+
+    private void processGetItemAttr(byte scope, long uid, byte numAttr, int[] attrs) {
+        if (DEBUG) Log.v(TAG, "processGetItemAttr: scope: " + scope + " uid:" + uid +
+                                                                    " numAttr:" + numAttr);
+        String[] textArray;
+        textArray = new String[numAttr];
+        if ((scope == SCOPE_VIRTUAL_FILE_SYS) || (scope == SCOPE_NOW_PLAYING)) {
+            Cursor cursor = null;
+            try {
+                if (mMediaUri == Uri.EMPTY) {
+                    Log.i(TAG, "Brwosed player not set, getItemAttr can not be processed");
+                }
+                cursor = mContext.getContentResolver().query(
+                     mMediaUri, mCursorCols,
+                     MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" + uid, null, null);
+                if ((cursor == null) || (cursor.getCount() == 0)) {
+                    Log.i(TAG, "Invalid track UID");
+                    getItemAttrRspNative((byte)0, attrs, textArray);
+                } else {
+                    cursor.moveToFirst();
+                    for (int i = 0; i < numAttr; ++i) {
+                        textArray[i] = getAttributeStringFromCursor(cursor, attrs[i]);
+                    }
+                    getItemAttrRspNative(numAttr, attrs, textArray);
+                    cursor.close();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Exception " + e); cursor.close();
+                getItemAttrRspNative((byte)0, attrs, textArray);
+            }
+        } else {
+            Log.i(TAG, "Invalid scope");
+            getItemAttrRspNative((byte)0, attrs, textArray);
+        }
+    }
+
+    private class ItemAttr {
+        ArrayList<Integer> mAttrList;
+        long mUid;
+        public ItemAttr (ArrayList<Integer> attrList, long uid) {
+            mAttrList = attrList;
+            mUid = uid;
+        }
+    }
+
     private void setAddressedPlayer(int playerId) {
         if (DEBUG) Log.v(TAG, "setAddressedPlayer: PlayerID: " + playerId);
         Message msg = mHandler.obtainMessage(MESSAGE_SET_ADDR_PLAYER, playerId, 0, 0);
@@ -1133,7 +2020,7 @@ final class Avrcp {
             if (DEBUG) Log.v(TAG, "Intent Broadcasted: " + newPackageName + ".setaddressedplayer");
             mRequestedAddressedPlayerPackageName = packageName;
             Message msg = mHandler.obtainMessage(MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT);
-            mHandler.sendMessageDelayed(msg, SET_ADDR_PLAYER_TIMEOUT);
+            mHandler.sendMessageDelayed(msg, AVRCP_BR_RSP_TIMEOUT);
             Log.v(TAG, "Post MESSAGE_SET_ADDR_PLAYER_REQ_TIMEOUT");
         } else {
             if (DEBUG) Log.v(TAG, "setAddressedPlayer fails: No such media player available");
@@ -1156,46 +2043,727 @@ final class Avrcp {
         Log.v(TAG, "mIsConnected: " + mIsConnected);
     }
 
-    private void getFolderItems(byte scope, int start, int end, int attrCnt) {
+    private void getFolderItems(byte scope, int start, int end, int attrCnt,
+                                                        int numAttr, int[] attrs) {
         if (DEBUG) Log.v(TAG, "getFolderItems");
         if (DEBUG) Log.v(TAG, "scope: " + scope + " attrCnt: " + attrCnt);
         if (DEBUG) Log.v(TAG, "start: " + start + " end: " + end);
-        FolderListEntries folderListEntries = new FolderListEntries (scope, start, end, attrCnt);
+        for (int i = 0; i < numAttr; ++i) {
+            if (DEBUG) Log.v(TAG, "attrs[" + i + "] = " + attrs[i]);
+        }
+
+        FolderListEntries folderListEntries = new FolderListEntries (scope, start, end, attrCnt,
+                                                                                    numAttr, attrs);
         Message msg = mHandler.obtainMessage(MESSAGE_GET_FOLDER_ITEMS, 0, 0, folderListEntries);
         mHandler.sendMessage(msg);
     }
 
-    private void processGetFolderItems(byte scope, int start, int end, int attrCnt) {
+    private void processGetFolderItems(byte scope, int start, int end, int size,
+                                                                int numAttr, int[] attrs) {
         if (DEBUG) Log.v(TAG, "processGetFolderItems");
-        if (DEBUG) Log.v(TAG, "scope: " + scope + " attrCnt: " + attrCnt);
-        if (DEBUG) Log.v(TAG, "start: " + start + " end: " + end);
-        if (scope == 0x00) { // populate mediaplayer item list here
-            byte[] folderItems = new byte[attrCnt]; // this value needs to be configured as per the Max pckt size received in request frame from stack
-            int[] folderItemLengths = new int[32]; // need to check if we can configure this dynamically
-            int availableMediaPlayers = 0;
-            int count = 0;
-            int positionItemStart = 0;
-            if (mMediaPlayers.size() > 0) {
-                final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
-                while (rccIterator.hasNext()) {
-                    final MediaPlayerInfo di = rccIterator.next();
-                    if (di.GetPlayerAvailablility()) {
-                        if (start == 0) {
-                            byte[] playerEntry = di.RetrievePlayerItemEntry();
-                            int length = di.RetrievePlayerEntryLength();
-                            folderItemLengths[availableMediaPlayers ++] = length;
-                            for (count = 0; count < length; count ++) {
-                                folderItems[positionItemStart + count] = playerEntry[count];
-                            }
-                            positionItemStart += length; // move start to next item start
-                        } else if (start > 0) {
-                            --start;
+        if (DEBUG) Log.v(TAG, "scope: " + scope + " size: " + size);
+        if (DEBUG) Log.v(TAG, "start: " + start + " end: " + end + " numAttr: " + numAttr);
+        if (scope == SCOPE_PLAYER_LIST) { // populate mediaplayer item list here
+            processGetMediaPlayerItems(scope, start, end, size, numAttr, attrs);
+        } else if ((scope == SCOPE_VIRTUAL_FILE_SYS) || (scope == SCOPE_NOW_PLAYING)) {
+            for (int i = 0; i < numAttr; ++i) {
+                if (DEBUG) Log.v(TAG, "attrs[" + i + "] = " + attrs[i]);
+            }
+            processGetFolderItemsInternal(scope, start, end, size, (byte)numAttr, attrs);
+        }
+    }
+
+    private void processGetMediaPlayerItems(byte scope, int start, int end, int size,
+                                                                int numAttr, int[] attrs) {
+        byte[] folderItems = new byte[size];
+        int[] folderItemLengths = new int[32];
+        int availableMediaPlayers = 0;
+        int count = 0;
+        int positionItemStart = 0;
+        if (mMediaPlayers.size() > 0) {
+            final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
+            while (rccIterator.hasNext()) {
+                final MediaPlayerInfo di = rccIterator.next();
+                if (di.GetPlayerAvailablility()) {
+                    if (start == 0) {
+                        byte[] playerEntry = di.RetrievePlayerItemEntry();
+                        int length = di.RetrievePlayerEntryLength();
+                        folderItemLengths[availableMediaPlayers ++] = length;
+                        for (count = 0; count < length; count ++) {
+                            folderItems[positionItemStart + count] = playerEntry[count];
                         }
+                        positionItemStart += length; // move start to next item start
+                    } else if (start > 0) {
+                        --start;
                     }
                 }
             }
-            if (DEBUG) Log.v(TAG, "Number of available MediaPlayers = " + availableMediaPlayers);
-            getFolderItemsRspNative ((byte)0x04, 0x1357, availableMediaPlayers, folderItems, folderItemLengths);
+        }
+        if (DEBUG) Log.v(TAG, "Number of available MediaPlayers = " + availableMediaPlayers);
+        getMediaPlayerListRspNative ((byte)OPERATION_SUCCESSFUL, 0x1357,
+                    availableMediaPlayers, folderItems, folderItemLengths);
+    }
+
+    private boolean isCurrentPathValid () {
+        if (mCurrentPath.equals(PATH_ROOT) || mCurrentPath.equals(PATH_TITLES) ||
+            mCurrentPath.equals(PATH_ALBUMS) || mCurrentPath.equals(PATH_ARTISTS) ||
+            mCurrentPath.equals(PATH_PLAYLISTS)){
+            return true;
+        }
+        return false;
+    }
+
+    private void processGetFolderItemsInternal(byte scope, int start, int end, int size,
+                                                                    byte numAttr, int[] attrs) {
+        if (DEBUG) Log.v(TAG, "processGetFolderItemsInternal");
+
+        if (DEBUG) Log.v(TAG, "requested attribute count" + numAttr);
+        for (int count = 0; count < numAttr; count++) {
+            if (DEBUG) Log.v(TAG, "attr[" + count + "] = " + attrs[count]);
+        }
+
+        if (scope == SCOPE_VIRTUAL_FILE_SYS) {
+            int status = OPERATION_SUCCESSFUL;
+            int numItems = 0;
+            int reqItems = (end - start) + 1;
+            int[] itemType = new int[MAX_BROWSE_ITEM_TO_SEND];
+            long[] uid = new long[MAX_BROWSE_ITEM_TO_SEND];
+            int[] type = new int[MAX_BROWSE_ITEM_TO_SEND];
+            byte[] playable = new byte[MAX_BROWSE_ITEM_TO_SEND];
+            String[] displayName = new String[MAX_BROWSE_ITEM_TO_SEND];
+            byte[] numAtt = new byte[MAX_BROWSE_ITEM_TO_SEND];
+            String[] attValues = new String[MAX_BROWSE_ITEM_TO_SEND * 7];
+            int[] attIds = new int[MAX_BROWSE_ITEM_TO_SEND * 7];
+
+            // Item specific attribute's entry starts from index*7
+            for (int count = 0; count < (MAX_BROWSE_ITEM_TO_SEND * 7); count++) {
+                attValues[count] = "";
+                attIds[count] = 0;
+            }
+
+            if (DEBUG) Log.v(TAG, "mCurrentPath: " + mCurrentPath);
+            if (DEBUG) Log.v(TAG, "mCurrentPathUID: " + mCurrentPathUid);
+            if (!isCurrentPathValid()) {
+                getFolderItemsRspNative((byte)DOES_NOT_EXIST, numItems, itemType, uid, type,
+                                            playable, displayName, numAtt, attValues, attIds);
+                Log.e(TAG, "Current path not set");
+                return;
+            }
+
+            if ((start < 0) || (end < 0) || (start > end)) {
+                getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType, uid, type,
+                                        playable, displayName, numAtt, attValues, attIds);
+                Log.e(TAG, "Wrong start/end index");
+                return;
+            }
+
+            if (mCurrentPath.equals(PATH_ROOT)) {
+                int availableItems = NUM_ROOT_ELEMENTS;
+                if (start >= availableItems) {
+                    Log.i(TAG, "startIteam exceeds the available item index");
+                    getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType, uid,
+                                        type, playable, displayName, numAtt, attValues, attIds);
+                    return;
+                }
+                if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                availableItems = availableItems - start;
+                if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                    availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                if (reqItems > availableItems)
+                    reqItems = availableItems;
+                if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                numItems = reqItems;
+
+                for (int count = 0; count < reqItems; count ++) {
+                    int index = start + count;
+                    switch (index) {
+                        case 0:
+                            itemType[index] = TYPE_FOLDER_ITEM;
+                            uid[index] = UID_ALBUM;
+                            type[index] = FOLDER_TYPE_ALBUMS;
+                            playable[index] = 0;
+                            displayName[index] = PATH_ALBUMS;
+                            numAtt[index] = 0;
+                            break;
+                        case 1:
+                            itemType[index] = TYPE_FOLDER_ITEM;
+                            uid[index] = UID_ARTIST;
+                            type[index] = FOLDER_TYPE_ARTISTS;
+                            playable[index] = 0;
+                            displayName[index] = PATH_ARTISTS;
+                            numAtt[index] = 0;
+                            break;
+                        case 2:
+                            itemType[index] = TYPE_FOLDER_ITEM;
+                            uid[index] = UID_PLAYLIST;
+                            type[index] = FOLDER_TYPE_PLAYLISTS;
+                            playable[index] = 0;
+                            displayName[index] = PATH_PLAYLISTS;
+                            numAtt[index] = 0;
+                            break;
+                        case 3:
+                            itemType[index] = TYPE_FOLDER_ITEM;
+                            uid[index] = UID_TITLES;
+                            type[index] = FOLDER_TYPE_TITLES;
+                            playable[index] = 0;
+                            displayName[index] = PATH_TITLES;
+                            numAtt[index] = 0;
+                            break;
+                        default:
+                            Log.i(TAG, "wrong index");
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                            itemType, uid, type, playable, displayName, numAtt, attValues,
+                                                                                    attIds);
+                    }
+                }
+
+                for (int count = 0; count < numItems; count++) {
+                    Log.v(TAG, itemType[count] + "," + uid[count] + "," + type[count]);
+                }
+                getFolderItemsRspNative((byte)status, numItems, itemType, uid, type,
+                                    playable, displayName, numAtt, attValues, attIds);
+            } else if (mCurrentPath.equals(PATH_TITLES)) {
+                int availableItems = 0;
+                Cursor cursor = null;
+                try {
+                    cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            mCursorCols, MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                            MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
+                    if (cursor != null) {
+                        availableItems = cursor.getCount();
+                        if (start >= availableItems) {
+                            Log.i(TAG, "startIteam exceeds the available item index");
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                            itemType, uid, type, playable, displayName, numAtt, attValues,
+                                                                                    attIds);
+                            cursor.close();
+                            return;
+                        }
+                        cursor.moveToFirst();
+                        for (int i = 0; i < start; i++) {
+                            cursor.moveToNext();
+                        }
+                    } else {
+                        Log.i(TAG, "Error: could not fetch the elements");
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                uid, type, playable, displayName, numAtt, attValues, attIds);
+                        return;
+                    }
+                    if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                    if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                    availableItems = availableItems - start;
+                    if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                        availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                    if (reqItems > availableItems)
+                        reqItems = availableItems;
+                    if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                    int attIndex;
+                    int index;
+                    for (index = 0; index < reqItems; index++) {
+                        itemType[index] = TYPE_MEDIA_ELEMENT_ITEM;
+                        uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow("_id"));
+                        type[index] = MEDIA_TYPE_AUDIO;
+                        playable[index] = 0;
+                        displayName[index] =
+                            cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
+                                                                    Audio.Media.TITLE));
+                        numAtt[index] = numAttr;
+                        for (attIndex = 0; attIndex < numAttr; attIndex++) {
+                            attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
+                                                                    cursor, attrs[attIndex]);
+                            attIds[(7 * index) + attIndex] = attrs[attIndex];
+                        }
+                        cursor.moveToNext();
+                    }
+                    numItems = index;
+                    getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
+                                        type, playable, displayName, numAtt, attValues, attIds);
+                    cursor.close();
+                } catch(Exception e) {
+                    Log.i(TAG, "Exception e" + e);
+                    cursor.close();
+                    getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
+                                            playable, displayName, numAtt, attValues, attIds);
+                }
+            } else if (mCurrentPath.equals(PATH_ALBUMS)) {
+                if (mCurrentPathUid == null) {
+                    long availableItems = 0;
+                    Cursor cursor = null;
+                    try {
+                        availableItems = getNumItems(PATH_ALBUMS, MediaStore.Audio.Media.ALBUM_ID);
+                        if (start >= availableItems) {
+                            Log.i(TAG, "startIteam exceeds the available item index");
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType,
+                                    uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+                        if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                        if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+
+                        availableItems = availableItems - start;
+                        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                        if (reqItems > availableItems)
+                            reqItems = (int)availableItems;
+                        Log.i(TAG, "revised reqItems: " + reqItems);
+
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri, mCursorCols,
+                                            MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                                            MediaStore.Audio.Albums.DEFAULT_SORT_ORDER);
+
+                        int count = 0;
+                        if (cursor != null) {
+                            count = cursor.getCount();
+                        } else {
+                            Log.i(TAG, "Error: could not fetch the elements");
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+                        if (count < reqItems) {
+                            reqItems = count;
+                        }
+                        cursor.moveToFirst();
+                        int index = 0;
+                        long prevElem = -1;
+                        long curElem = -1;
+                        while ((reqItems > 0) && (count > 0)) {
+                            curElem = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                    MediaStore.Audio.Media.ALBUM_ID));
+                            if (curElem != prevElem) {
+                                if (start > 0) {
+                                    --start;
+                                    cursor.moveToNext();
+                                    continue;
+                                }
+                                itemType[index] = TYPE_FOLDER_ITEM;
+                                uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                    MediaStore.Audio.Media.ALBUM_ID));
+                                type[index] = FOLDER_TYPE_ALBUMS;
+                                playable[index] = 0;
+                                displayName[index] = cursor.getString(
+                                            cursor.getColumnIndexOrThrow(
+                                            MediaStore.Audio.Media.ALBUM));
+                                numAtt[index] = 0;
+                                index++;
+                                reqItems--;
+                            }
+                            prevElem = curElem;
+                            cursor.moveToNext();
+                            count--;
+                        }
+                        if (index > 0) {
+                            numItems = index;
+                            getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems,
+                                itemType, uid, type, playable, displayName, numAtt, attValues,
+                                attIds);
+                        } else {
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                                itemType, uid, type, playable, displayName, numAtt, attValues,
+                                attIds);
+                        }
+                        cursor.close();
+                    } catch(Exception e) {
+                        Log.i(TAG, "Exception e" + e);
+                        cursor.close();
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
+                                        playable, displayName, numAtt, attValues, attIds);
+                    }
+                } else {
+                    long folderUid = Long.valueOf(mCurrentPathUid);
+                    int availableItems = 0;
+                    Cursor cursor = null;
+                    try {
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            mCursorCols, MediaStore.Audio.Media.IS_MUSIC + "=1 AND " +
+                            MediaStore.Audio.Media.ALBUM_ID + "=" + folderUid, null,
+                                            MediaStore.Audio.Albums.DEFAULT_SORT_ORDER);
+
+                        if (cursor != null) {
+                            availableItems = cursor.getCount();
+                            if (start >= availableItems) {
+                                Log.i(TAG, "startIteam exceeds the available item index");
+                                getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                                    itemType, uid, type, playable, displayName, numAtt,
+                                    attValues, attIds);
+                                cursor.close();
+                                return;
+                            }
+                            cursor.moveToFirst();
+                            for (int i = 0; i < start; i++) {
+                                cursor.moveToNext();
+                            }
+                        } else {
+                            Log.i(TAG, "Error: could not fetch the elements");
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems,
+                                itemType, uid, type, playable, displayName, numAtt,
+                                attValues, attIds);
+                            return;
+                        }
+
+                        if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                        if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                        availableItems = availableItems - start;
+                        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                        if (reqItems > availableItems)
+                            reqItems = availableItems;
+                        if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                        int attIndex;
+                        int index;
+                        for (index = 0; index < reqItems; index++) {
+                            itemType[index] = TYPE_MEDIA_ELEMENT_ITEM;
+                            uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow("_id"));
+                            type[index] = MEDIA_TYPE_AUDIO;
+                            playable[index] = 0;
+                            displayName[index] =
+                                cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
+                                                                        Audio.Media.TITLE));
+                            numAtt[index] = numAttr;
+                            for (attIndex = 0; attIndex < numAttr; attIndex++) {
+                                attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
+                                                                            cursor, attrs[attIndex]);
+                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                            }
+                            cursor.moveToNext();
+                        }
+                        numItems = index;
+                        getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
+                                            type, playable, displayName, numAtt, attValues, attIds);
+                        cursor.close();
+                    } catch(Exception e) {
+                        Log.i(TAG, "Exception e" + e);
+                        cursor.close();
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
+                                        playable, displayName, numAtt, attValues, attIds);
+                    }
+                }
+            } else if (mCurrentPath.equals(PATH_ARTISTS)) {
+                if (mCurrentPathUid == null) {
+                    long availableItems = 0;
+                    Cursor cursor = null;
+                    try {
+                        availableItems = getNumItems(PATH_ARTISTS,
+                                    MediaStore.Audio.Media.ARTIST_ID);
+                        if (start >= availableItems) {
+                            Log.i(TAG, "startIteam exceeds the available item index");
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType,
+                                    uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+
+                        if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                        if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                        availableItems = availableItems - start;
+                        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                        if (reqItems > availableItems)
+                            reqItems = (int)availableItems;
+                        if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri, mCursorCols,
+                            MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                            MediaStore.Audio.Artists.DEFAULT_SORT_ORDER);
+
+                        int count = 0;
+                        if (cursor != null) {
+                            count = cursor.getCount();
+                        } else {
+                            Log.i(TAG, "Error: could not fetch the elements");
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                    uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+                        if (count < reqItems) {
+                            reqItems = count;
+                        }
+                        cursor.moveToFirst();
+                        int index = 0;
+                        long prevElem = -1;
+                        long curElem = -1;
+                        while ((reqItems > 0) && (count > 0)) {
+                            curElem = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                    MediaStore.Audio.Media.ARTIST_ID));
+                            if (curElem != prevElem) {
+                                if (start > 0) {
+                                    --start;
+                                    cursor.moveToNext();
+                                    continue;
+                                }
+                                itemType[index] = TYPE_FOLDER_ITEM;
+                                uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                    MediaStore.Audio.Media.ARTIST_ID));
+                                type[index] = FOLDER_TYPE_ARTISTS;
+                                playable[index] = 0;
+                                displayName[index] = cursor.getString(
+                                    cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST));
+                                numAtt[index] = 0;
+                                index++;
+                                reqItems--;
+                            }
+                            prevElem = curElem;
+                            cursor.moveToNext();
+                            count--;
+                        }
+                        if (index > 0) {
+                            numItems = index;
+                            getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType,
+                                uid, type, playable, displayName, numAtt, attValues, attIds);
+                        } else {
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType,
+                                uid, type, playable, displayName, numAtt, attValues, attIds);
+                        }
+                        cursor.close();
+                    } catch(Exception e) {
+                        Log.i(TAG, "Exception e" + e);
+                        cursor.close();
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
+                                        playable, displayName, numAtt, attValues, attIds);
+                    }
+                } else {
+                    long folderUid = Long.valueOf(mCurrentPathUid);
+                    int availableItems = 0;
+                    Cursor cursor = null;
+                    try {
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            mCursorCols, MediaStore.Audio.Media.IS_MUSIC + "=1 AND " +
+                            MediaStore.Audio.Media.ARTIST_ID + "=" + folderUid, null,
+                            MediaStore.Audio.Artists.DEFAULT_SORT_ORDER);
+
+                        if (cursor != null) {
+                            availableItems = cursor.getCount();
+                            if (start >= availableItems) {
+                                Log.i(TAG, "startIteam exceeds the available item index");
+                                getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                                itemType, uid, type, playable, displayName, numAtt, attValues,
+                                                                                        attIds);
+                                cursor.close();
+                                return;
+                            }
+                            cursor.moveToFirst();
+                            for (int i = 0; i < start; i++) {
+                                cursor.moveToNext();
+                            }
+                        } else {
+                            Log.i(TAG, "Error: could not fetch the elements");
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                    uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+
+                        if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                        if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                        availableItems = availableItems - start;
+                        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                        if (reqItems > availableItems)
+                            reqItems = availableItems;
+                        if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                        int attIndex;
+                        int index;
+                        for (index = 0; index < reqItems; index++) {
+                            itemType[index] = TYPE_MEDIA_ELEMENT_ITEM;
+                            uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow("_id"));
+                            type[index] = MEDIA_TYPE_AUDIO;
+                            playable[index] = 0;
+                            displayName[index] =
+                                cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
+                                                                        Audio.Media.TITLE));
+                            numAtt[index] = numAttr;
+                            for (attIndex = 0; attIndex < numAttr; attIndex++) {
+                                attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
+                                                                        cursor, attrs[attIndex]);
+                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                            }
+                            cursor.moveToNext();
+                        }
+                        numItems = index;
+                        getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType,
+                            uid, type, playable, displayName, numAtt, attValues, attIds);
+                        cursor.close();
+                    } catch(Exception e) {
+                        Log.i(TAG, "Exception e" + e);
+                        cursor.close();
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid,
+                                        type, playable, displayName, numAtt, attValues, attIds);
+                    }
+                }
+            } else if (mCurrentPath.equals(PATH_PLAYLISTS)) {
+                if (mCurrentPathUid == null) {
+                    long availableItems = 0;
+                    Cursor cursor = null;
+                    try {
+                        availableItems = getNumPlaylistItems();
+                        if (start >= availableItems) {
+                            Log.i(TAG, "startIteam exceeds the available item index");
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType,
+                                    uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+
+                        if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                        if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                        availableItems = availableItems - start;
+                        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                        if (reqItems > availableItems)
+                            reqItems = (int)availableItems;
+                        if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                        String[] cols = new String[] {
+                                MediaStore.Audio.Playlists._ID,
+                                MediaStore.Audio.Playlists.NAME
+                        };
+
+                        cursor = mContext.getContentResolver().query(
+                            mMediaUri,
+                            cols, MediaStore.Audio.Playlists.NAME + " != ''", null,
+                            MediaStore.Audio.Playlists.DEFAULT_SORT_ORDER);
+
+                        int count = 0;
+                        if (cursor != null) {
+                            count = cursor.getCount();
+                        } else {
+                            Log.i(TAG, "Error: could not fetch the elements");
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+                        if (count < reqItems) {
+                            reqItems = count;
+                        }
+                        cursor.moveToFirst();
+                        int index = 0;
+                        for (index = 0; index < reqItems; index++) {
+                            itemType[index] = TYPE_FOLDER_ITEM;
+                            uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                        MediaStore.Audio.Playlists._ID));
+                            type[index] = FOLDER_TYPE_PLAYLISTS;
+                            playable[index] = 0;
+                            displayName[index] =
+                                cursor.getString(cursor.getColumnIndexOrThrow(
+                                                MediaStore.Audio.Playlists.NAME));
+                            cursor.moveToNext();
+                        }
+                        numItems = index;
+
+                        if (index > 0) {
+                            numItems = index;
+                            getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems,
+                                itemType, uid, type, playable, displayName, numAtt,
+                                attValues, attIds);
+                        } else {
+                            getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                                itemType, uid, type, playable, displayName, numAtt,
+                                attValues, attIds);
+                        }
+                        cursor.close();
+                    } catch(Exception e) {
+                        Log.i(TAG, "Exception e" + e);
+                        cursor.close();
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                            uid, type, playable, displayName, numAtt, attValues, attIds);
+                    }
+                } else {
+                    long folderUid = Long.valueOf(mCurrentPathUid);
+                    int availableItems = 0;
+                    Cursor cursor = null;
+
+                    String[] playlistMemberCols = new String[] {
+                            MediaStore.Audio.Playlists.Members._ID,
+                            MediaStore.Audio.Media.TITLE,
+                            MediaStore.Audio.Media.DATA,
+                            MediaStore.Audio.Media.ALBUM,
+                            MediaStore.Audio.Media.ARTIST,
+                            MediaStore.Audio.Media.DURATION,
+                            MediaStore.Audio.Playlists.Members.PLAY_ORDER,
+                            MediaStore.Audio.Playlists.Members.AUDIO_ID,
+                            MediaStore.Audio.Media.IS_MUSIC
+                    };
+
+                    try {
+                        Uri uri = MediaStore.Audio.Playlists.Members.getContentUri("external",
+                                                                                    folderUid);
+                        StringBuilder where = new StringBuilder();
+                        where.append(MediaStore.Audio.Media.TITLE + " != ''");
+                        cursor = mContext.getContentResolver().query(uri, playlistMemberCols,
+                                        where.toString(), null,
+                                        MediaStore.Audio.Playlists.Members.DEFAULT_SORT_ORDER);
+
+                        if (cursor != null) {
+                            availableItems = cursor.getCount();
+                            if (start >= availableItems) {
+                                Log.i(TAG, "startIteam exceeds the available item index");
+                                getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
+                                    itemType, uid, type, playable, displayName, numAtt,
+                                    attValues, attIds);
+                                cursor.close();
+                                return;
+                            }
+                            cursor.moveToFirst();
+                            for (int i = 0; i < start; i++) {
+                                cursor.moveToNext();
+                            }
+                        } else {
+                            Log.i(TAG, "Error: could not fetch the elements");
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                    uid, type, playable, displayName, numAtt, attValues, attIds);
+                            return;
+                        }
+
+                        if (DEBUG) Log.v(TAG, "availableItems: " + availableItems);
+                        if (DEBUG) Log.v(TAG, "reqItems: " + reqItems);
+                        availableItems = availableItems - start;
+                        if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
+                            availableItems = MAX_BROWSE_ITEM_TO_SEND;
+                        if (reqItems > availableItems)
+                            reqItems = availableItems;
+                        if (DEBUG) Log.v(TAG, "revised reqItems: " + reqItems);
+
+                        int attIndex;
+                        int index;
+                        for (index = 0; index < reqItems; index++) {
+                            itemType[index] = TYPE_MEDIA_ELEMENT_ITEM;
+                            uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.
+                                                                Audio.Playlists.Members.AUDIO_ID));
+                            type[index] = MEDIA_TYPE_AUDIO;
+                            playable[index] = 0;
+                            displayName[index] =
+                                cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
+                                                                        Audio.Media.TITLE));
+                            numAtt[index] = numAttr;
+                            for (attIndex = 0; attIndex < numAttr; attIndex++) {
+                                attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
+                                                                        cursor, attrs[attIndex]);
+                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                            }
+                            cursor.moveToNext();
+                        }
+                        numItems = index;
+                        getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
+                                            type, playable, displayName, numAtt, attValues, attIds);
+                        cursor.close();
+                    } catch(Exception e) {
+                        Log.i(TAG, "Exception e" + e);
+                        cursor.close();
+                        getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
+                                        playable, displayName, numAtt, attValues, attIds);
+                    }
+                }
+            }
+        } else if (scope == SCOPE_NOW_PLAYING) {
+            mAudioManager.getRemoteControlClientNowPlayingEntries(mClientGeneration);
+            mCachedRequest = new CachedRequest(start, end, numAttr, attrs);
         }
     }
 
@@ -1323,6 +2891,12 @@ final class Avrcp {
                 registerNotificationRspAvailablePlayersChangedNative(mAvailablePlayersChangedNT);
                 break;
 
+            case EVT_NOW_PLAYING_CONTENT_CHANGED:
+                if (DEBUG) Log.v(TAG, "Process EVT_NOW_PLAYING_CONTENT_CHANGED Interim");
+                mNowPlayingContentChangedNT = NOTIFICATION_TYPE_INTERIM;
+                registerNotificationRspNowPlayingContentChangedNative(mNowPlayingContentChangedNT);
+                break;
+
             default:
                 Log.v(TAG, "processRegisterNotification: Unhandled Type: " + eventId);
                 break;
@@ -1433,6 +3007,54 @@ final class Avrcp {
         if (DEBUG) Log.v(TAG, "position=" + songPosition);
         return songPosition;
     }
+
+    private String getAttributeStringFromCursor(Cursor cursor, int attrId) {
+        String attrStr = null;
+        switch (attrId) {
+            case MEDIA_ATTR_TITLE:
+                attrStr = cursor.getString(cursor.getColumnIndexOrThrow(
+                                        MediaStore.Audio.Media.TITLE));
+                break;
+            case MEDIA_ATTR_ARTIST:
+                attrStr = cursor.getString(cursor.getColumnIndexOrThrow(
+                                        MediaStore.Audio.Media.ARTIST));
+                break;
+            case MEDIA_ATTR_ALBUM:
+                attrStr = cursor.getString(cursor.getColumnIndexOrThrow(
+                                        MediaStore.Audio.Media.ALBUM));
+                break;
+            case MEDIA_ATTR_PLAYING_TIME:
+                attrStr = cursor.getString(cursor.getColumnIndexOrThrow(
+                                        MediaStore.Audio.Media.DURATION));
+                break;
+            case MEDIA_ATTR_TRACK_NUM:
+                if (mCurrentPath.equals(PATH_PLAYLISTS)) {
+                    attrStr = cursor.getString(cursor.getColumnIndexOrThrow(
+                                    MediaStore.Audio.Playlists.Members._ID));
+                } else {
+                    attrStr = String.valueOf(cursor.getLong(
+                                cursor.getColumnIndexOrThrow("_id")));
+                }
+                break;
+            case MEDIA_ATTR_NUM_TRACKS:
+                attrStr = String.valueOf(cursor.getCount());
+                break;
+            case MEDIA_ATTR_GENRE:
+                attrStr = "<unknown>"; // GENRE is not supported
+                break;
+            default:
+                Log.v(TAG, "getAttributeStringFromCursor: wrong attribute: attrId = "
+                                                                            + attrId);
+                break;
+        }
+        if (attrStr == null) {
+            attrStr = new String();
+        }
+        if (DEBUG) Log.v(TAG, "getAttributeStringFromCursor: attrId = "
+                                            + attrId + " str = " + attrStr);
+        return attrStr;
+    }
+
 
     private String getAttributeString(int attrId) {
         String attrStr = null;
@@ -1743,7 +3365,7 @@ private void updateLocalPlayerSettings( byte[] data) {
     final static int EVT_BATT_STATUS_CHANGED = 6;
     final static int EVT_SYSTEM_STATUS_CHANGED = 7;
     final static int EVT_APP_SETTINGS_CHANGED = 8;
-
+    final static int EVT_NOW_PLAYING_CONTENT_CHANGED = 9;
     final static int EVT_AVAILABLE_PLAYERS_CHANGED = 10; //0x0a
     final static int EVT_ADDRESSED_PLAYER_CHANGED = 11; //0x0b
     // match up with btrc_notification_type_t enum of bt_rc.h
@@ -1757,6 +3379,8 @@ private void updateLocalPlayerSettings( byte[] data) {
     final static byte ITEM_PLAYER = 0x01;
 
     final static int SCOPE_PLAYER_LIST = 0x00;
+    final static int SCOPE_VIRTUAL_FILE_SYS = 0x01;
+    final static int SCOPE_NOW_PLAYING = 0x03;
 
     final static int FOLDER_ITEM_COUNT_NONE = 0xFF;
 
@@ -2063,17 +3687,32 @@ private void updateLocalPlayerSettings( byte[] data) {
     private native boolean registerNotificationRspPlayPosNative(int type, int playPos);
     private native boolean setVolumeNative(int volume);
     private native boolean sendPassThroughCommandNative(int keyCode, int keyState);
-    private native boolean registerNotificationRspAddressedPlayerChangedNative(int type, int playerId);
-    private native boolean registerNotificationRspAvailablePlayersChangedNative (int type);
+    private native boolean registerNotificationRspAddressedPlayerChangedNative(
+                                                                    int type, int playerId);
+    private native boolean registerNotificationRspAvailablePlayersChangedNative(int type);
+    private native boolean registerNotificationRspNowPlayingContentChangedNative(int type);
     private native boolean setAdressedPlayerRspNative(byte statusCode);
-    private native boolean getFolderItemsRspNative(byte statusCode, int uidCounter, int itemCount, byte[] folderItems, int[] folderItemLengths);
+    private native boolean getMediaPlayerListRspNative(byte statusCode, int uidCounter,
+                                    int itemCount, byte[] folderItems, int[] folderItemLengths);
+    private native boolean getFolderItemsRspNative(byte statusCode, int numItems,
+        int[] itemType, long[] uid, int[] type, byte[] playable, String[] displayName,
+        byte[] numAtt, String[] attValues, int[] attIds);
     private native boolean getListPlayerappAttrRspNative(byte attr, byte[] attrIds);
     private native boolean getPlayerAppValueRspNative(byte numberattr, byte[]values );
     private native boolean SendCurrentPlayerValueRspNative(byte numberattr, byte[]attr );
     private native boolean SendSetPlayerAppRspNative();
-    private native boolean sendSettingsTextRspNative(int num_attr, byte[] attr, int length, String[]text);
-    private native boolean sendValueTextRspNative(int num_attr, byte[] attr, int length, String[]text);
-    private native boolean registerNotificationPlayerAppRspNative(int type, byte numberattr, byte[]attr);
+    private native boolean sendSettingsTextRspNative(int num_attr, byte[] attr,
+        int length, String[]text);
+    private native boolean sendValueTextRspNative(int num_attr, byte[] attr,
+        int length, String[]text);
+    private native boolean registerNotificationPlayerAppRspNative(int type,
+        byte numberattr, byte[]attr);
+    private native boolean setBrowsedPlayerRspNative(byte statusCode, int uidCounter,
+                            int itemCount, int folderDepth, int charId, String[] folderItems);
+    private native boolean changePathRspNative(int status, long itemCount);
+    private native boolean playItemRspNative(int status);
+    private native boolean getItemAttrRspNative(byte numAttr, int[] attrIds,
+        String[] textArray);
 
     /**
       * A class to encapsulate all the information about a media player.
