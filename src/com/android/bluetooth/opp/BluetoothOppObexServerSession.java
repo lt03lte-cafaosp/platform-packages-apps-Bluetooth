@@ -87,6 +87,9 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     private Context mContext;
 
     private Handler mCallback = null;
+    private Handler mPreTransferCallback = null;
+
+    public static final int DISCONNECT = 1;
 
     /* status when server is blocking for user/auto confirmation */
     private boolean mServerBlocking = true;
@@ -132,8 +135,9 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
      * Called when connection is accepted from remote, to retrieve the first
      * Header then wait for user confirmation
      */
-    public void preStart() {
+    public void preStart(Handler handler) {
         if (D) Log.d(TAG, "acquire full WakeLock");
+        mPreTransferCallback = handler;
         mWakeLock.acquire();
         try {
             if (D) Log.d(TAG, "Create ServerSession with transport " + mTransport.toString());
@@ -182,6 +186,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             }
         }
         mCallback = null;
+        mPreTransferCallback = null;
         mSession = null;
     }
 
@@ -747,6 +752,12 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     @Override
     public void onDisconnect(HeaderSet req, HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnect");
+        if (mPreTransferCallback != null) {
+             Message msg = Message.obtain(mPreTransferCallback);
+             msg.what = DISCONNECT;
+             msg.obj = null;
+             msg.sendToTarget();
+        }
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
     }
 
