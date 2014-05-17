@@ -232,6 +232,24 @@ public class BluetoothOppService extends Service {
 
     private static final int STOP_LISTENER = 200;
 
+    /*
+     * Handler for cleaning up Pre Transfer conditons
+     */
+    private Handler mPreTransferHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case BluetoothOppObexServerSession.DISCONNECT:
+                    if ((mServerSession != null) && (mServerTransfer == null)) {
+                        if (V) Log.v(TAG, "Server session cleanup");
+                        mServerSession.stop();
+                        mServerSession = null;
+                    }
+                    break;
+            }
+        }
+    };
+
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -294,17 +312,13 @@ public class BluetoothOppService extends Service {
                 case BluetoothOppRfcommListener.MSG_INCOMING_BTOPP_CONNECTION:
                     if (D) Log.d(TAG, "Get incoming connection mBatchSz: "+ mBatchs.size());
                     ObexTransport transport = (ObexTransport)msg.obj;
-                    if(mServerTransfer == null){
-                         Log.d(TAG, "mServerTranser is NULL");
-                    }
                     /*
                      * Strategy for incoming connections:
-                     * 1. If there is no ongoing transfer, no on-hold connection, start it
-                     * 2. If there is ongoing transfer, hold it for 20 seconds(1 seconds * 20 times)
+                     * 1. If there is no active connection, no on-hold connection, start it
+                     * 2. If there is active connection, hold it for 20 seconds(1 seconds * 20 times)
                      * 3. If there is on-hold connection, reject directly
                      */
-                    if (((mBatchs.size() == 0) || ((mBatchs.size() > 0) && (mServerTransfer == null)
-                        )) && mPendingConnection == null) {
+                    if ((mServerSession == null) && (mPendingConnection == null)) {
                         Log.i(TAG, "Start Obex Server");
                         createServerSession(transport);
                     } else {
@@ -329,8 +343,7 @@ public class BluetoothOppService extends Service {
                     }
                     break;
                 case MSG_INCOMING_CONNECTION_RETRY:
-                    if ((mBatchs.size() == 0) || ((mBatchs.size() > 0) && (mServerTransfer == null))
-                        ) {
+                    if (mServerSession == null) {
                         Log.i(TAG, "Start Obex Server");
                         createServerSession(mPendingConnection);
                         mIncomingRetries = 0;
@@ -389,7 +402,7 @@ public class BluetoothOppService extends Service {
     /* suppose we auto accept an incoming OPUSH connection */
     private void createServerSession(ObexTransport transport) {
         mServerSession = new BluetoothOppObexServerSession(this, transport);
-        mServerSession.preStart();
+        mServerSession.preStart(mPreTransferHandler);
         if (D) Log.d(TAG, "Get ServerSession " + mServerSession.toString()
                     + " for incoming connection" + transport.toString());
     }
@@ -899,6 +912,7 @@ public class BluetoothOppService extends Service {
                                 + mServerTransfer.getBatchId());
                     }
                     mServerTransfer = null;
+                    mServerSession = null;
                 }
                 removeBatch(batch);
             }
@@ -1024,6 +1038,7 @@ public class BluetoothOppService extends Service {
                 if (V) Log.v(TAG, "Stop Server Transfer");
                 mServerTransfer.stop();
                 mServerTransfer = null;
+                mServerSession = null;
             }
 
             if (batch.isEmpty()) {
