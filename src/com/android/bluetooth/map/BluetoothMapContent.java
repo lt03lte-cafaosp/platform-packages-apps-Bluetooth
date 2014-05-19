@@ -83,6 +83,7 @@ public class BluetoothMapContent {
     private static final int MASK_SENT = 0x2000;
     private static final int MASK_PROTECTED = 0x4000;
     private static final int MASK_REPLYTO_ADDRESSING = 0x8000;
+    private static final String HONDA_CARKIT = "64:D4:BD";
 
     /* Type of MMS address. From Telephony.java it must be one of PduHeaders.BCC, */
     /* PduHeaders.CC, PduHeaders.FROM, PduHeaders.TO. These are from PduHeaders.java */
@@ -953,7 +954,8 @@ public class BluetoothMapContent {
         if(subLength == BluetoothMapAppParams.INVALID_VALUE_PARAMETER)
             subLength = 256;
 
-        if ((ap.getParameterMask() & MASK_SUBJECT) != 0) {
+        if (BluetoothMapService.getRemoteDevice().getAddress().startsWith(HONDA_CARKIT) ||
+                         (ap.getParameterMask() & MASK_SUBJECT) != 0) {
             if (fi.msgType == FilterInfo.TYPE_SMS) {
                 subject = c.getString(c.getColumnIndex(Sms.BODY));
             } else if (fi.msgType == FilterInfo.TYPE_MMS) {
