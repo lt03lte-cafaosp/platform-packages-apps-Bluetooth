@@ -29,6 +29,8 @@ public class BluetoothMapbMessageSms extends BluetoothMapbMessage {
     private ArrayList<SmsPdu> smsBodyPdus = null;
     private String smsBody = null;
     private String PCM_CARKIT = "9C:DF:03";
+    private String FORD_SYNC_CARKIT ="00:1E:AE";
+
     public void setSmsBodyPdus(ArrayList<SmsPdu> smsBodyPdus) {
         this.smsBodyPdus = smsBodyPdus;
         this.charset = null;
@@ -85,6 +87,8 @@ public class BluetoothMapbMessageSms extends BluetoothMapbMessage {
                message if carriage return is present in it */
             if(BluetoothMapService.getRemoteDevice().getAddress().startsWith(PCM_CARKIT)) {
                tmpBody = tmpBody.replaceAll("\r", "");
+            } else if(BluetoothMapService.getRemoteDevice().getAddress().startsWith(FORD_SYNC_CARKIT)) {
+               tmpBody = tmpBody.replaceAll("\n", "");
             }
 
             bodyFragments.add(tmpBody.getBytes("UTF-8"));
