@@ -686,6 +686,8 @@ final class A2dpStateMachine extends StateMachine {
                         broadcastAudioState(device, BluetoothA2dp.STATE_NOT_PLAYING,
                                             BluetoothA2dp.STATE_PLAYING);
                     }
+                    mAudioManager.abandonAudioFocus(mAudioFocusListener);
+                    informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                     break;
                 default:
                   loge("Audio State Device: " + device + " bad state: " + state);
@@ -999,12 +1001,11 @@ final class A2dpStateMachine extends StateMachine {
                                 == BluetoothProfile.PROFILE_A2DP_SRC) {
                             //Camera Pauses the Playback before starting the Video recording
                             //But it doesn't start the playback once recording is completed.
-                            //Disconnecting the A2dp to move the A2dpSink to proper state.
-                            disconnectA2dpNative(getByteAddress(mCurrentDevice));
+                                disconnectA2dpNative(getByteAddress(mCurrentDevice));
+                            }
                             // in case PEER DEVICE is A2DP SRC we need to manage audio focus
-                            int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
-                            log("abandonAudioFocus returned" + status);
-                        }
+                        int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
+                        log("abandonAudioFocus returned" + status);
                     } else {
                         int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                         log("abandonAudioFocus returned" + status);
@@ -1016,18 +1017,16 @@ final class A2dpStateMachine extends StateMachine {
 
     private OnAudioFocusChangeListener mAudioFocusListener = new OnAudioFocusChangeListener(){
         public void onAudioFocusChange(int focusChange){
-            log("onAudioFocusChangeListener  focuschange" + focusChange);
+            log("onAudioFocusChangeListener focuschange" + focusChange);
             switch(focusChange){
                 case AudioManager.AUDIOFOCUS_LOSS:
                     if (mCurrentDevice != null) {
                         if (mService.getLastConnectedA2dpSepType(mCurrentDevice)
                                    == BluetoothProfile.PROFILE_A2DP_SRC) {
-                            // in case of perm loss, disconnect the link
-                            disconnectA2dpNative(getByteAddress(mCurrentDevice));
-                            // in case PEER DEVICE is A2DP SRC we need to manage audio focus
-                            int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
-                            log("abandonAudioFocus returned" + status);
+                                disconnectA2dpNative(getByteAddress(mCurrentDevice));
                         }
+                        // in case PEER DEVICE is A2DP SRC we need to manage audio focus
+                        int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                     } else {
                         int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                         log("abandonAudioFocus returned" + status);
