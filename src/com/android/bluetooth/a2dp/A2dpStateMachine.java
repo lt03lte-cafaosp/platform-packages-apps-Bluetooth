@@ -754,7 +754,7 @@ final class A2dpStateMachine extends StateMachine {
             }
 
             if (currentState == mConnected) {
-                if (mCurrentDevice.equals(device)) {
+                if ((mCurrentDevice != null) && mCurrentDevice.equals(device)) {
                     return BluetoothProfile.STATE_CONNECTED;
                 }
                 return BluetoothProfile.STATE_DISCONNECTED;
