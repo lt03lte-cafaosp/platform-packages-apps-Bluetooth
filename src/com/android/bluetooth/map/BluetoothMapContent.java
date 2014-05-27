@@ -1784,6 +1784,7 @@ public class BluetoothMapContent {
                       }
                 } else if(recipientName.contains(",")){
                       multiRecepients = recipientName.replace(", \"", "; \"");
+                      multiRecepients = recipientName.replace(", ", "; ");
                       if(multiRecepients != null){
                          if (V){
                              Log.v(TAG, "Setting ::Recepient name :: " + multiRecepients.trim());
@@ -1792,15 +1793,30 @@ public class BluetoothMapContent {
                          do {
                             tempEmail = emailId.nextElement().toString();
                             setVCardFromEmailAddress(message, tempEmail, false);
-                            message.addTo(null, tempEmail);
+
+                            if(tempEmail.indexOf('<') != -1) {
+                               if(D) Log.d(TAG, "Adding to: " + tempEmail.substring(tempEmail.indexOf('<')+1,
+                                                            tempEmail.indexOf('>')));
+                               message.addTo(null,tempEmail.substring(tempEmail.indexOf('<')+1,
+                                                            tempEmail.indexOf('>')));
+                            } else {
+                               message.addTo(null, tempEmail);
+                            }
                          } while(emailId.hasMoreElements());
                       }
                 } else {
                       Log.v(TAG, " Setting ::Recepient name :: " + recipientName.trim());
                       setVCardFromEmailAddress(message, recipientName.trim(), false);
+                      if(recipientName.indexOf('<') != -1 && recipientName.indexOf('>') != -1) {
+                        if(V) Log.v(TAG, "to addressing is " + recipientName.substring(recipientName.indexOf('<')+1,
+                                                           recipientName.lastIndexOf('>')));
+                        message.addTo(null, recipientName.substring(recipientName.indexOf('<')+1,
+                                                           recipientName.lastIndexOf('>')));
+                      } else {
                       message.addTo(null, recipientName.trim());
-                 }
-             }
+                      }
+                }
+            }
 
             recipientName = null;
             multiRecepients = null;
@@ -1831,7 +1847,7 @@ public class BluetoothMapContent {
                       }
                 } else if(recipientName.contains(",")){
                       multiRecepients = recipientName.replace(", \"", "; \"");
-if(V) Log.v(TAG, " After replacing  " + multiRecepients);
+                      multiRecepients = recipientName.replace(", ", "; ");
 
                       if(multiRecepients != null){
                          if (V){
@@ -1845,10 +1861,17 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
                          } while(emailId.hasMoreElements());
                       }
                 } else {
-                      Log.v(TAG, " Setting ::Recepient name :: " + recipientName.trim());
+                      if(V) Log.v(TAG, " Setting ::Recepient name :: " + recipientName.trim());
                       setVCardFromEmailAddress(message, recipientName.trim(), false);
-                      message.addCc(null, recipientName.trim());
-                 }
+                      if(recipientName.indexOf('<') != -1 && recipientName.indexOf('>') != -1) {
+                         if(V) Log.v(TAG, "CC addressing is " + recipientName.substring(recipientName.indexOf('<')+1,
+                                                            recipientName.lastIndexOf('>')));
+                         message.addCc(null, recipientName.substring(recipientName.indexOf('<')+1,
+                                                            recipientName.lastIndexOf('>')));
+                      } else {
+                         message.addCc(null, recipientName.trim());
+                      }
+              }
              }
         }
     }
