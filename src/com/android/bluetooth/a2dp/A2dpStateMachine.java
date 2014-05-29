@@ -683,6 +683,8 @@ final class A2dpStateMachine extends StateMachine {
                         broadcastAudioState(device, BluetoothA2dp.STATE_NOT_PLAYING,
                                             BluetoothA2dp.STATE_PLAYING);
                     }
+                    mAudioManager.abandonAudioFocus(mAudioFocusListener);
+                    informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                     break;
                 default:
                   loge("Audio State Device: " + device + " bad state: " + state);
@@ -1001,6 +1003,7 @@ final class A2dpStateMachine extends StateMachine {
                                         Avrcp.KEY_STATE_PRESSED);
                                 mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
                                         Avrcp.KEY_STATE_RELEASED);
+                                informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                             } else {
                                 disconnectA2dpNative(getByteAddress(mCurrentDevice));
                                 log("AVRCP not connected, disconnecting A2dp");
@@ -1020,7 +1023,7 @@ final class A2dpStateMachine extends StateMachine {
 
     private OnAudioFocusChangeListener mAudioFocusListener = new OnAudioFocusChangeListener(){
         public void onAudioFocusChange(int focusChange){
-            log("onAudioFocusChangeListener  focuschange" + focusChange);
+            log("onAudioFocusChangeListener focuschange" + focusChange);
             switch(focusChange){
                 case AudioManager.AUDIOFOCUS_LOSS:
                     if (mCurrentDevice != null) {
@@ -1031,6 +1034,7 @@ final class A2dpStateMachine extends StateMachine {
                                         Avrcp.KEY_STATE_PRESSED);
                                 mService.sendPassThroughCmd(Avrcp.AVRC_ID_PAUSE,
                                         Avrcp.KEY_STATE_RELEASED);
+                                informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                             } else {
                                 disconnectA2dpNative(getByteAddress(mCurrentDevice));
                                 log("AVRCP not connected, disconnecting A2dp");
