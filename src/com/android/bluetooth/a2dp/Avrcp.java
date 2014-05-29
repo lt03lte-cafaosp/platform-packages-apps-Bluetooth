@@ -243,6 +243,11 @@ final class Avrcp {
     private static final int MAX_BROWSE_ITEM_TO_SEND = 0x03;
     private static final int MAX_ATTRIB_COUNT = 0x07;
 
+    private final static int ALBUMS_ITEM_INDEX = 0;
+    private final static int ARTISTS_ITEM_INDEX = 1;
+    private final static int PLAYLISTS_ITEM_INDEX = 2;
+    private final static int TITLES_ITEM_INDEX = 3;
+
     //Intents for PlayerApplication Settings
     private static final String PLAYERSETTINGS_REQUEST = "org.codeaurora.music.playersettingsrequest";
     private static final String PLAYERSETTINGS_RESPONSE =
@@ -1668,7 +1673,7 @@ final class Avrcp {
                             where.append(MediaStore.Audio.Playlists.NAME + " != ''");
 
                             cursor = mContext.getContentResolver().query(
-                                mMediaUri,
+                                MediaStore.Audio.Playlists.EXTERNAL_CONTENT_URI,
                                 cols, MediaStore.Audio.Playlists._ID + "=" + folderUid,
                                 null, null);
 
@@ -2179,37 +2184,37 @@ final class Avrcp {
                 for (int count = 0; count < reqItems; count ++) {
                     int index = start + count;
                     switch (index) {
-                        case 0:
-                            itemType[index] = TYPE_FOLDER_ITEM;
-                            uid[index] = UID_ALBUM;
-                            type[index] = FOLDER_TYPE_ALBUMS;
-                            playable[index] = 0;
-                            displayName[index] = PATH_ALBUMS;
-                            numAtt[index] = 0;
+                        case ALBUMS_ITEM_INDEX:
+                            itemType[count] = TYPE_FOLDER_ITEM;
+                            uid[count] = UID_ALBUM;
+                            type[count] = FOLDER_TYPE_ALBUMS;
+                            playable[count] = 0;
+                            displayName[count] = PATH_ALBUMS;
+                            numAtt[count] = 0;
                             break;
-                        case 1:
-                            itemType[index] = TYPE_FOLDER_ITEM;
-                            uid[index] = UID_ARTIST;
-                            type[index] = FOLDER_TYPE_ARTISTS;
-                            playable[index] = 0;
-                            displayName[index] = PATH_ARTISTS;
-                            numAtt[index] = 0;
+                        case ARTISTS_ITEM_INDEX:
+                            itemType[count] = TYPE_FOLDER_ITEM;
+                            uid[count] = UID_ARTIST;
+                            type[count] = FOLDER_TYPE_ARTISTS;
+                            playable[count] = 0;
+                            displayName[count] = PATH_ARTISTS;
+                            numAtt[count] = 0;
                             break;
-                        case 2:
-                            itemType[index] = TYPE_FOLDER_ITEM;
-                            uid[index] = UID_PLAYLIST;
-                            type[index] = FOLDER_TYPE_PLAYLISTS;
-                            playable[index] = 0;
-                            displayName[index] = PATH_PLAYLISTS;
-                            numAtt[index] = 0;
+                        case PLAYLISTS_ITEM_INDEX:
+                            itemType[count] = TYPE_FOLDER_ITEM;
+                            uid[count] = UID_PLAYLIST;
+                            type[count] = FOLDER_TYPE_PLAYLISTS;
+                            playable[count] = 0;
+                            displayName[count] = PATH_PLAYLISTS;
+                            numAtt[count] = 0;
                             break;
-                        case 3:
-                            itemType[index] = TYPE_FOLDER_ITEM;
-                            uid[index] = UID_TITLES;
-                            type[index] = FOLDER_TYPE_TITLES;
-                            playable[index] = 0;
-                            displayName[index] = PATH_TITLES;
-                            numAtt[index] = 0;
+                        case TITLES_ITEM_INDEX:
+                            itemType[count] = TYPE_FOLDER_ITEM;
+                            uid[count] = UID_TITLES;
+                            type[count] = FOLDER_TYPE_TITLES;
+                            playable[count] = 0;
+                            displayName[count] = PATH_TITLES;
+                            numAtt[count] = 0;
                             break;
                         default:
                             Log.i(TAG, "wrong index");
@@ -2312,7 +2317,7 @@ final class Avrcp {
                         Log.i(TAG, "revised reqItems: " + reqItems);
 
                         cursor = mContext.getContentResolver().query(
-                            mMediaUri, mCursorCols,
+                                            mMediaUri, mCursorCols,
                                             MediaStore.Audio.Media.IS_MUSIC + "=1", null,
                                             MediaStore.Audio.Albums.DEFAULT_SORT_ORDER);
 
@@ -2338,20 +2343,19 @@ final class Avrcp {
                             if (curElem != prevElem) {
                                 if (start > 0) {
                                     --start;
-                                    cursor.moveToNext();
-                                    continue;
+                                } else {
+                                    itemType[index] = TYPE_FOLDER_ITEM;
+                                    uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                        MediaStore.Audio.Media.ALBUM_ID));
+                                    type[index] = FOLDER_TYPE_ALBUMS;
+                                    playable[index] = 0;
+                                    displayName[index] = cursor.getString(
+                                                cursor.getColumnIndexOrThrow(
+                                                MediaStore.Audio.Media.ALBUM));
+                                    numAtt[index] = 0;
+                                    index++;
+                                    reqItems--;
                                 }
-                                itemType[index] = TYPE_FOLDER_ITEM;
-                                uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
-                                                    MediaStore.Audio.Media.ALBUM_ID));
-                                type[index] = FOLDER_TYPE_ALBUMS;
-                                playable[index] = 0;
-                                displayName[index] = cursor.getString(
-                                            cursor.getColumnIndexOrThrow(
-                                            MediaStore.Audio.Media.ALBUM));
-                                numAtt[index] = 0;
-                                index++;
-                                reqItems--;
                             }
                             prevElem = curElem;
                             cursor.moveToNext();
@@ -2495,19 +2499,18 @@ final class Avrcp {
                             if (curElem != prevElem) {
                                 if (start > 0) {
                                     --start;
-                                    cursor.moveToNext();
-                                    continue;
+                                } else {
+                                    itemType[index] = TYPE_FOLDER_ITEM;
+                                    uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
+                                                        MediaStore.Audio.Media.ARTIST_ID));
+                                    type[index] = FOLDER_TYPE_ARTISTS;
+                                    playable[index] = 0;
+                                    displayName[index] = cursor.getString(
+                                        cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST));
+                                    numAtt[index] = 0;
+                                    index++;
+                                    reqItems--;
                                 }
-                                itemType[index] = TYPE_FOLDER_ITEM;
-                                uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow(
-                                                    MediaStore.Audio.Media.ARTIST_ID));
-                                type[index] = FOLDER_TYPE_ARTISTS;
-                                playable[index] = 0;
-                                displayName[index] = cursor.getString(
-                                    cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST));
-                                numAtt[index] = 0;
-                                index++;
-                                reqItems--;
                             }
                             prevElem = curElem;
                             cursor.moveToNext();
@@ -2626,7 +2629,7 @@ final class Avrcp {
                         };
 
                         cursor = mContext.getContentResolver().query(
-                            mMediaUri,
+                            MediaStore.Audio.Playlists.EXTERNAL_CONTENT_URI,
                             cols, MediaStore.Audio.Playlists.NAME + " != ''", null,
                             MediaStore.Audio.Playlists.DEFAULT_SORT_ORDER);
 
