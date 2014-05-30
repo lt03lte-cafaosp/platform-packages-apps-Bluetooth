@@ -295,7 +295,7 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
      * @param addresses the reformatted address substrings to encode.
      */
     public void encodeHeaderAddresses(StringBuilder sb, String headerName,
-            ArrayList<Rfc822Token> addresses) {
+            ArrayList<Rfc822Token> addresses) throws UnsupportedEncodingException {
         /* TODO: Do we need to encode the addresses if they contain illegal characters?
          * This depends of the outcome of errata 4176. The current spec. states to use UTF-8
          * where possible, but the RFCs states to use US-ASCII for the headers - hence encoding
@@ -312,7 +312,7 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
                 sb.append("\r\n "); // Append a FWS (folding whitespace)
                 lineLength = 0;
             }
-            sb.append(address.toString()).append(";");
+            sb.append(new String(address.toString().getBytes("UTF-8"),"UTF-8")).append(";");
             lineLength += partLength;
         }
         sb.append("\r\n");
@@ -344,7 +344,7 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
             sb.append("?=\r\n");
         }*/
         if (subject != null)
-            sb.append("Subject: ").append(subject).append("\r\n");
+            sb.append("Subject: ").append(new String(subject.getBytes("UTF-8"),"UTF-8")).append("\r\n");
         if(from != null)
             encodeHeaderAddresses(sb, "From: ", from); // This includes folding if needed.
         if(sender != null)
@@ -398,7 +398,6 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
                 .append("\r\n");
         sb.append("MIME Message").append("\r\n");
         sb.append("--"+boundary).append("\r\n");
-
         Log.v(TAG, "after encode header sb is "+ sb.toString());
         if(getIncludeAttachments() == false) {
             for(MimePart part : parts) {
