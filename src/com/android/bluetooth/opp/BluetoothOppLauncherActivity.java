@@ -50,6 +50,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.provider.Settings;
+import android.widget.Toast;
 
 /**
  * This class is designed to act as the entry point of handling the share intent
@@ -69,6 +70,15 @@ public class BluetoothOppLauncherActivity extends Activity {
         String action = (intent == null) ? null : intent.getAction();
         if (action == null) {
             Log.e(TAG, "Unexpected error! action is null");
+            finish();
+            return;
+        }
+        boolean airplane = (android.provider.Settings.System.getInt
+                    (this.getContentResolver(), android.provider.Settings.System.AIRPLANE_MODE_ON, 0) != 0);
+        boolean needPrompt = getResources().getBoolean(R.bool.config_airplane_invalid);
+       if (airplane && needPrompt) {
+             Toast.makeText(this,R.string.bluetooth_in_airplane_mode,
+                     Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
