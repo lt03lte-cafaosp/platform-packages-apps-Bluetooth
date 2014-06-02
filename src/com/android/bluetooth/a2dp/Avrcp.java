@@ -220,15 +220,16 @@ final class Avrcp {
     private final static long UID_PLAYLIST = 0x04;
     private final static int NUM_ROOT_ELEMENTS = 0x04;
 
+    private static final int INTERNAL_ERROR = 0x03;
+    private static final int OPERATION_SUCCESSFUL = 0x04;
     private static final int INVALID_DIRECTION = 0x07;
     private static final int NOT_A_DIRECTORY = 0x08;
     private static final int DOES_NOT_EXIST = 0x09;
-    private static final int UID_A_DIRECTORY = 0x0c;
-    private static final int MEDIA_IN_USE = 0x0d;
     private static final int INVALID_SCOPE = 0x0a;
     private static final int RANGE_OUT_OF_BOUNDS = 0x0b;
-    private static final int INTERNAL_ERROR = 0x03;
-    private static final int OPERATION_SUCCESSFUL = 0x04;
+    private static final int UID_A_DIRECTORY = 0x0c;
+    private static final int MEDIA_IN_USE = 0x0d;
+    private static final int PLAYER_NOT_BROWSABLE = 0x12;
 
     private static final int FOLDER_TYPE_MIXED = 0x00;
     private static final int FOLDER_TYPE_TITLES = 0x01;
@@ -469,7 +470,10 @@ final class Avrcp {
        * the corresponding fields are modified */
     private void registerMediaPlayers () {
         if (DEBUG) Log.v(TAG, "registerMediaPlayers");
-        int[] featureMasks = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        int[] featureMasks = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        int[] featureMasks2 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
         byte[] playerName1 = {0x4d, 0x75, 0x73, 0x69, 0x63}/*Music*/;
         byte[] playerName2 = {0x4d, 0x75, 0x73, 0x69, 0x63, 0x32}/*Music2*/;
 
@@ -496,6 +500,27 @@ final class Avrcp {
         featureMasks[FEATURE_MASK_NOW_PLAY_OFFSET] =
             featureMasks[FEATURE_MASK_NOW_PLAY_OFFSET] | FEATURE_MASK_NOW_PLAY_MASK;
 
+        /*Google player does not support browsing and now playing,
+            hence updated the masks properly*/
+        featureMasks2[FEATURE_MASK_PLAY_OFFSET] =
+            featureMasks2[FEATURE_MASK_PLAY_OFFSET] | FEATURE_MASK_PLAY_MASK;
+        featureMasks2[FEATURE_MASK_PAUSE_OFFSET] =
+            featureMasks2[FEATURE_MASK_PAUSE_OFFSET] | FEATURE_MASK_PAUSE_MASK;
+        featureMasks2[FEATURE_MASK_STOP_OFFSET] =
+            featureMasks2[FEATURE_MASK_STOP_OFFSET] | FEATURE_MASK_STOP_MASK;
+        featureMasks2[FEATURE_MASK_PAGE_UP_OFFSET] =
+            featureMasks2[FEATURE_MASK_PAGE_UP_OFFSET] | FEATURE_MASK_PAGE_UP_MASK;
+        featureMasks2[FEATURE_MASK_PAGE_DOWN_OFFSET] =
+            featureMasks2[FEATURE_MASK_PAGE_DOWN_OFFSET] | FEATURE_MASK_PAGE_DOWN_MASK;
+        featureMasks2[FEATURE_MASK_REWIND_OFFSET] =
+            featureMasks2[FEATURE_MASK_REWIND_OFFSET] | FEATURE_MASK_REWIND_MASK;
+        featureMasks2[FEATURE_MASK_FAST_FWD_OFFSET] =
+            featureMasks2[FEATURE_MASK_FAST_FWD_OFFSET] | FEATURE_MASK_FAST_FWD_MASK;
+        featureMasks2[FEATURE_MASK_VENDOR_OFFSET] =
+            featureMasks2[FEATURE_MASK_VENDOR_OFFSET] | FEATURE_MASK_VENDOR_MASK;
+        featureMasks2[FEATURE_MASK_ADV_CTRL_OFFSET] =
+            featureMasks2[FEATURE_MASK_ADV_CTRL_OFFSET] | FEATURE_MASK_ADV_CTRL_MASK;
+
         mediaPlayerInfo1 = new MediaPlayerInfo ((short)0x0001,
                     MAJOR_TYPE_AUDIO,
                     SUB_TYPE_NONE,
@@ -504,6 +529,7 @@ final class Avrcp {
                     (short)0x05,
                     playerName1,
                     "com.android.music",
+                    true,
                     featureMasks);
 
         mediaPlayerInfo2 = new MediaPlayerInfo ((short)0x0002,
@@ -514,7 +540,8 @@ final class Avrcp {
                     (short)0x06,
                     playerName2,
                     "com.google.android.music",
-                    featureMasks);
+                    false,
+                    featureMasks2);
 
         mMediaPlayers.add(mediaPlayerInfo1);
         mMediaPlayers.add(mediaPlayerInfo2);
@@ -1113,31 +1140,39 @@ final class Avrcp {
     private void updateAddressedMediaPlayer(int playerId) {
         if (DEBUG) Log.v(TAG, "updateAddressedMediaPlayer");
         int previousAddressedPlayerId = mAddressedPlayerId;
+        boolean toNotify;
         if ((mAddressedPlayerChangedNT == NOTIFICATION_TYPE_INTERIM) && (mAddressedPlayerId != playerId)) {
             if (DEBUG) Log.v(TAG, "send AddressedMediaPlayer to stack: playerId" + playerId);
             mAddressedPlayerId = playerId;
             mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
             registerNotificationRspAddressedPlayerChangedNative(mAddressedPlayerChangedNT, mAddressedPlayerId);
-            if (previousAddressedPlayerId != 0) {
-                resetAndSendPlayerStatusReject();
-            }
+            toNotify = false;
         } else {
             mAddressedPlayerId = playerId;
+            toNotify = true;
+        }
+        if (previousAddressedPlayerId != 0) {
+            resetAndSendPlayerStatusReject(toNotify);
         }
     }
 
-    private void resetAndSendPlayerStatusReject() {
+    private void resetAndSendPlayerStatusReject(boolean toNotifyRemote) {
         if (DEBUG) Log.v(TAG, "resetAndSendPlayerStatusReject");
 
         if (mPlayStatusChangedNT == NOTIFICATION_TYPE_INTERIM) {
             if (DEBUG) Log.v(TAG, "send Play Status reject to stack");
             mPlayStatusChangedNT = NOTIFICATION_TYPE_REJECT;
-            registerNotificationRspPlayStatusNative(mPlayStatusChangedNT, PLAYSTATUS_STOPPED);
+            if (toNotifyRemote) {
+                registerNotificationRspPlayStatusNative(mPlayStatusChangedNT,
+                                                            PLAYSTATUS_STOPPED);
+            }
         }
         if (mPlayPosChangedNT == NOTIFICATION_TYPE_INTERIM) {
             if (DEBUG) Log.v(TAG, "send Play Position reject to stack");
             mPlayPosChangedNT = NOTIFICATION_TYPE_REJECT;
-            registerNotificationRspPlayPosNative(mPlayPosChangedNT, -1);
+            if (toNotifyRemote) {
+                registerNotificationRspPlayPosNative(mPlayPosChangedNT, -1);
+            }
             mHandler.removeMessages(MESSAGE_PLAY_INTERVAL_TIMEOUT);
         }
         if (mTrackChangedNT == NOTIFICATION_TYPE_INTERIM) {
@@ -1148,7 +1183,17 @@ final class Avrcp {
             for (int i = 0; i < TRACK_ID_SIZE; ++i) {
                 track[i] = (byte) (mTrackNumber >> (56 - 8 * i));
             }
-            registerNotificationRspTrackChangeNative(mTrackChangedNT, track);
+            if (toNotifyRemote) {
+                registerNotificationRspTrackChangeNative(mTrackChangedNT, track);
+            }
+        }
+        if (mNowPlayingContentChangedNT == NOTIFICATION_TYPE_INTERIM) {
+            if (DEBUG) Log.v(TAG, "send Now playing changed reject to stack");
+            mNowPlayingContentChangedNT = NOTIFICATION_TYPE_REJECT;
+            if (toNotifyRemote) {
+                registerNotificationRspNowPlayingContentChangedNative(
+                                                    mNowPlayingContentChangedNT);
+            }
         }
     }
 
@@ -1445,16 +1490,23 @@ final class Avrcp {
                 if (di.RetrievePlayerId() == playerId) {
                     if (di.GetPlayerAvailablility()) {
                         if (DEBUG) Log.v(TAG, "player found and available");
-                        packageName = di.RetrievePlayerPackageName();
+                        if (di.IsPlayerBrowsable()) {
+                            packageName = di.RetrievePlayerPackageName();
+                        }
                     }
                 }
             }
         }
+        /*Following gets updated if SetBrowsed Player succeeds*/
+        mCurrentPath = PATH_INVALID;
+        mMediaUri = Uri.EMPTY;
+        mCurrentPathUid = null;
         if (packageName != null) {
             mAudioManager.setRemoteControlClientBrowsedPlayer(packageName);
         } else {
             if (DEBUG) Log.v(TAG, "player not available for browse");
-            setBrowsedPlayerRspNative((byte)ERR_INVALID_PLAYER_ID, 0x0, 0, 0, 0, null);
+            setBrowsedPlayerRspNative((byte)PLAYER_NOT_BROWSABLE, 0x0,
+                                                            0, 0, 0, null);
         }
     }
 
@@ -1785,9 +1837,24 @@ final class Avrcp {
     private void processPlayItem(int scope, long uid) {
         if (DEBUG) Log.v(TAG, "processPlayItem: scope: " + scope + " uid:" + uid);
         if (uid < 0) {
-            Log.i(TAG, "invalid uid");
+            Log.e(TAG, "invalid uid");
             playItemRspNative(DOES_NOT_EXIST);
-        } else if (scope == SCOPE_VIRTUAL_FILE_SYS) {
+            return;
+        }
+        if (mMediaPlayers.size() > 0) {
+            final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
+            while (rccIterator.hasNext()) {
+                final MediaPlayerInfo di = rccIterator.next();
+                if (di.GetPlayerFocus()) {
+                    if (!di.IsRemoteAddressable()) {
+                        playItemRspNative(INTERNAL_ERROR);
+                        Log.e(TAG, "Play Item fails: Player not remote addressable");
+                        return;
+                    }
+                }
+            }
+        }
+        if (scope == SCOPE_VIRTUAL_FILE_SYS) {
             if (mCurrentPath.equals(PATH_ROOT)) {
                 playItemRspNative(UID_A_DIRECTORY);
             } else if (mCurrentPath.equals(PATH_TITLES)) {
@@ -1799,7 +1866,7 @@ final class Avrcp {
                         MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" + uid,
                         null, null);
                     if ((cursor == null) || (cursor.getCount() == 0)) {
-                        Log.i(TAG, "No such track");
+                        Log.e(TAG, "No such track");
                         playItemRspNative(DOES_NOT_EXIST);
                     } else {
                         Log.i(TAG, "Play uid:" + uid);
@@ -1913,6 +1980,7 @@ final class Avrcp {
             mAudioManager.setRemoteControlClientPlayItem(mClientGeneration, uid, scope);
         } else {
             playItemRspNative(DOES_NOT_EXIST);
+            Log.e(TAG, "Play Item fails: Invalid scope");
         }
     }
 
@@ -1953,8 +2021,10 @@ final class Avrcp {
         if ((scope == SCOPE_VIRTUAL_FILE_SYS) || (scope == SCOPE_NOW_PLAYING)) {
             Cursor cursor = null;
             try {
-                if (mMediaUri == Uri.EMPTY) {
-                    Log.i(TAG, "Brwosed player not set, getItemAttr can not be processed");
+                if ((mMediaUri == Uri.EMPTY) || (mCurrentPath.equals(PATH_INVALID))) {
+                    Log.e(TAG, "Browsed player not set, getItemAttr can not be processed");
+                    getItemAttrRspNative((byte)0, attrs, textArray);
+                    return;
                 }
                 cursor = mContext.getContentResolver().query(
                      mMediaUri, mCursorCols,
@@ -2045,6 +2115,9 @@ final class Avrcp {
         mContext.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
         Log.v(TAG, "Device Address: " + mDevice.getAddress());
         mIsConnected = state;
+        mCurrentPath = PATH_INVALID;
+        mCurrentPathUid = null;
+        mMediaUri = Uri.EMPTY;
         Log.v(TAG, "mIsConnected: " + mIsConnected);
     }
 
@@ -2120,6 +2193,19 @@ final class Avrcp {
 
     private void processGetFolderItemsInternal(byte scope, int start, int end, int size,
                                                                     byte numAttr, int[] attrs) {
+
+        int status = OPERATION_SUCCESSFUL;
+        int numItems = 0;
+        int reqItems = (end - start) + 1;
+        int[] itemType = new int[MAX_BROWSE_ITEM_TO_SEND];
+        long[] uid = new long[MAX_BROWSE_ITEM_TO_SEND];
+        int[] type = new int[MAX_BROWSE_ITEM_TO_SEND];
+        byte[] playable = new byte[MAX_BROWSE_ITEM_TO_SEND];
+        String[] displayName = new String[MAX_BROWSE_ITEM_TO_SEND];
+        byte[] numAtt = new byte[MAX_BROWSE_ITEM_TO_SEND];
+        String[] attValues = new String[MAX_BROWSE_ITEM_TO_SEND * 7];
+        int[] attIds = new int[MAX_BROWSE_ITEM_TO_SEND * 7];
+
         if (DEBUG) Log.v(TAG, "processGetFolderItemsInternal");
 
         if (DEBUG) Log.v(TAG, "requested attribute count" + numAttr);
@@ -2128,18 +2214,6 @@ final class Avrcp {
         }
 
         if (scope == SCOPE_VIRTUAL_FILE_SYS) {
-            int status = OPERATION_SUCCESSFUL;
-            int numItems = 0;
-            int reqItems = (end - start) + 1;
-            int[] itemType = new int[MAX_BROWSE_ITEM_TO_SEND];
-            long[] uid = new long[MAX_BROWSE_ITEM_TO_SEND];
-            int[] type = new int[MAX_BROWSE_ITEM_TO_SEND];
-            byte[] playable = new byte[MAX_BROWSE_ITEM_TO_SEND];
-            String[] displayName = new String[MAX_BROWSE_ITEM_TO_SEND];
-            byte[] numAtt = new byte[MAX_BROWSE_ITEM_TO_SEND];
-            String[] attValues = new String[MAX_BROWSE_ITEM_TO_SEND * 7];
-            int[] attIds = new int[MAX_BROWSE_ITEM_TO_SEND * 7];
-
             // Item specific attribute's entry starts from index*7
             for (int count = 0; count < (MAX_BROWSE_ITEM_TO_SEND * 7); count++) {
                 attValues[count] = "";
@@ -2757,14 +2831,32 @@ final class Avrcp {
                                             type, playable, displayName, numAtt, attValues, attIds);
                         cursor.close();
                     } catch(Exception e) {
-                        Log.i(TAG, "Exception e" + e);
+                        Log.e(TAG, "Exception e" + e);
                         cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
                                         playable, displayName, numAtt, attValues, attIds);
                     }
                 }
+            } else {
+                getFolderItemsRspNative((byte)DOES_NOT_EXIST, numItems, itemType, uid, type,
+                                playable, displayName, numAtt, attValues, attIds);
+                Log.e(TAG, "GetFolderItems fail as player is not browsable");
             }
         } else if (scope == SCOPE_NOW_PLAYING) {
+            if (mMediaPlayers.size() > 0) {
+                final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
+                while (rccIterator.hasNext()) {
+                    final MediaPlayerInfo di = rccIterator.next();
+                    if (di.GetPlayerFocus()) {
+                        if (!di.IsRemoteAddressable()) {
+                            getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
+                                uid, type, playable, displayName, numAtt, attValues, attIds);
+                            Log.e(TAG, "GetFolderItems fails: addressed player is not browsable");
+                            return;
+                        }
+                    }
+                }
+            }
             mAudioManager.getRemoteControlClientNowPlayingEntries(mClientGeneration);
             mCachedRequest = new CachedRequest(start, end, numAttr, attrs);
         }
@@ -3736,6 +3828,7 @@ private void updateLocalPlayerSettings( byte[] data) {
         private byte mItemType;
         private Metadata mMetadata;
         private long mTrackNumber;
+        private boolean mIsRemoteAddressable;
 
         // need to have the featuremask elements as int instead of byte, else MSB would be lost. Later need to take only
         // 8 applicable bits from LSB.
@@ -3745,7 +3838,8 @@ private void updateLocalPlayerSettings( byte[] data) {
         public MediaPlayerInfo(short playerId, byte majorPlayerType,
                     int playerSubType, byte playState, short charsetId,
                     short displayableNameLength, byte[] displayableName,
-                    String playerPackageName, int[] featureMask ) {
+                    String playerPackageName, boolean isRemoteAddressable,
+                    int[] featureMask ) {
             mPlayerId = playerId;
             mMajorPlayerType = majorPlayerType;
             mPlayerSubType = playerSubType;
@@ -3759,6 +3853,7 @@ private void updateLocalPlayerSettings( byte[] data) {
             mFeatureMask = new int[FEATURE_BITMASK_FIELD_LENGTH];
             mMetadata = new Metadata();
             mTrackNumber = -1L;
+            mIsRemoteAddressable = isRemoteAddressable;
             for (int count = 0; count < FEATURE_BITMASK_FIELD_LENGTH; count ++) {
                 mFeatureMask[count] = featureMask[count];
             }
@@ -3835,6 +3930,23 @@ private void updateLocalPlayerSettings( byte[] data) {
 
         public boolean GetPlayerFocus() {
             return mIsFocussed;
+        }
+
+        public boolean IsPlayerBrowsable() {
+            if ((mFeatureMask[FEATURE_MASK_BROWSE_OFFSET] & FEATURE_MASK_BROWSE_MASK)
+                                                                                != 0) {
+                Log.v(TAG, "Player ID: " + mPlayerId + "is Browsable!");
+                return true;
+            } else {
+                Log.v(TAG, "Player ID: " + mPlayerId + "is not Browsable!");
+                return false;
+            }
+        }
+
+        /*This is set for the players which can be addressed by peer using setAddressedPlayer
+            command*/
+        public boolean IsRemoteAddressable() {
+            return mIsRemoteAddressable;
         }
 
         /*below apis are required while seraching for id by package name received from media players*/
