@@ -211,6 +211,7 @@ public class BluetoothMnsObexClient {
 
     public void handleRegistration(int masId, int notificationStatus){
         Log.d(TAG, "handleRegistration( " + masId + ", " + notificationStatus + ")");
+        synchronized (this) {
 
         if((mEmailObserverRegistered == false) && (mObserverRegistered == false) &&
            (notificationStatus == BluetoothMapAppParams.NOTIFICATION_STATUS_YES)) {
@@ -218,7 +219,6 @@ public class BluetoothMnsObexClient {
             connect();
         }
 
-        synchronized (this) {
         if(notificationStatus == BluetoothMapAppParams.NOTIFICATION_STATUS_NO) {
               if(masId == 1 && mEmailObserverRegistered ) {
                  mEmailObserver.unregisterObserver();
