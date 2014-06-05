@@ -691,7 +691,7 @@ public class BluetoothMapContent {
                       }
                    } else{
                          if (D) Log.d(TAG, "setSenderAddressing: " + address);
-                         e.setEmailSenderAddressing(address.trim());
+                         e.setEmailSenderAddressing(address);
                    }
                 }
                 return;
@@ -1961,23 +1961,22 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
 
         if (smsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_SMS;
-
             String where = setWhereFilter(folder, fi, ap);
+                Cursor c = mResolver.query(Sms.CONTENT_URI,
+                    SMS_PROJECTION, where, null, "date DESC");
 
-            Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
-
-            if (c != null) {
-                while (c.moveToNext()) {
-                    if (matchAddresses(c, fi, ap)) {
-                        printSms(c);
-                        e = element(c, fi, ap);
-                        bmList.add(e);
+                if (c != null) {
+                    while (c.moveToNext()) {
+                        if (matchAddresses(c, fi, ap)) {
+                            printSms(c);
+                            e = element(c, fi, ap);
+                            bmList.add(e);
+                        }
                     }
+                    c.close();
                 }
-                c.close();
             }
-        }
+
 
         if (mmsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_MMS;
