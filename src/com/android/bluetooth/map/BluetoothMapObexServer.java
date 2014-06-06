@@ -226,7 +226,6 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     private void onDisconnectInternal(final HeaderSet req, final HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnectInternal(): enter");
         if (V) logHeader(req);
-
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
         if (mCallback != null) {
             Message msg = Message.obtain(mCallback);
@@ -886,7 +885,6 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
 
         return ResponseCodes.OBEX_HTTP_OK;
     }
-
 
     private static final void logHeader(HeaderSet hs) {
         Log.v(TAG, "Dumping HeaderSet " + hs.toString());

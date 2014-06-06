@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.*;
 
+import com.google.android.mms.pdu.PduHeaders;
 
 public class BluetoothMapContent {
     private static final String TAG = "BluetoothMapContent";
@@ -458,8 +459,15 @@ public class BluetoothMapContent {
 
     private void setPriority(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
+        String priority = "no";
         if ((ap.getParameterMask() & MASK_PRIORITY) != 0) {
-            String priority = "no";
+            int pri = 0;
+            if (fi.msgType == FilterInfo.TYPE_MMS) {
+                pri = c.getInt(c.getColumnIndex(Mms.PRIORITY));
+            }
+            if (pri == PduHeaders.PRIORITY_HIGH) {
+                priority = "yes";
+            }
             if (D) Log.d(TAG, "setPriority: " + priority);
             e.setPriority(priority);
         }
@@ -1364,6 +1372,23 @@ public class BluetoothMapContent {
 
         return where;
     }
+    private String setWhereFilterPriority(BluetoothMapAppParams ap, FilterInfo fi) {
+        String where = "";
+        int pri = ap.getFilterPriority();
+        /*only MMS have priority info */
+        if(fi.msgType == FilterInfo.TYPE_MMS)
+        {
+            if(pri == 0x0002)
+            {
+                where += " AND " + Mms.PRIORITY + "<=" +
+                    Integer.toString(PduHeaders.PRIORITY_NORMAL);
+            }else if(pri == 0x0001) {
+                where += " AND " + Mms.PRIORITY + "=" +
+                    Integer.toString(PduHeaders.PRIORITY_HIGH);
+            }
+        }
+        return where;
+    }
 
     private String setWhereFilterRecipient(BluetoothMapAppParams ap,
         FilterInfo fi) {
@@ -1430,6 +1455,7 @@ public class BluetoothMapContent {
         where += setWhereFilterFolderType(folder, fi);
         where += setWhereFilterReadStatus(ap, fi);
         where += setWhereFilterPeriod(ap, fi);
+        where += setWhereFilterPriority(ap,fi);
         /* where += setWhereFilterOriginator(ap, fi); */
         /* where += setWhereFilterRecipient(ap, fi); */
 
@@ -1967,21 +1993,22 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
 
         if (smsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_SMS;
+            if(ap.getFilterPriority() != 1){ /*SMS cannot have high priority*/
+                String where = setWhereFilter(folder, fi, ap);
 
-            String where = setWhereFilter(folder, fi, ap);
+                Cursor c = mResolver.query(Sms.CONTENT_URI,
+                    SMS_PROJECTION, where, null, "date DESC");
 
-            Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
-
-            if (c != null) {
-                while (c.moveToNext()) {
-                    if (matchAddresses(c, fi, ap)) {
-                        printSms(c);
-                        e = element(c, fi, ap);
-                        bmList.add(e);
+                if (c != null) {
+                    while (c.moveToNext()) {
+                        if (matchAddresses(c, fi, ap)) {
+                            printSms(c);
+                            e = element(c, fi, ap);
+                            bmList.add(e);
+                        }
                     }
+                    c.close();
                 }
-                c.close();
             }
         }
 
@@ -2068,7 +2095,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
             where += " AND read=0 ";
             where += setWhereFilterPeriod(ap, fi);
             Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
+                    SMS_PROJECTION, where, null, "date DESC");
 
             if (c != null) {
                 cnt = c.getCount();
