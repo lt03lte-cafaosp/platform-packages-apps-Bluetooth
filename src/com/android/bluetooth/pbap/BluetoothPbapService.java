@@ -573,8 +573,8 @@ public class BluetoothPbapService extends Service {
                     intent.putExtra(BluetoothDevice.EXTRA_CLASS_NAME,
                                     BluetoothPbapReceiver.class.getName());
 
-                    sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
                     isWaitingAuthorization = true;
+                    sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
 
                     if (VERBOSE) Log.v(TAG, "waiting for authorization for connection from: "
                              + sRemoteDeviceName);
