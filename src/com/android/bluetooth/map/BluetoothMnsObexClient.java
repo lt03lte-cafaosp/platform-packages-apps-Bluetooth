@@ -336,6 +336,14 @@ public class BluetoothMnsObexClient {
         int responseCode = -1;
         HeaderSet request;
         int maxChunkSize, bytesToWrite, bytesWritten = 0;
+
+        ClientSession clientSession = mClientSession;
+
+        if ((!mConnected) || (clientSession == null)) {
+            Log.w(TAG, "sendEvent after disconnect:" + mConnected);
+            return responseCode;
+        }
+
         request = new HeaderSet();
         BluetoothMapAppParams appParams = new BluetoothMapAppParams();
         appParams.setMasInstanceId(masInstanceId);

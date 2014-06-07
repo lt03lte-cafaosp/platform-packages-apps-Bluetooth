@@ -109,6 +109,8 @@ public class BluetoothMapService extends ProfileService {
 
     private static final int DISCONNECT_MAP = 3;
 
+    private PowerManager.WakeLock mWakeLock = null;
+
     private BluetoothAdapter mAdapter;
 
     private BluetoothMapAuthenticator mAuth = null;
@@ -159,7 +161,7 @@ public class BluetoothMapService extends ProfileService {
     private final void closeService() {
        if (VERBOSE) Log.v(TAG, "closeService");
        mConnectionManager.closeAll();
-    }
+   }
 
     private final Handler mSessionStatusHandler = new Handler() {
         @Override
