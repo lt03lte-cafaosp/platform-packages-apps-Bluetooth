@@ -99,6 +99,10 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
             if (adapter != null && adapter.isEnabled()) {
                 context.startService(new Intent(context, BluetoothOppService.class));
             }
+        } else if (action.equals(BluetoothDevicePicker.ACTION_DEVICE_NOT_SELECTED)) {
+            if (V) Log.v(TAG, "ACTION_DEVICE_NOT_SELECTED");
+            BluetoothOppManager mOppManager = BluetoothOppManager.getInstance(context);
+            mOppManager.cleanUpSendingFileInfo();
         } else if (action.equals(BluetoothDevicePicker.ACTION_DEVICE_SELECTED)) {
             BluetoothOppManager mOppManager = BluetoothOppManager.getInstance(context);
 
