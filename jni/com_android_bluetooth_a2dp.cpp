@@ -295,6 +295,17 @@ static void allowConnectionNative(JNIEnv *env, jobject object, int is_valid) {
 
 }
 
+static void activateA2dpSinkNative(JNIEnv *env, jobject object, int is_enable) {
+
+    if (!sBluetoothA2dpInterface) {
+        ALOGE("sBluetoothA2dpInterface is NULL ");
+        return;
+    }
+
+    sBluetoothA2dpInterface->activate_sink(is_enable);
+
+}
+
 static void informAudioFocusStateNative(JNIEnv *env, jobject object, int state) {
 
     if (!sBluetoothA2dpInterface) {
@@ -357,6 +368,7 @@ static JNINativeMethod sMethods[] = {
     {"suspendA2dpNative", "()V", (void *) suspendA2dpNative},
     {"resumeA2dpNative", "()V", (void *) resumeA2dpNative},
     {"informAudioFocusStateNative", "(I)V", (void *) informAudioFocusStateNative},
+    {"activateA2dpSinkNative", "(I)V", (void *) activateA2dpSinkNative},
 };
 
 int register_com_android_bluetooth_a2dp(JNIEnv* env)
