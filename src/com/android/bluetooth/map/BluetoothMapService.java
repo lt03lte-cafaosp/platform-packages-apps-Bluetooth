@@ -108,6 +108,8 @@ public class BluetoothMapService extends ProfileService {
 
     private static final int DISCONNECT_MAP = 3;
 
+    private PowerManager.WakeLock mWakeLock = null;
+
     private BluetoothAdapter mAdapter;
 
     private BluetoothMapAuthenticator mAuth = null;
