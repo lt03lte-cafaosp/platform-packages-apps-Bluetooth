@@ -102,6 +102,7 @@ public class AdapterService extends Service {
     private static final int ADAPTER_SERVICE_TYPE=Service.START_STICKY;
 
     static {
+        System.load("/system/lib/libbluetooth_jni.so");
         classInitNative();
     }
     private PowerManager mPowerManager;
