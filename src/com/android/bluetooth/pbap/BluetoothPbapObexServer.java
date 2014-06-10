@@ -196,6 +196,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
 
     private int onConnectInternal(final HeaderSet request, HeaderSet reply) {
         if (V) logHeader(request);
+        notifyUpdateWakeLock();
         try {
             byte[] uuid = (byte[])request.getHeader(HeaderSet.TARGET);
             if (uuid == null) {
@@ -245,7 +246,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         if (D) Log.d(TAG, "onDisconnect(): enter");
         acquirePbapWakeLock();
         if (V) logHeader(req);
-
+        notifyUpdateWakeLock();
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
         if (mCallback != null) {
             Message msg = Message.obtain(mCallback);
@@ -259,7 +260,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
     @Override
     public int onAbort(HeaderSet request, HeaderSet reply) {
         if (D) Log.d(TAG, "onAbort(): enter.");
-        acquirePbapWakeLock();
+        notifyUpdateWakeLock();
         sIsAborted = true;
         releasePbapWakeLock();
         return ResponseCodes.OBEX_HTTP_OK;
@@ -269,7 +270,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
     public int onPut(final Operation op) {
         acquirePbapWakeLock();
         if (D) Log.d(TAG, "onPut(): not support PUT request.");
-        releasePbapWakeLock();
+        notifyUpdateWakeLock();
         return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
     }
 
@@ -288,7 +289,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             final boolean create) {
         if (V) logHeader(request);
         if (D) Log.d(TAG, "before setPath, mCurrentPath ==  " + mCurrentPath);
-
+        notifyUpdateWakeLock();
         String current_path_tmp = mCurrentPath;
         String tmp_path = null;
         try {
@@ -341,15 +342,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
 
     @Override
     public int onGet(Operation op) {
-        if (V) Log.v(TAG, "onGet");
-        acquirePbapWakeLock();
-        int retVal = onGetInternal(op);
-        if (V) Log.v(TAG, "exiting from onGet");
-        releasePbapWakeLock();
-        return retVal;
-    }
-
-    private int onGetInternal(Operation op) {
+        notifyUpdateWakeLock();
         sIsAborted = false;
         HeaderSet request = null;
         HeaderSet reply = new HeaderSet();
@@ -1142,6 +1135,12 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         result.append(".vcf\" name=\"");
         xmlEncode(name, result);
         result.append("\"/>");
+    }
+
+    private void notifyUpdateWakeLock() {
+        Message msg = Message.obtain(mCallback);
+        msg.what = BluetoothPbapService.MSG_ACQUIRE_WAKE_LOCK;
+        msg.sendToTarget();
     }
 
     public static final void logHeader(HeaderSet hs) {

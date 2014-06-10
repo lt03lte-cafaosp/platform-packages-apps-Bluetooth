@@ -60,6 +60,7 @@ public class BluetoothMnsObexClient {
     private ClientSession mClientSession;
     private boolean mConnected = false;
     BluetoothDevice mRemoteDevice;
+    private Handler mCallback = null;
     private BluetoothMapContentObserver mObserver;
     private BluetoothMapContentObserver mEmailObserver;
     private boolean mObserverRegistered = false;
