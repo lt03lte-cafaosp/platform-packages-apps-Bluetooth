@@ -239,7 +239,7 @@ public class BluetoothOppService extends Service {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
-                case BluetoothOppObexServerSession.DISCONNECT:
+                case BluetoothOppObexServerSession.CLOSE_SERVER_SESSION:
                     if ((mServerSession != null) && (mServerTransfer == null)) {
                         if (V) Log.v(TAG, "Server session cleanup");
                         mServerSession.stop();
