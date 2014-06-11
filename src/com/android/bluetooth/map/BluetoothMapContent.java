@@ -50,13 +50,13 @@ import com.android.emailcommon.provider.EmailContent.SyncColumns;
 
 import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
 import com.google.android.mms.pdu.CharacterSets;
+import com.google.android.mms.pdu.PduHeaders;
 import android.database.sqlite.SQLiteException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.*;
 import org.apache.commons.codec.net.QuotedPrintableCodec;
 import org.apache.commons.codec.DecoderException;
-
 
 public class BluetoothMapContent {
     private static final String TAG = "BluetoothMapContent";
@@ -817,7 +817,7 @@ public class BluetoothMapContent {
                       }
                    } else{
                          if (D) Log.d(TAG, "setSenderAddressing: " + address);
-                         e.setEmailSenderAddressing(address.trim());
+                         e.setEmailSenderAddressing(address);
                    }
                 }
                 return;
@@ -2209,7 +2209,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
             where += " AND read=0 ";
             where += setWhereFilterPeriod(ap, fi);
             Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
+                    SMS_PROJECTION, where, null, "date DESC");
 
             if (c != null) {
                 cnt = c.getCount();
