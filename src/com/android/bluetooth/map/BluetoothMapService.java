@@ -40,6 +40,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.ParcelUuid;
@@ -98,6 +99,10 @@ public class BluetoothMapService extends ProfileService {
 
     public static final int MSG_OBEX_AUTH_CHALL = 5003;
 
+    public static final int MSG_ACQUIRE_WAKE_LOCK = 5004;
+
+    public static final int MSG_RELEASE_WAKE_LOCK = 5005;
+
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
 
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
@@ -107,6 +112,8 @@ public class BluetoothMapService extends ProfileService {
     private static final int USER_TIMEOUT = 2;
 
     private static final int DISCONNECT_MAP = 3;
+
+   private PowerManager.WakeLock mWakeLock = null;
 
     private BluetoothAdapter mAdapter;
 
