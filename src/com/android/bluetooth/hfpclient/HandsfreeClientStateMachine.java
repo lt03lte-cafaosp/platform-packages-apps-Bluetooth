@@ -1466,7 +1466,7 @@ final class HandsfreeClientStateMachine extends StateMachine {
                     // Send AT+NREC to remote if supported by audio
                     if (HandsfreeClientHalConstants.HANDSFREECLIENT_NREC_SUPPORTED) {
                         sendATCmdNative(HandsfreeClientHalConstants.HANDSFREECLIENT_AT_CMD_NREC,
-                            1 , 0, null);
+                            1 , 0, "");
                     }
                     transitionTo(mConnected);
 
@@ -1613,7 +1613,7 @@ final class HandsfreeClientStateMachine extends StateMachine {
                     }
                     break;
                 case REDIAL:
-                    if (dialNative(null)) {
+                    if (dialNative("")) {
                         addQueuedAction(REDIAL);
                     } else {
                         Log.e(TAG, "ERROR: Cannot redial");
