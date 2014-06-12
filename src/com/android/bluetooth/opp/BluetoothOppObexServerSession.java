@@ -89,7 +89,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     private Handler mCallback = null;
     private Handler mPreTransferCallback = null;
 
-    public static final int DISCONNECT = 1;
+    public static final int CLOSE_SERVER_SESSION = 1;
 
     /* status when server is blocking for user/auto confirmation */
     private boolean mServerBlocking = true;
@@ -752,12 +752,6 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     @Override
     public void onDisconnect(HeaderSet req, HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnect");
-        if (mPreTransferCallback != null) {
-             Message msg = Message.obtain(mPreTransferCallback);
-             msg.what = DISCONNECT;
-             msg.obj = null;
-             msg.sendToTarget();
-        }
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
     }
 
@@ -781,6 +775,13 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             msg.what = BluetoothOppObexSession.MSG_SESSION_COMPLETE;
             msg.obj = mInfo;
             msg.sendToTarget();
+        }
+
+        if ((mInfo == null) && (mPreTransferCallback != null)) {
+             Message msg = Message.obtain(mPreTransferCallback);
+             msg.what = CLOSE_SERVER_SESSION;
+             msg.obj = mInfo;
+             msg.sendToTarget();
         }
     }
 
