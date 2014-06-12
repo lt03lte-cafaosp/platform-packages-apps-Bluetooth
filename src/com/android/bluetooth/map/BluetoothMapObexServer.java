@@ -165,6 +165,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     private int onConnectInternal(final HeaderSet request, HeaderSet reply) {
         if (D) Log.d(TAG, "onConnectInternal():");
         if (V) logHeader(request);
+        notifyUpdateWakeLock();
         try {
             byte[] uuid = (byte[])request.getHeader(HeaderSet.TARGET);
             if (uuid == null) {
@@ -226,7 +227,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     private void onDisconnectInternal(final HeaderSet req, final HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnectInternal(): enter");
         if (V) logHeader(req);
-
+        notifyUpdateWakeLock();
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
         if (mCallback != null) {
             Message msg = Message.obtain(mCallback);
@@ -239,21 +240,15 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     @Override
     public int onAbort(HeaderSet request, HeaderSet reply) {
         if (D) Log.d(TAG, "onAbort(): enter.");
+        notifyUpdateWakeLock();
         sIsAborted = true;
         return ResponseCodes.OBEX_HTTP_OK;
     }
 
     @Override
     public int onPut(final Operation op) {
-    if (D) Log.d(TAG, "onPut(): enter");
-        acquireMapLock();
-        int retVal = onPutInternal(op);
-        if (V) Log.v(TAG, "BluetoothMapObexServer: exiting from onPut");
-        releaseMapLock();
-        return retVal;
-    }
-    public int onPutInternal(final Operation op) {
-        if (D) Log.d(TAG, "onPutInternal(): enter");
+        if (D) Log.d(TAG, "onPut(): enter");
+        notifyUpdateWakeLock();
         HeaderSet request = null;
         String type, name;
         byte[] appParamRaw;
@@ -422,6 +417,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
             final boolean create) {
         String folderName;
         BluetoothMapFolderElement folder;
+        notifyUpdateWakeLock();
         try {
             folderName = (String)request.getHeader(HeaderSet.NAME);
         } catch (Exception e) {
@@ -478,14 +474,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
 
     @Override
     public int onGet(Operation op) {
-    if (V) Log.v(TAG, "BluetoothMapObexServer: onGet");
-        acquireMapLock();
-        int retVal = onGetInternal(op);
-        if (V) Log.v(TAG, "BluetoothMapObexServer: exiting from onGet");
-        releaseMapLock();
-        return retVal;
-    }
-    private int onGetInternal(Operation op) {
+        notifyUpdateWakeLock();
         sIsAborted = false;
         HeaderSet request;
         String type;
@@ -887,6 +876,11 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
         return ResponseCodes.OBEX_HTTP_OK;
     }
 
+    private void notifyUpdateWakeLock() {
+        Message msg = Message.obtain(mCallback);
+        msg.what = BluetoothMapService.MSG_ACQUIRE_WAKE_LOCK;
+        msg.sendToTarget();
+    }
 
     private static final void logHeader(HeaderSet hs) {
         Log.v(TAG, "Dumping HeaderSet " + hs.toString());

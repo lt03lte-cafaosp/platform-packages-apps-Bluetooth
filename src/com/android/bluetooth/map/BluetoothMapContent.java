@@ -458,9 +458,11 @@ public class BluetoothMapContent {
 
     private void setPriority(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
+     
         if ((ap.getParameterMask() & MASK_PRIORITY) != 0) {
             String priority = "no";
-            if (D) Log.d(TAG, "setPriority: " + priority);
+
+        if (D) Log.d(TAG, "setPriority: " + priority);
             e.setPriority(priority);
         }
     }
@@ -1967,21 +1969,22 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
 
         if (smsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_SMS;
+            if(ap.getFilterPriority() != 1){ /*SMS cannot have high priority*/
+                String where = setWhereFilter(folder, fi, ap);
 
-            String where = setWhereFilter(folder, fi, ap);
+                Cursor c = mResolver.query(Sms.CONTENT_URI,
+                    SMS_PROJECTION, where, null, "date DESC");
 
-            Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
-
-            if (c != null) {
-                while (c.moveToNext()) {
-                    if (matchAddresses(c, fi, ap)) {
-                        printSms(c);
-                        e = element(c, fi, ap);
-                        bmList.add(e);
+                if (c != null) {
+                    while (c.moveToNext()) {
+                        if (matchAddresses(c, fi, ap)) {
+                            printSms(c);
+                            e = element(c, fi, ap);
+                            bmList.add(e);
+                        }
                     }
+                    c.close();
                 }
-                c.close();
             }
         }
 
@@ -2068,7 +2071,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
             where += " AND read=0 ";
             where += setWhereFilterPeriod(ap, fi);
             Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
+                    SMS_PROJECTION, where, null, "date DESC");
 
             if (c != null) {
                 cnt = c.getCount();
