@@ -466,6 +466,15 @@ static jboolean sendLEConnUpdateNative(JNIEnv *env, jobject obj,  jbyteArray add
     return result;
 }
 
+static jboolean setLETxPowerLevelNative(JNIEnv *env, jobject obj, jint tx_power_level){
+    ALOGV("%s:",__FUNCTION__);
+    jboolean result = JNI_FALSE;
+    if (!qBluetoothInterface) return result;
+    int ret = qBluetoothInterface->le_set_tx_power_level(tx_power_level);
+    result = (ret == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+    return result;
+}
+
 static JNINativeMethod qMethods[] = {
     /* name, signature, funcPtr */
     {"classInitNative", "()V", (void *) classInitNative},
@@ -482,6 +491,7 @@ static JNINativeMethod qMethods[] = {
     {"btLeLppEnableRssiMonitorNative", "(Ljava/lang/String;Z)V", (void*)btLeLppEnableRssiMonitorNative},
     {"btLeLppReadRssiThresholdNative", "(Ljava/lang/String;)V", (void*)btLeLppReadRssiThresholdNative},
     {"sendLEConnUpdateNative","([BIIII)Z",(void*) sendLEConnUpdateNative},
+    {"setLETxPowerLevelNative","(I)Z",(void*) setLETxPowerLevelNative},
 };
 
 int register_com_android_bluetooth_btservice_QAdapterService(JNIEnv* env)

@@ -459,6 +459,17 @@ public class QAdapterService extends Service {
               Log.d(TAG,"sendLEConnUpdate() in Adapterservice:");
               return service.sendLEConnUpdate(device, interval_min, interval_max, latency, supervisionTimeout);
            }
+
+          public boolean setLETxPowerLevel(int txPowerLevel) {
+              if (!Utils.checkCaller()) {
+                  Log.w(TAG,"setLETxPowerLevel(): not allowed for non-active user");
+                  return false;
+              }
+              QAdapterService service = getService();
+              if (service == null) return false;
+              Log.d(TAG,"setLETxPowerLevel() in Adapterservice:");
+              return service.setLETxPowerLevel(txPowerLevel);
+           }
      }
 
 
@@ -657,6 +668,14 @@ public class QAdapterService extends Service {
          return sendLEConnUpdateNative(addr, interval_min, interval_max, latency, supervisionTimeout);
       }
 
+     boolean setLETxPowerLevel(int txPowerLevel){
+         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+
+         debugLog("in AdapterService, calling the native fn for setLETxPowerLevel::txPowerLevel"+txPowerLevel);
+
+         return setLETxPowerLevelNative(txPowerLevel);
+      }
+
 
      private static final class LeExtendedScanSession {
          public final int mScanToken;
@@ -699,6 +718,8 @@ public class QAdapterService extends Service {
 
     private native boolean sendLEConnUpdateNative(byte[] address, int interval_min,
             int interval_max, int latency, int supervisionTimeout);
+
+    private native boolean setLETxPowerLevelNative(int txPowerLevel);
 
 
     protected void finalize() {
