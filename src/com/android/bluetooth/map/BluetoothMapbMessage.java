@@ -419,17 +419,24 @@ public abstract class BluetoothMapbMessage {
         }
 
         public String getStringTerminator(String terminator) {
-           StringBuilder dataStr= new StringBuilder();
-           String lineCur = getLineTerminator();
-           while( lineCur != null && (!lineCur.equals(terminator)))
-           {
-               dataStr.append(lineCur);
-               if(! lineCur.equals("\r\n")) {
-                  dataStr.append("\r\n");
-               }
-               lineCur = getLineTerminator();
+            StringBuilder dataStr= new StringBuilder();
+            String str = null;
+            String lineCur = getLineTerminator();
+            while( lineCur != null)
+            {
+                dataStr.append(lineCur);
+                if(! lineCur.equals("\r\n")) {
+                   dataStr.append("\r\n");
+                }
+                lineCur = getLineTerminator();
            }
-           return dataStr.toString();
+
+           str = dataStr.toString();
+           if(terminator.equals("END:BBODY"))
+              str = str.substring(0,str.lastIndexOf("END:MSG"));
+           else
+              str = str.substring(0,str.lastIndexOf(terminator));
+           return str;
         }
     };
 
@@ -711,6 +718,7 @@ public abstract class BluetoothMapbMessage {
                     messages[i] = messages[i].trim();
                     parseMsgPart(messages[i]);
                 }
+                return;
             }
             line = reader.getLineEnforce();
         }
