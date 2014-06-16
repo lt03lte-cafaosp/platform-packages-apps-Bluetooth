@@ -814,6 +814,7 @@ public class BluetoothMapService extends ProfileService {
                       mConnectionManager.addToMapClientList(mRemoteDevice.getAddress(), mMasId);
 
                       mConnectionManager.setWaitingForConfirmation(mMasId);
+                      isWaitingAuthorization = true;
                       Intent intent = new
                           Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
                       intent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
@@ -821,7 +822,6 @@ public class BluetoothMapService extends ProfileService {
                                       BluetoothDevice.REQUEST_TYPE_MESSAGE_ACCESS);
                       intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
                       sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
-                      isWaitingAuthorization = true;
 
                       if (DEBUG) Log.d(TAG, "waiting for authorization for connection from: "
                               + sRemoteDeviceName);
