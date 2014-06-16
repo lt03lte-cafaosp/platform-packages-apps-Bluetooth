@@ -823,6 +823,11 @@ final class Avrcp {
             mCurrentPosMs = getPlayPosition();
         }
 
+        if ((state == RemoteControlClient.PLAYSTATE_PLAYING) && (mCurrentPlayState != state)) {
+            mPlayStartTimeMs = SystemClock.elapsedRealtime();
+            Log.d(TAG, "Update mPlayStartTimeMs to " + mPlayStartTimeMs);
+        }
+
         mCurrentPlayState = state;
 
         if (mMediaPlayers.size() > 0) {
@@ -847,11 +852,14 @@ final class Avrcp {
             }
         }
 
-        if (currentPosMs != RemoteControlClient.PLAYBACK_POSITION_INVALID) {
-            mCurrentPosMs = currentPosMs;
-        }
-        if (state == RemoteControlClient.PLAYSTATE_PLAYING) {
-            mPlayStartTimeMs = SystemClock.elapsedRealtime();
+        if (!(RemoteControlClient.PLAYSTATE_PLAYING == mCurrentPlayState &&
+              mCurrentPlayState == state && mCurrentPosMs == currentPosMs)) {
+            if (currentPosMs != RemoteControlClient.PLAYBACK_POSITION_INVALID) {
+                mCurrentPosMs = currentPosMs;
+                mPlayStartTimeMs = SystemClock.elapsedRealtime();
+                Log.d(TAG, "Update mPlayStartTimeMs: " + mPlayStartTimeMs + " mCurrentPosMs: "
+                                                                                + mCurrentPosMs);
+            }
         }
 
         boolean newPosValid = (mCurrentPosMs !=
@@ -1338,7 +1346,12 @@ final class Avrcp {
                 songPosition = mCurrentPosMs;
             }
         }
-        if (DEBUG) Log.v(TAG, "position=" + songPosition);
+        if (DEBUG) Log.v(TAG, "position = " + songPosition);
+        if (DEBUG) Log.v(TAG, "song length = " + mSongLengthMs);
+        if ((mSongLengthMs != 0) && (songPosition > mSongLengthMs)) {
+            songPosition = songPosition % mSongLengthMs;
+            if (DEBUG) Log.v(TAG, "revised position = " + songPosition);
+        }
         return songPosition;
     }
 
