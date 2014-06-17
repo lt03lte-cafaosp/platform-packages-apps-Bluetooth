@@ -18,6 +18,7 @@
 package com.android.bluetooth.btservice;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.QBluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothMasInstance;
@@ -504,12 +505,30 @@ final class RemoteDevices {
             return;
         }
 
+        int state = mAdapterService.getState();
+
+        Log.e(TAG, "state" + state + "newState" + newState);
+
         Intent intent = null;
         if (newState == AbstractionLayer.BT_ACL_STATE_CONNECTED) {
-            intent = new Intent(BluetoothDevice.ACTION_ACL_CONNECTED);
+            if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_TURNING_ON) {
+                intent = new Intent(BluetoothDevice.ACTION_ACL_CONNECTED);
+            } else if (state == QBluetoothAdapter.STATE_BLE_ON || state == QBluetoothAdapter.STATE_BLE_TURNING_ON) {
+                intent = new Intent(QBluetoothAdapter.ACTION_BLE_ACL_CONNECTED);
+            }
             debugLog("aclStateChangeCallback: State:Connected to Device:" + device);
         } else {
-            intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+            if (device.getBondState() == BluetoothDevice.BOND_BONDING) {
+                /*Broadcasting PAIRING_CANCEL intent as well in this case*/
+                intent = new Intent(BluetoothDevice.ACTION_PAIRING_CANCEL);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+                mAdapterService.sendBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM);
+            }
+            if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_TURNING_OFF) {
+                intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+            } else if (state == QBluetoothAdapter.STATE_BLE_ON || state == QBluetoothAdapter.STATE_BLE_TURNING_OFF) {
+                intent = new Intent(QBluetoothAdapter.ACTION_BLE_ACL_DISCONNECTED);
+            }
             debugLog("aclStateChangeCallback: State:DisConnected to Device:" + device);
         }
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);

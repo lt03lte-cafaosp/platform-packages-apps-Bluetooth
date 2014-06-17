@@ -17,6 +17,7 @@
 package com.android.bluetooth.btservice;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.QBluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
@@ -43,6 +44,7 @@ class AdapterProperties {
     private byte[] mAddress;
     private int mBluetoothClass;
     private int mScanMode;
+    private int mScanModeBle = BluetoothAdapter.SCAN_MODE_NONE;
     private int mDiscoverableTimeout;
     private ParcelUuid[] mUuids;
     private CopyOnWriteArrayList<BluetoothDevice> mBondedDevices = new CopyOnWriteArrayList<BluetoothDevice>();
@@ -525,20 +527,23 @@ class AdapterProperties {
                     /* mDiscoverableTimeout is part of the
                        adapterPropertyChangedCallback received before
                        onBluetoothReady */
-                    switch (mScanMode) {
-                        case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
-                            if (mDiscoverableTimeout != 0)
-                                setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
-                            else
-                                setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
-                            break;
-                        case BluetoothAdapter.SCAN_MODE_NONE:
-                        case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
-                        default:
+                if (mScanModeBle != BluetoothAdapter.SCAN_MODE_NONE)
+                    mScanMode = mScanModeBle;
+
+                switch (mScanMode) {
+                    case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
+                        if (mDiscoverableTimeout != 0)
                             setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
-                    }
-                    /* though not always required, this keeps NV up-to date on first-boot after flash */
-                    setDiscoverableTimeout(mDiscoverableTimeout);
+                        else
+                            setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+                        break;
+                    case BluetoothAdapter.SCAN_MODE_NONE:
+                    case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
+                    default:
+                         setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
+                }
+                /* though not always required, this keeps NV up-to date on first-boot after flash */
+                setDiscoverableTimeout(mDiscoverableTimeout);
             }
         }
     }
@@ -546,6 +551,7 @@ class AdapterProperties {
     private boolean mBluetoothDisabling=false;
 
     void onBluetoothDisable() {
+        //sequence: ON->BLE_ON
         // When BT disable is invoked, set the scan_mode to NONE
         // so no incoming connections are possible
 
@@ -553,11 +559,24 @@ class AdapterProperties {
         //continue with disable sequence
         debugLog("onBluetoothDisable()");
         mBluetoothDisabling = true;
-
         if (getState() == BluetoothAdapter.STATE_TURNING_OFF) {
-           switch (mScanMode) {
-               case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
-                   if (mDiscoverableTimeout != 0)
+            mScanModeBle = mScanMode;
+            setScanMode(AbstractionLayer.BT_SCAN_MODE_NONE);
+        }
+    }
+
+    void onBleDisable() {
+       /*Complete OFF cases, sequence BLE_ON->OFF
+       set the scan mode with the previous scan mode value
+       */
+       debugLog("onBleDisable()");
+
+       if (getState() == QBluetoothAdapter.STATE_BLE_TURNING_OFF) {
+            mScanMode = mScanModeBle;
+            mScanModeBle = BluetoothAdapter.SCAN_MODE_NONE;
+            switch (mScanMode) {
+                case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
+                    if (mDiscoverableTimeout != 0)
                        setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
                    else
                        setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
@@ -566,9 +585,11 @@ class AdapterProperties {
                case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
                default:
                    setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
-           }
+            }
+
         }
     }
+
     void discoveryStateChangeCallback(int state) {
         infoLog("Callback:discoveryStateChangeCallback with state:" + state + " disc: " + mDiscovering);
         synchronized (mObject) {

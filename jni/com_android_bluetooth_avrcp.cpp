@@ -79,7 +79,11 @@ static void btavrcp_remote_features_callback(bt_bdaddr_t* bd_addr, btrc_remote_f
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getRcFeatures, addr, (jint)features);
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getRcFeatures, addr, (jint)features);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -92,7 +96,11 @@ static void btavrcp_get_play_status_callback() {
         return;
     }
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getPlayStatus);
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getPlayStatus);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -102,7 +110,13 @@ static void btavrcp_get_player_seeting_value_callback(btrc_player_attr_t player_
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-    sCallbackEnv->CallVoidMethod(mCallbacksObj ,method_onListPlayerAttributeValues , (jbyte)player_att );
+
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj ,method_onListPlayerAttributeValues,
+                                                    (jbyte)player_att);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -112,7 +126,12 @@ static void btavrcp_get_player_attribute_id_callback() {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-    sCallbackEnv->CallVoidMethod(mCallbacksObj,method_onListPlayerAttributeRequest );
+
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj,method_onListPlayerAttributeRequest);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -131,8 +150,14 @@ static void btavrcp_getcurrent_player_app_setting_values( uint8_t num_attr,
         return;
     }
     sCallbackEnv->SetIntArrayRegion(attrs, 0, num_attr, (jint *)p_attrs);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj,method_onGetPlayerAttributeValues,
-                                                              (jbyte)num_attr,attrs );
+
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj,method_onGetPlayerAttributeValues,
+                                                              (jbyte)num_attr,attrs);
+    }
+    else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(attrs);
 }
@@ -160,8 +185,12 @@ static void btavrcp_set_playerapp_setting_value_callback(btrc_player_settings_t 
         return;
     }
     sCallbackEnv->SetByteArrayRegion(attrs_value, 0, attr->num_attr, (jbyte *)attr->attr_values);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_setPlayerAppSetting, (jbyte)attr->num_attr,
-                                                                            attrs_ids ,attrs_value );
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_setPlayerAppSetting,
+                            (jbyte)attr->num_attr ,attrs_ids ,attrs_value);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     sCallbackEnv->DeleteLocalRef(attrs_ids);
     sCallbackEnv->DeleteLocalRef(attrs_value);
 }
@@ -181,7 +210,12 @@ static void btavrcp_getPlayer_app_attribute_text(uint8_t num , btrc_player_attr_
         return;
     }
     sCallbackEnv->SetByteArrayRegion(attrs, 0, num, (jbyte *)att);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getplayerattribute_text,(jbyte) num ,attrs );
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getplayerattribute_text,
+                                                    (jbyte) num ,attrs);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     sCallbackEnv->DeleteLocalRef(attrs);
 }
 
@@ -200,8 +234,12 @@ static void btavrcp_getPlayer_app_value_text(uint8_t attr_id , uint8_t num_val ,
         return;
     }
     sCallbackEnv->SetByteArrayRegion(Attr_Value, 0, num_val, (jbyte *)value);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getplayervalue_text,(jbyte) attr_id,
-                                                                  (jbyte) num_val , Attr_Value );
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getplayervalue_text,(jbyte) attr_id,
+                                                              (jbyte) num_val , Attr_Value);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     sCallbackEnv->DeleteLocalRef(Attr_Value);
 }
 
@@ -221,7 +259,12 @@ static void btavrcp_get_element_attr_callback(uint8_t num_attr, btrc_media_attr_
         return;
     }
     sCallbackEnv->SetIntArrayRegion(attrs, 0, num_attr, (jint *)p_attrs);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getElementAttr, (jbyte)num_attr, attrs);
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getElementAttr, (jbyte)num_attr, attrs);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(attrs);
 }
@@ -233,9 +276,12 @@ static void btavrcp_register_notification_callback(btrc_event_id_t event_id, uin
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_registerNotification,
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_registerNotification,
                                  (jint)event_id, (jint)param);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -246,9 +292,13 @@ static void btavrcp_volume_change_callback(uint8_t volume, uint8_t ctype) {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_volumeChangeCallback, (jint)volume,
+                                                     (jint)ctype);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_volumeChangeCallback, (jint)volume,
-                                                                             (jint)ctype);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -285,8 +335,13 @@ static void btavrcp_get_folder_items_callback(btrc_browse_folderitem_t scope ,
     ALOGI("end entry: %d", end);
     ALOGI("size: %d", size);
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getFolderItems, (jbyte)scope,
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getFolderItems, (jbyte)scope,
                                                     start, end, size, num_attr, attrs);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(attrs);
 }
@@ -298,9 +353,13 @@ static void btavrcp_passthrough_command_callback(int id, int pressed) {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handlePassthroughCmd, (jint)id,
+                                                  (jint)pressed);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handlePassthroughCmd, (jint)id,
-                                                                             (jint)pressed);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -312,9 +371,13 @@ static void btavrcp_passthrough_response_callback(int id, int pressed) {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handlePassthroughRsp, (jint)id,
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handlePassthroughRsp, (jint)id,
                                                                              (jint)pressed);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -327,7 +390,11 @@ static void btavrcp_set_addressed_player_callback(uint32_t player_id) {
         return;
     }
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_setAddressedPlayer, (jint)player_id);
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_setAddressedPlayer, (jint)player_id);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
 
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
@@ -340,9 +407,11 @@ static void btavrcp_set_browsed_player_callback(uint32_t player_id) {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_setBrowsedPlayer, (jint)player_id);
-
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_setBrowsedPlayer, (jint)player_id);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -354,9 +423,12 @@ static void btavrcp_change_path_callback(uint8_t direction, uint64_t uid) {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_changePath, (jbyte)direction, (jlong)uid);
-
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_changePath, (jbyte)direction,
+                                                    (jlong)uid);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -368,8 +440,11 @@ static void btavrcp_play_item_callback(uint8_t scope, uint64_t uid) {
         ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
         return;
     }
-
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_playItem, (jbyte)scope, (jlong)uid);
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_playItem, (jbyte)scope, (jlong)uid);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
 
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
@@ -397,8 +472,13 @@ static void btavrcp_get_item_attr_callback(uint8_t scope, uint64_t uid,
         return;
     }
     sCallbackEnv->SetIntArrayRegion(attrs, 0, num_attr, (jint *)p_attrs);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getItemAttr, (jbyte)scope, (jlong)uid,
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getItemAttr, (jbyte)scope, (jlong)uid,
                                                                         (jbyte)num_attr, attrs);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(attrs);
 }
@@ -422,8 +502,13 @@ static void btavrcp_connection_state_callback(int state, bt_bdaddr_t* bd_addr) {
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onConnectionStateChanged, (jint) state,
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onConnectionStateChanged, (jint) state,
                                  addr);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
