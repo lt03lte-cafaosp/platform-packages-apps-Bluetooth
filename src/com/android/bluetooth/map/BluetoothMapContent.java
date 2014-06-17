@@ -54,9 +54,7 @@ import android.database.sqlite.SQLiteException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.*;
-import org.apache.commons.codec.net.QuotedPrintableCodec;
-import org.apache.commons.codec.DecoderException;
-
+import com.google.android.mms.pdu.PduHeaders;
 
 public class BluetoothMapContent {
     private static final String TAG = "BluetoothMapContent";
@@ -462,7 +460,7 @@ public class BluetoothMapContent {
         }
     }
 
-    public static String decodeEncodedWord(String checkEncoded) {
+    /*public static String decodeEncodedWord(String checkEncoded) {
         if (checkEncoded != null && (checkEncoded.contains("=?") == false)) {
             if(V) Log.v(TAG, " Decode NotRequired" + checkEncoded);
             return checkEncoded;
@@ -499,7 +497,7 @@ public class BluetoothMapContent {
             return checkEncoded;
          }
          return decoded;
-    }
+    }*/
 
     private void setProtected(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
@@ -822,7 +820,7 @@ public class BluetoothMapContent {
                             e.setEmailSenderAddressing(address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
                          } else {
                             if (D) Log.d(TAG, "setSenderAddressing: " + address);
-                            e.setEmailSenderAddressing(address.trim());
+                            e.setEmailSenderAddressing(address);
                          }
                    }
                 }
@@ -853,21 +851,6 @@ public class BluetoothMapContent {
                 int displayNameIndex = c.getColumnIndex(MessageColumns.DISPLAY_NAME);
                 if (D) Log.d(TAG, "setSenderName: " +c.getString(displayNameIndex));
                 name = c.getString(displayNameIndex);
-                if(name != null && name.contains("")){
-                   String[] senderStr = name.split("");
-                   if(senderStr !=null && senderStr.length > 0){
-                      if (V){
-                         Log.v(TAG, " ::Sender name split String 0:: " + senderStr[0]
-                                    + "::Sender name split String 1:: " + senderStr[1]);
-                      }
-                      name = senderStr[1];
-                   }
-                }
-                if (name != null) {
-                    name = decodeEncodedWord(name);
-                    name = name.trim();
-                }
-
             }
             if (D) Log.d(TAG, "setSenderName: " + name);
             e.setSenderName(name);
@@ -2127,23 +2110,22 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
 
         if (smsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_SMS;
+                String where = setWhereFilter(folder, fi, ap);
 
-            String where = setWhereFilter(folder, fi, ap);
+                Cursor c = mResolver.query(Sms.CONTENT_URI,
+                    SMS_PROJECTION, where, null, "date DESC");
 
-            Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
-
-            if (c != null) {
-                while (c.moveToNext()) {
-                    if (matchAddresses(c, fi, ap)) {
-                        printSms(c);
-                        e = element(c, fi, ap);
-                        bmList.add(e);
+                if (c != null) {
+                    while (c.moveToNext()) {
+                        if (matchAddresses(c, fi, ap)) {
+                            printSms(c);
+                            e = element(c, fi, ap);
+                            bmList.add(e);
+                        }
                     }
+                    c.close();
                 }
-                c.close();
             }
-        }
 
         if (mmsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_MMS;
@@ -2228,7 +2210,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
             where += " AND read=0 ";
             where += setWhereFilterPeriod(ap, fi);
             Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
+                    SMS_PROJECTION, where, null, "date DESC");
 
             if (c != null) {
                 cnt = c.getCount();
