@@ -193,6 +193,8 @@ final class A2dpStateMachine extends StateMachine {
         @Override
         public void enter() {
             log("Enter Disconnected: " + getCurrentMessage().what);
+            // Remove Timeout msg when moved to stable state
+            removeMessages(CONNECT_TIMEOUT);
         }
 
         @Override
@@ -331,6 +333,7 @@ final class A2dpStateMachine extends StateMachine {
                     deferMessage(message);
                     break;
                 case CONNECT_TIMEOUT:
+                    disconnectA2dpNative(getByteAddress(mTargetDevice));
                     onConnectionStateChanged(CONNECTION_STATE_DISCONNECTED,
                                              getByteAddress(mTargetDevice));
                     break;
@@ -353,7 +356,6 @@ final class A2dpStateMachine extends StateMachine {
                     log("Stack Event: " + event.type);
                     switch (event.type) {
                         case EVENT_TYPE_CONNECTION_STATE_CHANGED:
-                            removeMessages(CONNECT_TIMEOUT);
                             processConnectionEvent(event.valueInt, event.device);
                             break;
                         default:
@@ -524,6 +526,7 @@ final class A2dpStateMachine extends StateMachine {
         @Override
         public void enter() {
             log("Enter Connected: " + getCurrentMessage().what);
+            removeMessages(CONNECT_TIMEOUT);
             // Upon connected, the audio starts out as stopped
             broadcastAudioState(mCurrentDevice, BluetoothA2dp.STATE_NOT_PLAYING,
                                 BluetoothA2dp.STATE_PLAYING);
@@ -756,7 +759,7 @@ final class A2dpStateMachine extends StateMachine {
             }
 
             if (currentState == mConnected) {
-                if (mCurrentDevice.equals(device)) {
+                if ((mCurrentDevice != null) && mCurrentDevice.equals(device)) {
                     return BluetoothProfile.STATE_CONNECTED;
                 }
                 return BluetoothProfile.STATE_DISCONNECTED;

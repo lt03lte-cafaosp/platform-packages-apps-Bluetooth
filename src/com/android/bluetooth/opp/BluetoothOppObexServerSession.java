@@ -89,7 +89,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     private Handler mCallback = null;
     private Handler mPreTransferCallback = null;
 
-    public static final int DISCONNECT = 1;
+    public static final int CLOSE_SERVER_SESSION = 1;
 
     /* status when server is blocking for user/auto confirmation */
     private boolean mServerBlocking = true;
@@ -515,7 +515,8 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                 }
             }
         } else if (mAccepted == BluetoothShare.USER_CONFIRMATION_DENIED
-                || mAccepted == BluetoothShare.USER_CONFIRMATION_TIMEOUT) {
+                || mAccepted == BluetoothShare.USER_CONFIRMATION_TIMEOUT
+                || mAccepted == BluetoothShare.USER_BAD_REQUEST) {
             /* user actively deny the inbound transfer */
             /*
              * Note There is a question: what's next if user deny the first obj?
@@ -536,7 +537,10 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             // set status as local cancel
             status = BluetoothShare.STATUS_CANCELED;
             Constants.updateShareStatus(mContext, mInfo.mId, status);
-            obexResponse = ResponseCodes.OBEX_HTTP_FORBIDDEN;
+            if (mAccepted == BluetoothShare.USER_BAD_REQUEST)
+                obexResponse = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+            else
+                obexResponse = ResponseCodes.OBEX_HTTP_FORBIDDEN;
 
             if (mCallback != null) {
                 Message msg = Message.obtain(mCallback);
@@ -752,12 +756,6 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     @Override
     public void onDisconnect(HeaderSet req, HeaderSet resp) {
         if (D) Log.d(TAG, "onDisconnect");
-        if (mPreTransferCallback != null) {
-             Message msg = Message.obtain(mPreTransferCallback);
-             msg.what = DISCONNECT;
-             msg.obj = null;
-             msg.sendToTarget();
-        }
         resp.responseCode = ResponseCodes.OBEX_HTTP_OK;
     }
 
@@ -772,7 +770,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
     @Override
     public void onClose() {
-        if (V) Log.v(TAG, "release WakeLock");
+        if (D) Log.v(TAG, "release WakeLock");
         releaseWakeLocks();
 
         /* onClose could happen even before start() where mCallback is set */
@@ -781,6 +779,13 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             msg.what = BluetoothOppObexSession.MSG_SESSION_COMPLETE;
             msg.obj = mInfo;
             msg.sendToTarget();
+        }
+
+        if ((mInfo == null) && (mPreTransferCallback != null)) {
+             Message msg = Message.obtain(mPreTransferCallback);
+             msg.what = CLOSE_SERVER_SESSION;
+             msg.obj = mInfo;
+             msg.sendToTarget();
         }
     }
 
