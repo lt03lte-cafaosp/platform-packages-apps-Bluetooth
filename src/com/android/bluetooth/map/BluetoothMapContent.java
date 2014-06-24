@@ -50,13 +50,13 @@ import com.android.emailcommon.provider.EmailContent.SyncColumns;
 
 import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
 import com.google.android.mms.pdu.CharacterSets;
+import com.google.android.mms.pdu.PduHeaders;
 import android.database.sqlite.SQLiteException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.*;
 import org.apache.commons.codec.net.QuotedPrintableCodec;
 import org.apache.commons.codec.DecoderException;
-
 
 public class BluetoothMapContent {
     private static final String TAG = "BluetoothMapContent";
@@ -822,7 +822,7 @@ public class BluetoothMapContent {
                             e.setEmailSenderAddressing(address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
                          } else {
                             if (D) Log.d(TAG, "setSenderAddressing: " + address);
-                            e.setEmailSenderAddressing(address.trim());
+                            e.setEmailSenderAddressing(address);
                          }
                    }
                 }
@@ -2150,7 +2150,6 @@ public class BluetoothMapContent {
 
         if (smsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_SMS;
-
             String where = setWhereFilter(folder, fi, ap);
 
             Cursor c = mResolver.query(Sms.CONTENT_URI,
@@ -2251,7 +2250,7 @@ public class BluetoothMapContent {
             where += " AND read=0 ";
             where += setWhereFilterPeriod(ap, fi);
             Cursor c = mResolver.query(Sms.CONTENT_URI,
-                SMS_PROJECTION, where, null, "date DESC");
+                    SMS_PROJECTION, where, null, "date DESC");
 
             if (c != null) {
                 cnt = c.getCount();
