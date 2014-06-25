@@ -96,6 +96,7 @@ public class AdapterService extends Service {
     private static final int ADAPTER_SERVICE_TYPE=Service.START_STICKY;
 
     static {
+        System.load("/system/lib/libbluetooth_jni.so");
         classInitNative();
     }
     private PowerManager mPowerManager;
@@ -504,7 +505,7 @@ public class AdapterService extends Service {
     /**
      * The Binder implementation must be declared to be a static class, with
      * the AdapterService instance passed in the constructor. Furthermore,
-     * when the AdapterService shuts down, the reference to the AdapterService 
+     * when the AdapterService shuts down, the reference to the AdapterService
      * must be explicitly removed.
      *
      * Otherwise, a memory leak can occur from repeated starting/stopping the
