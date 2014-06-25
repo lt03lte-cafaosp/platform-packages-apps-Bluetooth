@@ -73,7 +73,6 @@ public class BluetoothMnsObexClient {
     public static final ParcelUuid BluetoothUuid_ObexMns =
             ParcelUuid.fromString("00001133-0000-1000-8000-00805F9B34FB");
 
-
     public BluetoothMnsObexClient(Context context, BluetoothDevice remoteDevice) {
         if (remoteDevice == null) {
             throw new NullPointerException("Obex transport is null");
@@ -211,6 +210,7 @@ public class BluetoothMnsObexClient {
 
     public void handleRegistration(int masId, int notificationStatus){
         Log.d(TAG, "handleRegistration( " + masId + ", " + notificationStatus + ")");
+        synchronized (this) {
 
         if((mEmailObserverRegistered == false) && (mObserverRegistered == false) &&
            (notificationStatus == BluetoothMapAppParams.NOTIFICATION_STATUS_YES)) {
@@ -218,7 +218,6 @@ public class BluetoothMnsObexClient {
             connect();
         }
 
-        synchronized (this) {
         if(notificationStatus == BluetoothMapAppParams.NOTIFICATION_STATUS_NO) {
               if(masId == 1 && mEmailObserverRegistered ) {
                  mEmailObserver.unregisterObserver();
