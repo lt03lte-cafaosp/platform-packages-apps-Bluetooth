@@ -589,7 +589,7 @@ public class BluetoothMapContent {
     private void setRecipientAddressing(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
         if ((ap.getParameterMask() & MASK_RECIPIENT_ADDRESSING) != 0) {
-            String address = null;
+            String address = "";
             if (fi.msgType == FilterInfo.TYPE_SMS) {
                 int msgType = c.getInt(c.getColumnIndex(Sms.TYPE));
                 if (msgType == 1) {
@@ -613,7 +613,7 @@ public class BluetoothMapContent {
     private void setRecipientName(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
         if ((ap.getParameterMask() & MASK_RECIPIENT_NAME) != 0) {
-            String name = null;
+            String name = "";
             if (fi.msgType == FilterInfo.TYPE_SMS) {
                 int msgType = c.getInt(c.getColumnIndex(Sms.TYPE));
                 if (msgType != 1) {
@@ -677,7 +677,7 @@ public class BluetoothMapContent {
     private void setSenderName(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
         if ((ap.getParameterMask() & MASK_SENDER_NAME) != 0) {
-            String name = null;
+            String name = "";
             if (fi.msgType == FilterInfo.TYPE_SMS) {
                 int msgType = c.getInt(c.getColumnIndex(Sms.TYPE));
                 if (msgType == 1) {
@@ -849,7 +849,7 @@ public class BluetoothMapContent {
     }
 
     private String getContactNameFromPhone(String phone) {
-        String name = null;
+        String name = "";
 
         Uri uri = Uri.withAppendedPath(PhoneLookup.CONTENT_FILTER_URI,
             Uri.encode(phone));
