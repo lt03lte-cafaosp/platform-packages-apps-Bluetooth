@@ -336,6 +336,7 @@ public class BluetoothMnsObexClient {
         int responseCode = -1;
         HeaderSet request;
         int maxChunkSize, bytesToWrite, bytesWritten = 0;
+
         request = new HeaderSet();
         BluetoothMapAppParams appParams = new BluetoothMapAppParams();
         appParams.setMasInstanceId(masInstanceId);
