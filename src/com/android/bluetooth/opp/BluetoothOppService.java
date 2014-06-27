@@ -1108,7 +1108,7 @@ public class BluetoothOppService extends Service {
                         mTransfer.start();
                         return;
                     } else if (nextBatch.mDirection == BluetoothShare.DIRECTION_INBOUND
-                            && mServerSession != null) {
+                            && mServerSession != null && nextBatch.getPendingShare() != null) {
                         // have to support pending inbound transfer
                         // if an outbound transfer and incoming socket happens together
                         if (V) Log.v(TAG, "Start pending inbound batch " + nextBatch.mId);
