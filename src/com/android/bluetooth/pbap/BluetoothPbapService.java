@@ -280,6 +280,7 @@ public class BluetoothPbapService extends Service {
         } else if (action.equals(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY)) {
             int requestType = intent.getIntExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                                            BluetoothDevice.REQUEST_TYPE_PHONEBOOK_ACCESS);
+            Log.d(TAG, "isWaitingAuthorization = %d, request type = %d" +  isWaitingAuthorization + requestType);
 
             if ((!isWaitingAuthorization) ||
                 (requestType != BluetoothDevice.REQUEST_TYPE_PHONEBOOK_ACCESS)) {
@@ -593,6 +594,7 @@ public class BluetoothPbapService extends Service {
                         sRemoteDeviceName = getString(R.string.defaultname);
                     }
 
+                    if (DEBUG) Log.d(TAG, "Sending intent for connection access request");
                     Intent intent = new
                             Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
                     intent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
@@ -603,8 +605,8 @@ public class BluetoothPbapService extends Service {
                     intent.putExtra(BluetoothDevice.EXTRA_CLASS_NAME,
                                     BluetoothPbapReceiver.class.getName());
 
-                    isWaitingAuthorization = true;
                     sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                    isWaitingAuthorization = true;
 
                     if (VERBOSE) Log.v(TAG, "waiting for authorization for connection from: "
                              + sRemoteDeviceName);
