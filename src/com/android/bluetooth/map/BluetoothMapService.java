@@ -118,7 +118,7 @@ public class BluetoothMapService extends ProfileService {
 
     private BluetoothSocket mConnSocket = null;
 
-    private BluetoothDevice mRemoteDevice = null;
+    private static BluetoothDevice mRemoteDevice = null;
 
     private static String sRemoteDeviceName = null;
 
@@ -204,7 +204,7 @@ public class BluetoothMapService extends ProfileService {
         return mState;
     }
 
-    public BluetoothDevice getRemoteDevice() {
+    public static BluetoothDevice getRemoteDevice() {
         return mRemoteDevice;
     }
     private void setState(int state) {
