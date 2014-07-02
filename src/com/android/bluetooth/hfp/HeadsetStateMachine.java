@@ -58,6 +58,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
+import android.telephony.MSimTelephonyManager;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
 import com.android.bluetooth.Utils;
@@ -180,6 +181,7 @@ final class HeadsetStateMachine extends StateMachine {
     private AudioManager mAudioManager;
     private AtPhonebook mPhonebook;
 
+    private MSimTelephonyManager mMSimTelephonyManager;
     private static Intent sVoiceCommandIntent;
 
     private HeadsetPhoneState mPhoneState;
@@ -250,6 +252,7 @@ final class HeadsetStateMachine extends StateMachine {
 
         mDialingOut = false;
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        mMSimTelephonyManager = MSimTelephonyManager.getDefault();
         mPhonebook = new AtPhonebook(mService, this);
         mPhoneState = new HeadsetPhoneState(context, this);
         mAudioState = BluetoothHeadset.STATE_AUDIO_DISCONNECTED;
@@ -1912,6 +1915,20 @@ final class HeadsetStateMachine extends StateMachine {
     private void processSubscriberNumberRequest() {
         if (mPhoneProxy != null) {
             try {
+                if (mMSimTelephonyManager.isMultiSimEnabled()) {
+                    for (int i = 0; i < mMSimTelephonyManager.getPhoneCount(); i++) {
+                        String number = mMSimTelephonyManager.getLine1Number(i);
+                        if (number != null) {
+                            atResponseStringNative("+CNUM: ,\"" + number + "\"," +
+                                           PhoneNumberUtils.toaFromString(number) + ",,4");
+                        } else {
+                            log("number is null");
+                        }
+                    }
+                    atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK, 0);
+                    return;
+                }
+
                 String number = mPhoneProxy.getSubscriberNumber();
                 if (number != null) {
                     atResponseStringNative("+CNUM: ,\"" + number + "\"," +
