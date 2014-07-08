@@ -1219,8 +1219,7 @@ public class AdapterService extends Service {
     }
 
      public void connectOtherProfile(BluetoothDevice device, int firstProfileStatus){
-        if ((mHandler.hasMessages(MESSAGE_CONNECT_OTHER_PROFILES) == false) &&
-            (isQuietModeEnabled()== false)){
+        if (mHandler.hasMessages(MESSAGE_CONNECT_OTHER_PROFILES) == false) {
             Message m = mHandler.obtainMessage(MESSAGE_CONNECT_OTHER_PROFILES);
             m.obj = device;
             m.arg1 = (int)firstProfileStatus;
