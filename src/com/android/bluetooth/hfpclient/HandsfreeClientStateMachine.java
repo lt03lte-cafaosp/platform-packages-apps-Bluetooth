@@ -852,6 +852,11 @@ final class HandsfreeClientStateMachine extends StateMachine {
             boolean outgoing) {
         Log.d(TAG, "queryCallsUpdate: " + id);
 
+        if (!mCalls.containsKey(id)) {
+            Log.d(TAG, "adding call " + id);
+            mCalls.put(id, new BluetoothHandsfreeClientCall(id, state, number, multiParty,
+                    outgoing));
+        }
         // should not happen
         if (mCallsUpdate == null) {
             return;
