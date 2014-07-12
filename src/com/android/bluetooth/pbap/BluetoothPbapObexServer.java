@@ -665,8 +665,8 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
                     if (D) Log.d(TAG, "currentValue=" + currentValue);
                     if (currentValue.equals(compareValue)) {
                         itemsFound++;
-                        if (currentValue.contains(","))
-                           currentValue = currentValue.substring(0, currentValue.lastIndexOf(','));
+                        if(!SIM)
+                            currentValue = currentValue.substring(0, currentValue.lastIndexOf(','));
                         writeVCardEntry(pos, currentValue,result);
                     }
                 }
@@ -677,10 +677,12 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         } else {
             if (searchValue != null) {
                 compareValue = searchValue.trim();
+                if (D) Log.d(TAG, "compareValue=" + compareValue);
             }
             for (int pos = listStartOffset; pos < listSize &&
                     itemsFound < requestSize; pos++) {
                 currentValue = nameList.get(pos);
+                if (D) Log.d(TAG, "currentValue=" + currentValue);
                 if (currentValue.contains(","))
                     currentValue = currentValue.substring(0, currentValue.lastIndexOf(','));
 

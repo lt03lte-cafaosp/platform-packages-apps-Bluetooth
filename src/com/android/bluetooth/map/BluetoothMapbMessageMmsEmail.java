@@ -370,7 +370,6 @@ public class BluetoothMapbMessageMmsEmail extends BluetoothMapbMessage {
             if(contentType != null)
                 sb.append("Content-Type: ").append(contentType).append("; boundary=").append(getBoundary()).append("\r\n");
         }
-        sb.append("\r\n"); // If no headers exists, we still need two CRLF, hence keep it out of the if above.
     }
 
     /**
