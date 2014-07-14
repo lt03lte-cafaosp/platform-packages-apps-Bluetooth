@@ -283,12 +283,12 @@ public class BluetoothMapSmsPdu {
         }
 
         private int gsmSubmitGetTpUdlOffset() {
-            switch(((data[0]  & 0xff) & (0x10 | 0x08))>>3) {
+            switch(((data[0]  & 0xff) & (0x08 | 0x04))>>2) {
             case 0: // Not TP-VP present
                 return gsmSubmitGetTpPidOffset() + 2;
             case 1: // TP-VP relative format
-            case 2: // TP-VP enhanced format
                 return gsmSubmitGetTpPidOffset() + 2 + 1;
+            case 2: // TP-VP enhanced format
             case 3: // TP-VP absolute format
                 break;
             }
