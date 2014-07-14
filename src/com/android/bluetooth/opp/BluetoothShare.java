@@ -264,6 +264,11 @@ public final class BluetoothShare implements BaseColumns {
     public static final int USER_CONFIRMATION_HANDOVER_CONFIRMED = 5;
 
     /**
+     * Bad incoming file request invalid URI or File Info
+     */
+    public static final int USER_BAD_REQUEST = 6;
+
+    /**
      * This transfer is visible and shows in the notifications while in progress
      * and after completion.
      */
