@@ -40,6 +40,7 @@ import android.provider.Telephony.Sms;
 import android.provider.Telephony.Threads;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.text.TextUtils;
 import android.text.format.Time;
 import android.util.TimeFormatException;
 import com.android.emailcommon.provider.EmailContent;
@@ -1020,7 +1021,9 @@ public class BluetoothMapContent {
 
     private String getContactNameFromPhone(String phone) {
         String name = null;
-
+        if (TextUtils.isEmpty(phone)) {
+           return name;
+        }
         Uri uri = Uri.withAppendedPath(PhoneLookup.CONTENT_FILTER_URI,
             Uri.encode(phone));
 
@@ -2314,6 +2317,9 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
     }
 
     private void setVCardFromPhoneNumber(BluetoothMapbMessage message, String phone, boolean incoming) {
+        if (TextUtils.isEmpty(phone)) {
+           return;
+        }
         String contactId = null, contactName = null;
         String[] phoneNumbers = null;
         String[] emailAddresses = null;
