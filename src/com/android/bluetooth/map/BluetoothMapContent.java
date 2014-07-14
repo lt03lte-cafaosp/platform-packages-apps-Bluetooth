@@ -2014,7 +2014,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
             Log.d(TAG, "where clause is = " + where);
             try {
                 Cursor c = mResolver.query(uriEmail,
-                EMAIL_PROJECTION, where, null, "timeStamp desc");
+                EMAIL_PROJECTION, where + " AND " + Message.FLAG_LOADED_SELECTION, null, "timeStamp desc");
                 if(c == null) {
                    Log.e(TAG, "Cursor is null. Returning from here");
                 }
