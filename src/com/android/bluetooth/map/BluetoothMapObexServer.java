@@ -582,13 +582,6 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
            Log.d(TAG, "Path not set. returning from here");
            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
         }
-        if(mMasId == 0 && (folderName.equalsIgnoreCase("root") ||
-                           folderName.equalsIgnoreCase("telecom") ||
-                           folderName.equalsIgnoreCase("msg"))) {
-           Log.e(TAG, "messagelisting for invalid folder");
-           return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
-        }
-
         if(appParams == null){
             appParams = new BluetoothMapAppParams();
             appParams.setMaxListCount(1024);
