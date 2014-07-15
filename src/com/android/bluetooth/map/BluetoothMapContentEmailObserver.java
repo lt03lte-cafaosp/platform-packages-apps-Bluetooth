@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -77,12 +76,12 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
     private static final boolean V = Log.isLoggable(BluetoothMapService.LOG_TAG, Log.VERBOSE) ? true : false;
 
     private HashMap<Long, EmailBox> mEmailBoxList = new HashMap<Long, EmailBox>();
-    private ConcurrentHashMap<Long, EmailMessage> mEmailList = new ConcurrentHashMap<Long, EmailMessage>();
+    private HashMap<Long, EmailMessage> mEmailList = new HashMap<Long, EmailMessage>();
     /** List of deleted message, do not notify */
-    private ConcurrentHashMap<Long, EmailMessage> mDeletedList = new ConcurrentHashMap<Long, EmailMessage>();
-    private ConcurrentHashMap<Long, EmailMessage> mEmailAddedList = new ConcurrentHashMap<Long, EmailMessage>();
+    private HashMap<Long, EmailMessage> mDeletedList = new HashMap<Long, EmailMessage>();
+    private HashMap<Long, EmailMessage> mEmailAddedList = new HashMap<Long, EmailMessage>();
     /** List of newly deleted message, notify */
-    private ConcurrentHashMap<Long, EmailMessage> mEmailDeletedList = new ConcurrentHashMap<Long, EmailMessage>();
+    private HashMap<Long, EmailMessage> mEmailDeletedList = new HashMap<Long, EmailMessage>();
     public static final int EMAIL_BOX_COLUMN_RECORD_ID = 0;
     public static final int EMAIL_BOX_COLUMN_DISPLAY_NAME = 1;
     public static final int EMAIL_BOX_COLUMN_ACCOUNT_KEY = 2;
@@ -313,8 +312,8 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
         if (crEmail != null) {
             if (crEmail.moveToFirst()) {
                 final HashMap<Long, EmailBox> boxList = mEmailBoxList;
-                ConcurrentHashMap<Long, EmailMessage> oldEmailList = mEmailList;
-                ConcurrentHashMap<Long, EmailMessage> emailList = new ConcurrentHashMap<Long, EmailMessage>();
+                HashMap<Long, EmailMessage> oldEmailList = mEmailList;
+                HashMap<Long, EmailMessage> emailList = new HashMap<Long, EmailMessage>();
                 do {
                     final long accountKey = crEmail.getLong(MSG_COL_ACCOUNT_KEY);
                     if (accountKey != mAccountKey) {
