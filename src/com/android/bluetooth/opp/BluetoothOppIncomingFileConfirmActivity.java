@@ -97,21 +97,9 @@ public class BluetoothOppIncomingFileConfirmActivity extends AlertActivity imple
         Intent intent = getIntent();
         mUri = intent.getData();
         mTransInfo = new BluetoothOppTransferInfo();
-
-        if (mUri != null) {
-            mTransInfo = BluetoothOppUtility.queryRecord(this, mUri);
-        } else {
-            Log.e(TAG, "uri= " + mUri);
-            mTransInfo = null;
-            mUri = BluetoothShare.CONTENT_URI;
-        }
-
+        mTransInfo = BluetoothOppUtility.queryRecord(this, mUri);
         if (mTransInfo == null) {
             if (V) Log.e(TAG, "Error: Can not get data from db");
-            mUpdateValues = new ContentValues();
-            mUpdateValues.put(BluetoothShare.USER_CONFIRMATION,
-                    BluetoothShare.USER_BAD_REQUEST);
-            this.getContentResolver().update(mUri, mUpdateValues, null, null);
             finish();
             return;
         }
@@ -191,9 +179,7 @@ public class BluetoothOppIncomingFileConfirmActivity extends AlertActivity imple
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        if (mTransInfo != null)
-            unregisterReceiver(mReceiver);
+        unregisterReceiver(mReceiver);
     }
 
     @Override
