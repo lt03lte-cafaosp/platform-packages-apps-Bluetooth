@@ -135,7 +135,6 @@ public class BluetoothPbapService extends Service {
 
     private static final int USER_CONFIRM_TIMEOUT_VALUE = 30000;
 
-
     // Ensure not conflict with Opp notification ID
     private static final int NOTIFICATION_ID_ACCESS = -1000001;
 
@@ -473,6 +472,7 @@ public class BluetoothPbapService extends Service {
         BluetoothPbapRfcommTransport transport = new BluetoothPbapRfcommTransport(mConnSocket);
         mServerSession = new ServerSession(transport, mPbapServer, mAuth);
         setState(BluetoothPbap.STATE_CONNECTED);
+
         if (VERBOSE) {
             Log.v(TAG, "startObexServerSession() success!");
         }
