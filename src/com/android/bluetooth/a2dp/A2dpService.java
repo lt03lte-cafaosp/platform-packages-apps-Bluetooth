@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2013-2014, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +27,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.ParcelUuid;
 import android.provider.Settings;
+import android.os.SystemProperties;
 import android.util.Log;
 import com.android.bluetooth.avrcp.Avrcp;
 import com.android.bluetooth.btservice.ProfileService;
@@ -61,8 +65,16 @@ public class A2dpService extends ProfileService {
     }
 
     protected boolean start() {
-        mAvrcp = Avrcp.make(this);
-        mStateMachine = A2dpStateMachine.make(this, this);
+        int maxConnections = 1;
+
+        int maxA2dpConnection =
+                SystemProperties.getInt("persist.bt.max.a2dp.connections", 1);
+        if (maxA2dpConnection == 2)
+                maxConnections = maxA2dpConnection;
+        log( "maxA2dpConnections = " + maxConnections);
+        mAvrcp = Avrcp.make(this, this, maxConnections);
+        mStateMachine = A2dpStateMachine.make(this, this,
+                maxConnections);
         setA2dpService(this);
         return true;
     }
@@ -209,8 +221,20 @@ public class A2dpService extends ProfileService {
         mAvrcp.setAbsoluteVolume(volume);
     }
 
-    public void setAvrcpAudioState(int state) {
-        mAvrcp.setA2dpAudioState(state);
+    public void setAvrcpAudioState(int state, BluetoothDevice device) {
+        mAvrcp.setA2dpAudioState(state, device);
+    }
+
+    public void setAvrcpDisconnectedDevice(BluetoothDevice device) {
+        mAvrcp.setA2dpDisconnectedDevice(device);
+    }
+
+    public void setAvrcpConnectedDevice(BluetoothDevice device) {
+        mAvrcp.setA2dpConnectedDevice(device);
+    }
+
+    public BluetoothDevice getA2dpPlayingDevice() {
+        return mStateMachine.getPlayingDevice();
     }
 
     synchronized boolean isA2dpPlaying(BluetoothDevice device) {

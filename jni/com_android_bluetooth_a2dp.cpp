@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2013-2014, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -163,7 +166,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 
-static void initNative(JNIEnv *env, jobject object) {
+static void initNative(JNIEnv *env, jobject object, jint maxA2dpConnections) {
     const bt_interface_t* btInf;
     bt_status_t status;
 
@@ -190,7 +193,8 @@ static void initNative(JNIEnv *env, jobject object) {
         return;
     }
 
-    if ( (status = sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks)) != BT_STATUS_SUCCESS) {
+    if ( (status = sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks,
+            maxA2dpConnections)) != BT_STATUS_SUCCESS) {
         ALOGE("Failed to initialize Bluetooth A2DP, status: %d", status);
         sBluetoothA2dpInterface = NULL;
         return;
@@ -260,24 +264,32 @@ static jboolean disconnectA2dpNative(JNIEnv *env, jobject object, jbyteArray add
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
 
-static void allowConnectionNative(JNIEnv *env, jobject object, int is_valid) {
+static void allowConnectionNative(JNIEnv *env, jobject object, int is_valid, jbyteArray address) {
 
+    jbyte *addr;
     if (!sBluetoothA2dpInterface) {
         ALOGE("sBluetoothA2dpInterface is NULL ");
         return;
     }
 
-    sBluetoothA2dpInterface->allow_connection(is_valid);
+    addr = env->GetByteArrayElements(address, NULL);
 
+    if (!addr) {
+        jniThrowIOException(env, EINVAL);
+        return ;
+    }
+
+    sBluetoothA2dpInterface->allow_connection(is_valid, (bt_bdaddr_t *)addr);
+    env->ReleaseByteArrayElements(address, addr, 0);
 }
 
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
-    {"initNative", "()V", (void *) initNative},
+    {"initNative", "(I)V", (void *) initNative},
     {"cleanupNative", "()V", (void *) cleanupNative},
     {"connectA2dpNative", "([B)Z", (void *) connectA2dpNative},
     {"disconnectA2dpNative", "([B)Z", (void *) disconnectA2dpNative},
-    {"allowConnectionNative", "(I)V", (void *) allowConnectionNative},
+    {"allowConnectionNative", "(I[B)V", (void *) allowConnectionNative},
 };
 
 int register_com_android_bluetooth_a2dp(JNIEnv* env)
