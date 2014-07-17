@@ -2381,12 +2381,12 @@ public class BluetoothMapContent {
         if (p != null)
            p.close();
 
-        // Bail out if we are unable to find a contact, based on the phone number
-        if(contactId == null) {
-            phoneNumbers = new String[1];
-            phoneNumbers[0] = phone;
-        }
-        else {
+        // Add only original sender's contact number in VCARD.
+        phoneNumbers = new String[1];
+        phoneNumbers[0] = phone;
+        if(contactId != null)  {
+            // Do not fetch and add all the contacts in vcard to avoid IOT issues with carkits
+            /*
             // Fetch all contact phone numbers
             p = mResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,
                 ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
@@ -2402,6 +2402,7 @@ public class BluetoothMapContent {
                 }
                 p.close();
             }
+            */
 
             // Fetch contact e-mail addresses
             p = mResolver.query(ContactsContract.CommonDataKinds.Email.CONTENT_URI, null,
