@@ -138,7 +138,7 @@ public class GattService extends ProfileService {
     private ServiceDeclaration getActiveDeclaration(int serverIf) {
         synchronized (mActiveServiceDeclarations) {
             if (mActiveServiceDeclarations.size() > 0)
-                return mServiceDeclarations.get(mServiceDeclarations.size() - 1);
+                return mActiveServiceDeclarations.get(serverIf);
         }
         return null;
     }
@@ -219,6 +219,7 @@ public class GattService extends ProfileService {
         mScanQueue.clear();
         mHandleMap.clear();
         mServiceDeclarations.clear();
+        mActiveServiceDeclarations.clear();
         mReliableQueue.clear();
         return true;
     }
@@ -1686,6 +1687,7 @@ public class GattService extends ProfileService {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         if (DBG) Log.d(TAG, "beginServiceDeclaration() - uuid=" + srvcUuid);
+        if (DBG) Log.d(TAG, "beginServiceDeclaration() - server_if=" + serverIf);
         ServiceDeclaration serviceDeclaration = addToActiveDeclaration(serverIf);
         serviceDeclaration.addService(srvcUuid, srvcType, srvcInstanceId, minHandles,
             advertisePreferred);
