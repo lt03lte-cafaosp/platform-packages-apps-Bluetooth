@@ -1164,39 +1164,32 @@ final class Avrcp {
     private void updateAddressedMediaPlayer(int playerId) {
         if (DEBUG) Log.v(TAG, "updateAddressedMediaPlayer");
         int previousAddressedPlayerId = mAddressedPlayerId;
-        boolean toNotify;
         if ((mAddressedPlayerChangedNT == NOTIFICATION_TYPE_INTERIM) && (mAddressedPlayerId != playerId)) {
             if (DEBUG) Log.v(TAG, "send AddressedMediaPlayer to stack: playerId" + playerId);
             mAddressedPlayerId = playerId;
             mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
             registerNotificationRspAddressedPlayerChangedNative(mAddressedPlayerChangedNT, mAddressedPlayerId);
-            toNotify = false;
+            if (previousAddressedPlayerId != 0) {
+                resetAndSendPlayerStatusReject();
+            }
         } else {
+            if (DEBUG) Log.v(TAG, "Do not reset notifications, ADDR_PLAYR_CHNGD not registered");
             mAddressedPlayerId = playerId;
-            toNotify = true;
-        }
-        if (previousAddressedPlayerId != 0) {
-            resetAndSendPlayerStatusReject(toNotify);
         }
     }
 
-    private void resetAndSendPlayerStatusReject(boolean toNotifyRemote) {
+    private void resetAndSendPlayerStatusReject() {
         if (DEBUG) Log.v(TAG, "resetAndSendPlayerStatusReject");
 
         if (mPlayStatusChangedNT == NOTIFICATION_TYPE_INTERIM) {
             if (DEBUG) Log.v(TAG, "send Play Status reject to stack");
             mPlayStatusChangedNT = NOTIFICATION_TYPE_REJECT;
-            if (toNotifyRemote) {
-                registerNotificationRspPlayStatusNative(mPlayStatusChangedNT,
-                                                            PLAYSTATUS_STOPPED);
-            }
+            registerNotificationRspPlayStatusNative(mPlayStatusChangedNT, PLAYSTATUS_STOPPED);
         }
         if (mPlayPosChangedNT == NOTIFICATION_TYPE_INTERIM) {
             if (DEBUG) Log.v(TAG, "send Play Position reject to stack");
             mPlayPosChangedNT = NOTIFICATION_TYPE_REJECT;
-            if (toNotifyRemote) {
-                registerNotificationRspPlayPosNative(mPlayPosChangedNT, -1);
-            }
+            registerNotificationRspPlayPosNative(mPlayPosChangedNT, -1);
             mHandler.removeMessages(MESSAGE_PLAY_INTERVAL_TIMEOUT);
         }
         if (mTrackChangedNT == NOTIFICATION_TYPE_INTERIM) {
@@ -1207,17 +1200,12 @@ final class Avrcp {
             for (int i = 0; i < TRACK_ID_SIZE; ++i) {
                 track[i] = (byte) (mTrackNumber >> (56 - 8 * i));
             }
-            if (toNotifyRemote) {
-                registerNotificationRspTrackChangeNative(mTrackChangedNT, track);
-            }
+            registerNotificationRspTrackChangeNative(mTrackChangedNT, track);
         }
         if (mNowPlayingContentChangedNT == NOTIFICATION_TYPE_INTERIM) {
             if (DEBUG) Log.v(TAG, "send Now playing changed reject to stack");
             mNowPlayingContentChangedNT = NOTIFICATION_TYPE_REJECT;
-            if (toNotifyRemote) {
-                registerNotificationRspNowPlayingContentChangedNative(
-                                                    mNowPlayingContentChangedNT);
-            }
+            registerNotificationRspNowPlayingContentChangedNative(mNowPlayingContentChangedNT);
         }
     }
 
