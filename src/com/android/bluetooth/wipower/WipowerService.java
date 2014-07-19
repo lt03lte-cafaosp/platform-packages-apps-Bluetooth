@@ -110,6 +110,12 @@ public class WipowerService extends Service
         return (ret==0) ? true : false;
     }
 
+    public boolean enablePowerApply(boolean enable, boolean on, boolean time_flag) {
+        Log.v(LOGTAG, "enablePowerApply: Calling Native enablei: " + enable + " on: " + on);
+        int ret = enablePowerApplyNative(enable, on, time_flag);
+        return (ret==0) ? true : false;
+    }
+
     public void registerCallback(IWipowerManagerCallback callback) {
         mCallbacks.register(callback);
     }
@@ -205,6 +211,18 @@ public class WipowerService extends Service
             return ret;
         }
 
+        public boolean enablePowerApply(boolean enable, boolean on, boolean time_flag) {
+            boolean ret = false;
+            Log.v(LOGTAG, "enablePowerApply: binder");
+            if (mService == null) {
+                Log.e(LOGTAG, "enableData:Service not found");
+            } else {
+                ret = mService.enablePowerApply(enable, on, time_flag);
+            }
+            return ret;
+        }
+
+
         public void registerCallback(IWipowerManagerCallback callback) {
             if (mService == null) {
                 Log.e(LOGTAG, "registerCallback:Service not found");
@@ -267,6 +285,8 @@ public class WipowerService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(LOGTAG, "onStart Command called!!");
+        Log.v(LOGTAG, "Calling InitNative");
+        initNative();
         //Make this restarable service by
         //Android app manager
         return START_STICKY;
@@ -350,5 +370,6 @@ public class WipowerService extends Service
    private native int getStateNative();
    private native int enableAlertNative(boolean enable);
    private native int enableDataNative(boolean enable);
+   private native int enablePowerApplyNative(boolean enable, boolean on, boolean time_flag);
 
 }

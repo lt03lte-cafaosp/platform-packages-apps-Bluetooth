@@ -284,6 +284,32 @@ static jint android_wipower_wipowerJNI_enableDataNative
     return 0;
 }
 
+/* native interface */
+static jint android_wipower_wipowerJNI_enablePowerApplyNative
+        (JNIEnv* env, jobject thiz, jboolean enable, jboolean on,
+            jboolean time_flag)
+{
+
+    ALOGD("%s->: enable: %x, on: %x time_flag %x", __func__, enable, on,
+          time_flag);
+
+    if (sWipowerInterface == NULL) {
+        ALOGE("No Interface initialized");
+        return JNI_FALSE;
+    }
+
+    int ret = sWipowerInterface->enable_power_apply(enable, on, time_flag);
+
+    if (ret != 0) {
+        ALOGE("%s: Failure", __func__);
+        return JNI_FALSE;
+    } else {
+        ALOGE("%s: Success", __func__);
+    }
+
+    return 0;
+}
+
 /*
  * JNI registration.
  */
@@ -313,6 +339,8 @@ static JNINativeMethod gMethods[] = {
         { "enableDataNative", "(Z)I",
             (void*)android_wipower_wipowerJNI_enableDataNative},
 
+        { "enablePowerApplyNative", "(ZZZ)I",
+            (void*)android_wipower_wipowerJNI_enablePowerApplyNative},
 };
 int register_android_hardware_wipower(JNIEnv* env)
 {
