@@ -21,6 +21,8 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 import android.os.ParcelUuid;
 import android.os.UserHandle;
 import android.util.Log;
@@ -58,15 +60,28 @@ class AdapterProperties {
     private boolean mDiscovering;
     private RemoteDevices mRemoteDevices;
     private BluetoothAdapter mAdapter;
+    private Context mContext;
 
     // Lock for all getters and setters.
     // If finer grained locking is needer, more locks
     // can be added here.
     private Object mObject = new Object();
 
+    private final BroadcastReceiver mBluetoothReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (Intent.ACTION_USER_SWITCHED.equals(action)) {
+                debugLog("USER_SWITCHED");
+                setScanMode(AbstractionLayer.BT_SCAN_MODE_NONE);
+            }
+        }
+    };
+
     public AdapterProperties(AdapterService service) {
         mService = service;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
+        mContext = mService;
     }
     public void init(RemoteDevices remoteDevices) {
         if (mProfileConnectionState ==null) {
@@ -75,6 +90,8 @@ class AdapterProperties {
             mProfileConnectionState.clear();
         }
         mRemoteDevices = remoteDevices;
+        IntentFilter filter = new IntentFilter(Intent.ACTION_USER_SWITCHED);
+        mContext.registerReceiver(mBluetoothReceiver, filter, null, null);
     }
 
     public void cleanup() {
@@ -86,6 +103,8 @@ class AdapterProperties {
         mService = null;
         if (!mBondedDevices.isEmpty())
             mBondedDevices.clear();
+        mContext.unregisterReceiver(mBluetoothReceiver);
+        mContext = null;
     }
 
     public Object Clone() throws CloneNotSupportedException {

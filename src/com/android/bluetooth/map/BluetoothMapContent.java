@@ -39,6 +39,7 @@ import android.provider.Telephony.Mms;
 import android.provider.Telephony.Sms;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.text.TextUtils;
 import android.text.format.Time;
 import android.util.TimeFormatException;
 import com.android.emailcommon.provider.EmailContent;
@@ -879,7 +880,9 @@ public class BluetoothMapContent {
 
     private String getContactNameFromPhone(String phone) {
         String name = null;
-
+        if (TextUtils.isEmpty(phone)) {
+           return name;
+        }
         Uri uri = Uri.withAppendedPath(PhoneLookup.CONTENT_FILTER_URI,
             Uri.encode(phone));
 
@@ -1864,7 +1867,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
             Log.d(TAG, "where clause is = " + where);
             try {
                 Cursor c = mResolver.query(uriEmail,
-                EMAIL_PROJECTION, where, null, "timeStamp desc");
+                EMAIL_PROJECTION, where + " AND " + Message.FLAG_LOADED_SELECTION, null, "timeStamp desc");
                 if(c == null) {
                    Log.e(TAG, "Cursor is null. Returning from here");
                 }
@@ -2164,6 +2167,9 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
     }
 
     private void setVCardFromPhoneNumber(BluetoothMapbMessage message, String phone, boolean incoming) {
+        if (TextUtils.isEmpty(phone)) {
+           return;
+        }
         String contactId = null, contactName = null;
         String[] phoneNumbers = null;
         String[] emailAddresses = null;
@@ -2185,12 +2191,12 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
         }
         p.close();
 
-        // Bail out if we are unable to find a contact, based on the phone number
-        if(contactId == null) {
-            phoneNumbers = new String[1];
-            phoneNumbers[0] = phone;
-        }
-        else {
+        // Add only original sender's contact number in VCARD.
+        phoneNumbers = new String[1];
+        phoneNumbers[0] = phone;
+        if(contactId != null)  {
+            // Do not fetch and add all the contacts in vcard to avoid IOT issues with carkits
+            /*
             // Fetch all contact phone numbers
             p = mResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,
                 ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
@@ -2206,6 +2212,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
                 }
                 p.close();
             }
+            */
 
             // Fetch contact e-mail addresses
             p = mResolver.query(ContactsContract.CommonDataKinds.Email.CONTENT_URI, null,
