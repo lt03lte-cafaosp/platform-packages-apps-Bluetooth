@@ -460,8 +460,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                 }
             }
         } else if (mAccepted == BluetoothShare.USER_CONFIRMATION_DENIED
-                || mAccepted == BluetoothShare.USER_CONFIRMATION_TIMEOUT
-                || mAccepted == BluetoothShare.USER_BAD_REQUEST) {
+                || mAccepted == BluetoothShare.USER_CONFIRMATION_TIMEOUT) {
             /* user actively deny the inbound transfer */
             /*
              * Note There is a question: what's next if user deny the first obj?
@@ -482,10 +481,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             // set status as local cancel
             status = BluetoothShare.STATUS_CANCELED;
             Constants.updateShareStatus(mContext, mInfo.mId, status);
-            if (mAccepted == BluetoothShare.USER_BAD_REQUEST)
-                obexResponse = ResponseCodes.OBEX_HTTP_BAD_REQUEST;
-            else
-                obexResponse = ResponseCodes.OBEX_HTTP_FORBIDDEN;
+            obexResponse = ResponseCodes.OBEX_HTTP_FORBIDDEN;
 
             Message msg = Message.obtain(mCallback);
             msg.what = BluetoothOppObexSession.MSG_SHARE_INTERRUPTED;
@@ -706,7 +702,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
     @Override
     public void onClose() {
-        if (D) Log.v(TAG, "release WakeLock");
+        if (V) Log.v(TAG, "release WakeLock");
         releaseWakeLocks();
 
         /* onClose could happen even before start() where mCallback is set */
