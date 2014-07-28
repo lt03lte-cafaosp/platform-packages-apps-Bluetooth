@@ -120,7 +120,7 @@ public class BluetoothMapFolderElement {
             for(i = offset; i<stopIndex; i++)
             {
                 xmlMsgElement.startTag(null, "folder");
-                xmlMsgElement.attribute("null", "name", subFolders.get(i).getName());
+                xmlMsgElement.attribute(null, "name", subFolders.get(i).getName());
                 xmlMsgElement.endTag(null, "folder");
             }
             xmlMsgElement.endTag(null, "folder-listing");
