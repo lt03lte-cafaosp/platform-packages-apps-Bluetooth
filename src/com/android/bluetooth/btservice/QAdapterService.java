@@ -101,6 +101,7 @@ public class QAdapterService extends Service {
     static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
 
     static {
+        System.load("/system/lib/libbluetooth_jni.so");
         classInitNative();
     }
 
