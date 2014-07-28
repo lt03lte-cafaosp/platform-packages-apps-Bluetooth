@@ -62,7 +62,7 @@ final class AdapterState extends StateMachine {
     static final int USER_TURN_OFF_DELAY_MS=500;
 
     //TODO: tune me
-    private static final int ENABLE_TIMEOUT_DELAY = 8000;
+    private static final int ENABLE_TIMEOUT_DELAY = 12000;
     private static final int DISABLE_TIMEOUT_DELAY = 8000;
     private static final int START_TIMEOUT_DELAY = 5000;
     private static final int STOP_TIMEOUT_DELAY = 5000;
@@ -336,8 +336,6 @@ final class AdapterState extends StateMachine {
                     mPendingCommandState.setTurningOn(false);
                     transitionTo(mOffState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
-                    errorLog("STOP_TIMEOUT:Killing the process to force a restart as part cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
                 case STOP_TIMEOUT:
                     if (DBG) Log.d(TAG,"CURRENT_STATE=PENDING, MESSAGE = STOP_TIMEOUT, isTurningOn=" + isTurningOn + ", isTurningOff=" + isTurningOff);
