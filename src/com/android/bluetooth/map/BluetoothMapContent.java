@@ -89,8 +89,13 @@ public class BluetoothMapContent {
     public static final int MMS_BCC = 0x81;
     public static final int MMS_CC = 0x82;
 
-   /* Type of Email address. From Telephony.java it must be one of PduHeaders.BCC, */
-   /* PduHeaders.CC, PduHeaders.FROM, PduHeaders.TO. These are from PduHeaders.java */
+    /* OMA-TS-MMS-ENC defined many types in X-Mms-Message-Type.
+       Only m-send-req (128) m-retrieve-conf (132), m-notification-ind (130)
+       are interested by user */
+    private static final String INTERESTED_MESSAGE_TYPE_CLAUSE =
+                         "( m_type = 128 OR m_type = 132 OR m_type = 130 )";
+
+   /* Type of Email address. */
     public static final int EMAIL_FROM = 0x89;
     public static final int EMAIL_TO = 0x97;
     public static final int EMAIL_BCC = 0x81;
@@ -158,6 +163,7 @@ public class BluetoothMapContent {
         Mms.READ,
         Mms.MESSAGE_BOX,
         Mms.STATUS,
+        Mms.MESSAGE_TYPE,
     };
 
     private class FilterInfo {
@@ -247,7 +253,8 @@ public class BluetoothMapContent {
                 "\n   " + Mms.DATE_SENT + " : " + c.getLong(c.getColumnIndex(Mms.DATE_SENT)) +
                 "\n   " + Mms.READ + " : " + c.getInt(c.getColumnIndex(Mms.READ)) +
                 "\n   " + Mms.MESSAGE_BOX + " : " + c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX)) +
-                "\n   " + Mms.STATUS + " : " + c.getInt(c.getColumnIndex(Mms.STATUS)));
+                "\n   " + Mms.STATUS + " : " + c.getInt(c.getColumnIndex(Mms.STATUS)) +
+                "\n   " + Mms.MESSAGE_TYPE + " : " + c.getInt(c.getColumnIndex(Mms.MESSAGE_TYPE)));
     }
 
     private void printMmsAddr(long id) {
@@ -1983,9 +1990,8 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
 
         if (mmsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_MMS;
-
             String where = setWhereFilter(folder, fi, ap);
-
+            where += " AND " + INTERESTED_MESSAGE_TYPE_CLAUSE;
             Cursor c = mResolver.query(Mms.CONTENT_URI,
                 MMS_PROJECTION, where, null, "date DESC");
 
@@ -2032,6 +2038,7 @@ if(V) Log.v(TAG, " After replacing  " + multiRecepients);
         if (mmsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_MMS;
             String where = setWhereFilter(folder, fi, ap);
+            where += " AND " + INTERESTED_MESSAGE_TYPE_CLAUSE;
             Cursor c = mResolver.query(Mms.CONTENT_URI,
                 MMS_PROJECTION, where, null, "date DESC");
 
