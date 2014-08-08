@@ -336,7 +336,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                                 mDeletedList.put(id, msg);
                             } else if (!mDeletedList.containsKey(id) &&
                                         !mEmailDeletedList.containsKey(id)) {
-                                if(V) Log.v(TAG,"Putting in deleted list");
+                                if(V) Log.v(TAG,"Putting in deleted list id "+id);
                                 mEmailDeletedList.put(id, msg);
                             }
                         } else if (box.mType == TYPE_OUTBOX) {
@@ -385,6 +385,10 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                     evt = new Event("NewMessage", email.mId, folderName,
                                      null, TYPE.EMAIL);
                     sendEvent(evt);
+                    if (mDeletedList.containsKey(email.mId)){
+                        Log.d(TAG,"mDeletedList removing id "+email.mId);
+                        mDeletedList.remove(email.mId);
+                    }
                 }
               }
            }
