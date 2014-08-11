@@ -145,8 +145,10 @@ static void android_wipower_wipowerJNI_initNative (JNIEnv* env, jobject obj) {
 
     //Get WiPower Interface
     sWipowerInterface = (const wipower_interface_t*)btInf->get_profile_interface(WIPOWER_PROFILE_ID);
-
-    ALOGE("%s: Get wipower interface: %x",__FUNCTION__, (unsigned int)sWipowerInterface);
+    if (sWipowerInterface == NULL) {
+        ALOGE("%s: Get wipower interface: %x",__FUNCTION__, (unsigned int)sWipowerInterface);
+        return;
+    }
     //Initialize wipower interface
     int ret = sWipowerInterface->init(&sWipowerCallbacks);
 
