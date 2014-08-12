@@ -696,8 +696,10 @@ static bool cleanupNative(JNIEnv *env, jobject obj) {
     sBluetoothInterface->cleanup();
     ALOGI("%s: return from cleanup",__FUNCTION__);
 
-    env->DeleteGlobalRef(sJniCallbacksObj);
-    sJniCallbacksObj = NULL;
+    if (sJniCallbacksObj) {
+        env->DeleteGlobalRef(sJniCallbacksObj);
+        sJniCallbacksObj = NULL;
+    }
     return JNI_TRUE;
 }
 
@@ -710,7 +712,10 @@ static bool ssrcleanupNative(JNIEnv *env, jobject obj) {
     sBluetoothInterface->ssrcleanup();
     ALOGI("%s: return from cleanup",__FUNCTION__);
 
-    env->DeleteGlobalRef(sJniCallbacksObj);
+    if (sJniCallbacksObj) {
+        env->DeleteGlobalRef(sJniCallbacksObj);
+        sJniCallbacksObj = NULL;
+    }
     return JNI_TRUE;
 }
 
