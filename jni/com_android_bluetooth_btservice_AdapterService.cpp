@@ -172,8 +172,10 @@ static void adapter_properties_callback(bt_status_t status, int num_properties,
         return;
     }
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_adapterPropertyChangedCallback, types,
-                                props);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_adapterPropertyChangedCallback, types,
+                                    props);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(props);
     callbackEnv->DeleteLocalRef(types);
@@ -242,8 +244,10 @@ static void remote_device_properties_callback(bt_status_t status, bt_bdaddr_t *b
         return;
     }
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_devicePropertyChangedCallback, addr,
-                                types, props);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_devicePropertyChangedCallback, addr,
+                                    types, props);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(props);
     callbackEnv->DeleteLocalRef(types);
@@ -284,7 +288,9 @@ static void device_found_callback(int num_properties, bt_property_t *properties)
     remote_device_properties_callback(BT_STATUS_SUCCESS, (bt_bdaddr_t *)properties[addr_index].val,
                                       num_properties, properties);
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_deviceFoundCallback, addr);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_deviceFoundCallback, addr);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(addr);
 }
@@ -308,8 +314,10 @@ static void bond_state_changed_callback(bt_status_t status, bt_bdaddr_t *bd_addr
     }
     callbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *)bd_addr);
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_bondStateChangeCallback, (jint) status,
-                                addr, (jint)state);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_bondStateChangeCallback, (jint) status,
+                                    addr, (jint)state);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(addr);
 }
@@ -334,8 +342,10 @@ static void acl_state_changed_callback(bt_status_t status, bt_bdaddr_t *bd_addr,
     }
     callbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *)bd_addr);
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_aclStateChangeCallback, (jint) status,
-                                addr, (jint)state);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_aclStateChangeCallback, (jint) status,
+                                    addr, (jint)state);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(addr);
 }
@@ -375,9 +385,10 @@ static void discovery_state_changed_callback(bt_discovery_state_t state) {
 
     ALOGV("%s: DiscoveryState:%d ", __FUNCTION__, state);
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_discoveryStateChangeCallback,
-                                (jint)state);
-
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_discoveryStateChangeCallback,
+                                    (jint)state);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
 }
 static void wake_state_changed_callback(bt_state_t state) {
@@ -389,9 +400,10 @@ static void wake_state_changed_callback(bt_state_t state) {
 
     ALOGV("%s: WakeState:%d ", __FUNCTION__, state);
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_wakeStateChangeCallback,
-                                (jint)state);
-
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_wakeStateChangeCallback,
+                                    (jint)state);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
 }
 #ifdef QCOM_BLUETOOTH
@@ -417,11 +429,15 @@ static void pin_request_callback(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint
     if (devname == NULL) goto Fail;
 
     callbackEnv->SetByteArrayRegion(devname, 0, sizeof(bt_bdname_t), (jbyte*)bdname);
+
+   if (sJniCallbacksObj) {
 #ifdef QCOM_BLUETOOTH
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback, addr, devname, cod, secure);
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback, addr, devname, cod, secure);
 #else
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback, addr, devname, cod, 0);
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback, addr, devname, cod, 0);
 #endif
+    }
+
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(addr);
     callbackEnv->DeleteLocalRef(devname);
@@ -453,8 +469,10 @@ static void ssp_request_callback(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint
     if (devname == NULL) goto Fail;
     callbackEnv->SetByteArrayRegion(devname, 0, sizeof(bt_bdname_t), (jbyte*)bdname);
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_sspRequestCallback, addr, devname, cod,
-                                (jint) pairing_variant, pass_key);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_sspRequestCallback, addr, devname, cod,
+                                    (jint) pairing_variant, pass_key);
+    }
 
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
     callbackEnv->DeleteLocalRef(addr);
@@ -576,8 +594,10 @@ static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_ad
         callbackEnv->DeleteLocalRef(name);
     }
 
-    callbackEnv->CallVoidMethod(sJniCallbacksObj, method_deviceMasInstancesFoundCallback,
-            (jint) status, addr, a_name, a_scn, a_masid, a_msgtype);
+    if (sJniCallbacksObj) {
+        callbackEnv->CallVoidMethod(sJniCallbacksObj, method_deviceMasInstancesFoundCallback,
+                                    (jint) status, addr, a_name, a_scn, a_masid, a_msgtype);
+    }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
 
 clean:
