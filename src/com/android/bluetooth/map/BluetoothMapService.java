@@ -164,7 +164,7 @@ public class BluetoothMapService extends ProfileService {
     private final Handler mSessionStatusHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-            if (VERBOSE) Log.v(TAG, "Handler(): got msg=" + msg.what);
+            if (DEBUG) Log.v(TAG, "Handler(): got msg=" + msg.what);
 
             switch (msg.what) {
                 case START_LISTENER:
@@ -695,7 +695,7 @@ public class BluetoothMapService extends ProfileService {
                   Log.d(TAG, "mMasId is "+mMasId);
             }
             Context context = getApplicationContext();
-            Log.d(TAG, "after getting application context");
+            if(VERBOSE) Log.d(TAG, "after getting application context");
             if(mBluetoothMnsObexClient == null)
                 mBluetoothMnsObexClient = new BluetoothMnsObexClient(context, mRemoteDevice);
             mBluetoothMnsObexClient.initObserver(mSessionStatusHandler, mMasId);
@@ -832,7 +832,7 @@ public class BluetoothMapService extends ProfileService {
                       stopped = true; // job done ,close this thread;
                     } catch (IOException ex) {
                        stopped=true;
-                       if (VERBOSE) Log.v(TAG, "Accept exception: " + ex.toString());
+                       if (DEBUG) Log.v(TAG, "Accept exception: " + ex.toString());
                    }
                }
             }

@@ -343,6 +343,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         info = mBatch.getPendingShare();
         while (info != null) {
             if (info.mStatus < 200) {
+                Log.v(TAG," Batch Failed updating Content Provider ");
                 info.mStatus = failReason;
                 Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + info.mId);
                 ContentValues updateValues = new ContentValues();
