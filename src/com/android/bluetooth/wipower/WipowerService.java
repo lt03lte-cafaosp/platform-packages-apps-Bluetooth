@@ -263,8 +263,6 @@ public class WipowerService extends Service
         Log.v(LOGTAG, "onCreate");
         super.onCreate();
 
-        Log.v(LOGTAG, "Calling InitNative");
-        initNative();
         mCallbacks = new RemoteCallbackList<IWipowerManagerCallback>();
         mBinder = new WipowerBinder(this);
         Log.v(LOGTAG, "onCreate>>");
@@ -289,7 +287,7 @@ public class WipowerService extends Service
         initNative();
         //Make this restarable service by
         //Android app manager
-        return START_STICKY;
+        return START_NOT_STICKY;
    }
 
 
