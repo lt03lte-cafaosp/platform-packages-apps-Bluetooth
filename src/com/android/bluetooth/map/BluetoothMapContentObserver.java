@@ -293,23 +293,10 @@ public class BluetoothMapContentObserver {
 
         if (V) Log.v(TAG, "findLocationMceInitiatedOperation " + msgHandle);
 
-        List<BluetoothMnsMsgHndlMceInitOp> staleOpList = new ArrayList<BluetoothMnsMsgHndlMceInitOp>();
-        for (BluetoothMnsMsgHndlMceInitOp op: opList) {
-            if (currentTime.toMillis(false) - op.time.toMillis(false) > 10000) {
-                // add stale entries
-                staleOpList.add(op);
-            }
-        }
-        if (!staleOpList.isEmpty()) {
-            for (BluetoothMnsMsgHndlMceInitOp op: staleOpList) {
-                // Remove stale entries
-                opList.remove(op);
-            }
-        }
-
         for (BluetoothMnsMsgHndlMceInitOp op: opList) {
             if (op.msgHandle.equalsIgnoreCase(msgHandle)){
                 location = opList.indexOf(op);
+                opList.remove(op);
                 break;
             }
         }
@@ -355,14 +342,24 @@ public class BluetoothMapContentObserver {
         Log.d(TAG, "msgHandle is "+msgHandle);
         location = findLocationMceInitiatedOperation(Long.toString(evt.handle));
         Log.d(TAG, "location is "+location);
-        if(location == -1) {
+        if(evt.eventType.equalsIgnoreCase("SendingSuccess")) {
+           if(location != -1) {
+              try {
+                  mMnsClient.sendEvent(evt.encode(), mMasId);
+              } catch (UnsupportedEncodingException ex) {
+                  Log.w(TAG, ex);
+              }
+           } else {
+                  Log.d(TAG, "not sending success event");
+                  return;
+           }
+        } else if (location == -1) {
            try {
+               Log.d(TAG, "sending mns event");
                mMnsClient.sendEvent(evt.encode(), mMasId);
-            } catch (UnsupportedEncodingException ex) {
+           } catch (UnsupportedEncodingException ex) {
                Log.w(TAG, ex);
-            }
-        } else {
-            removeMceInitiatedOperation(location);
+           }
         }
     }
 
