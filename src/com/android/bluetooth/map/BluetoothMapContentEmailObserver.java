@@ -336,7 +336,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                                 mDeletedList.put(id, msg);
                             } else if (!mDeletedList.containsKey(id) &&
                                         !mEmailDeletedList.containsKey(id)) {
-                                if(V) Log.v(TAG,"Putting in deleted list");
+                                if(V) Log.v(TAG,"Putting in deleted list id "+id);
                                 mEmailDeletedList.put(id, msg);
                             }
                         } else if (box.mType == TYPE_OUTBOX) {
@@ -347,6 +347,17 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                                         !mEmailAddedList.containsKey(id)) {
                                     Log.v(TAG,"Putting in added list");
                                     mEmailAddedList.put(id, msg);
+                                } else {
+                                    if (oldEmailList.get(id) != null) {
+                                        if(!(msg.mFolderName.equalsIgnoreCase(oldEmailList.
+                                            get(id).mFolderName))) {
+                                            Log.d(TAG,"sending Message Shift Event");
+                                            Event evt;
+                                            evt = new Event("MessageShift", id, msg.mFolderName,
+                                                      oldEmailList.get(id).mFolderName, TYPE.EMAIL);
+                                            sendEvent(evt);
+                                        }
+                                    }
                                 }
                         }
                     } else {
@@ -377,14 +388,27 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                     evt = new Event("SendingSuccess", email.mId, email.mFolderName,
                                               null, TYPE.EMAIL);
                     sendEvent(evt);
-                } else {
-                    if(D) Log.d(TAG,"sending NewMessage mns event");
-                    if(D) Log.d(TAG,"email.mId is "+email.mId);
-                    if(D) Log.d(TAG,"email.mType is "+email.mType);
-                    if(D) Log.d(TAG,"folder name is "+email.mFolderName);
-                    evt = new Event("NewMessage", email.mId, folderName,
-                                     null, TYPE.EMAIL);
+                } else if (email.mFolderName.equalsIgnoreCase("trash")) {
+                    evt = new Event("MessageDeleted", email.mId, "trash",null, TYPE.EMAIL);
                     sendEvent(evt);
+                } else if (email.mFolderName.equalsIgnoreCase("delete") ||
+                           email.mFolderName.equalsIgnoreCase("deleted")) {
+                    evt = new Event("MessageDeleted", email.mId, "deleted",null, TYPE.EMAIL);
+                    sendEvent(evt);
+                } else {
+                    if (mDeletedList.containsKey(email.mId)){
+                        Log.d(TAG,"mDeletedList removing id "+email.mId);
+                        mDeletedList.remove(email.mId);
+                        Log.d(TAG,"sending Message Shift Event");
+                        evt = new Event("MessageShift", email.mId, email.mFolderName,
+                                        "deleted", TYPE.EMAIL);
+                        sendEvent(evt);
+                    }  else if (email.mFolderName.equalsIgnoreCase("inbox")) {
+                        evt = new Event("NewMessage", email.mId, folderName,
+                                         null, TYPE.EMAIL);
+                        sendEvent(evt);
+
+                    }
                 }
               }
            }
@@ -620,7 +644,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
               address.append(";");
             }
             long handle = pushEmailToFolder(folder, address.toString(), msg);
-            addMceInitiatedOperation("+");
+            addMceInitiatedOperation(Long.toString(handle));
             /* if invalid handle (-1) then just return the handle - else continue sending (if folder is outbox) */
             if (BluetoothMapAppParams.INVALID_VALUE_PARAMETER != handle && folder.equalsIgnoreCase("outbox")) {
                Intent emailIn = new Intent();
