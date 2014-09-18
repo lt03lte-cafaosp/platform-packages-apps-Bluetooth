@@ -151,7 +151,7 @@ public class BluetoothMapMessageListing {
             list = list.subList(offset, offset + count);
         } else {
             if(offset > list.size()) {
-               list = null;
+               list = new ArrayList<BluetoothMapMessageListingElement>();
                Log.d(TAG, "offset greater than list size. Returning null");
             } else {
                list = list.subList(offset, list.size());
