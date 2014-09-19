@@ -48,6 +48,13 @@ import android.util.Log;
 import android.provider.Settings;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
+import android.net.Uri;
+import android.content.ContentResolver;
+import android.database.ContentObserver;
+import com.android.bluetooth.map.BluetoothMapUtils.*;
+import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
+import android.database.sqlite.SQLiteException;
+
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.Utils;
@@ -109,6 +116,8 @@ public class BluetoothMapService extends ProfileService {
 
     private static final int DISCONNECT_MAP = 3;
 
+    private static final int MSG_INTERNAL_REGISTER_EMAIL = 4;
+
     private BluetoothAdapter mAdapter;
 
     private BluetoothMapAuthenticator mAuth = null;
@@ -149,12 +158,50 @@ public class BluetoothMapService extends ProfileService {
     public static final int MAX_INSTANCES = 2;
     BluetoothMapObexConnectionManager mConnectionManager = null;
     public static final int MAS_INS_INFO[] = {MESSAGE_TYPE_SMS_MMS, MESSAGE_TYPE_EMAIL};
+    private ContentObserver mEmailAccountObserver;
+    public static final String AUTHORITY = "com.android.email.provider";
+    public static final Uri EMAIL_URI = Uri.parse("content://" + AUTHORITY);
+    public static final Uri EMAIL_ACCOUNT_URI = Uri.withAppendedPath(EMAIL_URI, "account");
+    public static boolean isMapEmailRequestON = false;
 
     public BluetoothMapService() {
         mState = BluetoothMap.STATE_DISCONNECTED;
         mConnectionManager = new BluetoothMapObexConnectionManager();
         if (VERBOSE)
            Log.v(TAG, "BluetoothMapService: mIsEmailEnabled: " + mIsEmailEnabled);
+        mEmailAccountObserver = new ContentObserver(null) {
+            @Override
+            public void onChange(boolean selfChange) {
+                long isEmailConfigured = -1;
+                Context context = mConnectionManager.getEmailContext();
+                //Handle only email configuration changes
+                if (context != null )
+                    isEmailConfigured = BluetoothMapUtils.getEmailAccountId(context) ;
+                boolean isMapEmailStarted = mConnectionManager.isMapEmailON();
+
+                if (VERBOSE) {
+                     Log.v(TAG,"onChange mEmailAccountObserver Configured Account: "+ isEmailConfigured
+                     + "IsMapEmailRequstInprogress " + isMapEmailRequestON + "isMAP AlreadyStarted "+ isMapEmailStarted);
+                }
+                if( mSessionStatusHandler.hasMessages(MSG_INTERNAL_REGISTER_EMAIL)) {
+                        // Remove any pending requests in queue
+                        mSessionStatusHandler.removeMessages(MSG_INTERNAL_REGISTER_EMAIL);
+                }
+                // Donot send request if Inprogress or already ON
+                if( isEmailConfigured != -1 && !isMapEmailRequestON && !isMapEmailStarted) {
+                       if ( mAdapter != null) {
+                            int state = mAdapter.getState();
+                            if (state == BluetoothAdapter.STATE_ON) {
+                                mSessionStatusHandler.sendEmptyMessage(MSG_INTERNAL_REGISTER_EMAIL);
+                            } else if (VERBOSE) {
+                                Log.v(TAG, "BT is not ON, no start");
+                            }
+                       }
+                } else if(isEmailConfigured == -1) {
+                    mConnectionManager.closeMapEmail();
+                   }
+                }
+        };
     }
     private final void closeService() {
        if (VERBOSE) Log.v(TAG, "closeService");
@@ -172,6 +219,14 @@ public class BluetoothMapService extends ProfileService {
                         mConnectionManager.startAll();
                     }
                     break;
+
+                case MSG_INTERNAL_REGISTER_EMAIL:
+                    Log.d(TAG,"received MSG_INTERNAL_REGISTER_EMAIL");
+                    if ((mAdapter != null) && mAdapter.isEnabled()) {
+                        mConnectionManager.startMapEmail();
+                    }
+                    break;
+
                 case USER_TIMEOUT:
                     Intent intent = new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
                     intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
@@ -346,6 +401,14 @@ public class BluetoothMapService extends ProfileService {
         mSessionStatusHandler.sendMessage(mSessionStatusHandler
                 .obtainMessage(START_LISTENER));
         }
+        // Register EmailAccountObserver for dynamic SDP update
+        try {
+            if (DEBUG) Log.d(TAG,"Registering observer");
+            getContentResolver().registerContentObserver(
+               EMAIL_ACCOUNT_URI, false, mEmailAccountObserver);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
         return true;
     }
 
@@ -360,6 +423,12 @@ public class BluetoothMapService extends ProfileService {
 
         setState(BluetoothMap.STATE_DISCONNECTED, BluetoothMap.RESULT_CANCELED);
         closeService();
+        try {
+            if (DEBUG) Log.d(TAG,"Unregistering Email account observer");
+            getContentResolver().unregisterContentObserver(mEmailAccountObserver);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
         return true;
     }
 
@@ -498,6 +567,39 @@ public class BluetoothMapService extends ProfileService {
                 connection.startRfcommSocketListener();
             }
         }
+        public boolean isMapEmailON () {
+                final BluetoothMapObexConnection connect = mConnections.get(1);
+                if(connect != null && connect.mMasId == 1 && connect.mServerSocket != null
+                    && connect.mAcceptThread != null )
+                    return true;
+                return false;
+        }
+        public Context getEmailContext () {
+            final BluetoothMapObexConnection connect = mConnections.get(1);
+            return connect.context;
+        }
+        public void startMapEmail() {
+            final BluetoothMapObexConnection connect = mConnections.get(1);
+            if (connect != null) {
+                // SET Email Inprogress ON
+                isMapEmailRequestON = true;
+                // Start Listener and add email support in SDP
+            connect.startRfcommSocketListener();
+        }
+            // SET Email Inprogress OFF
+            isMapEmailRequestON = false;
+        }
+
+        public void closeMapEmail() {
+            final BluetoothMapObexConnection connect = mConnections.get(1);
+            if (connect != null) {
+                // Handle common flag for MAP instances
+                boolean isWaitingAuth = isWaitingAuthorization;
+                // Stop Listener and remove email support in SDP
+                connect.closeConnection();
+                isWaitingAuthorization = isWaitingAuth;
+            }
+        }
 
         public void init() {
             for (BluetoothMapObexConnection connection: mConnections) {
@@ -550,6 +652,7 @@ public class BluetoothMapService extends ProfileService {
         private ServerSession mServerSession = null;
         private int mSupportedMessageTypes;
         private int mMasId;
+        private Context context;
         boolean mWaitingForConfirmation = false;
 
         public BluetoothMapObexConnection(int supportedMessageTypes, int masId) {
@@ -565,6 +668,16 @@ public class BluetoothMapService extends ProfileService {
                 Log.v(TAG, "Map Service startRfcommSocketListener");
                 Log.v(TAG, "mMasId is "+mMasId);
             }
+
+            context = getApplicationContext();
+            // Promote Email Instance only if primary email account configured
+            if(mMasId == 1) {
+               if (BluetoothMapUtils.getEmailAccountId(context) == -1) {
+                   if (VERBOSE) Log.v(TAG, "account is not configured");
+                   return;
+               }
+            }
+
             if (mServerSocket == null) {
                 if (!initSocket()) {
                     closeConnection();
