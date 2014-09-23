@@ -405,6 +405,8 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             needConfirm = false;
         }
 
+        mServerBlocking = true;
+
         if (isWhitelisted) {
             values.put(BluetoothShare.USER_CONFIRMATION,
                     BluetoothShare.USER_CONFIRMATION_HANDOVER_CONFIRMED);
@@ -431,7 +433,6 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                 mPartialWakeLock.acquire();
                 mWakeLock.release();
             }
-            mServerBlocking = true;
             try {
 
                 while (mServerBlocking) {
