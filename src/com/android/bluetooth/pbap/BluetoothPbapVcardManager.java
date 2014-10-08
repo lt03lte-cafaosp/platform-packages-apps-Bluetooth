@@ -93,6 +93,7 @@ public class BluetoothPbapVcardManager {
 
     private static final int SIM_NAME_COLUMN_INDEX = 0;
     private static final int SIM_NUMBER_COLUMN_INDEX = 1;
+    private static final int SIM_ID_COLUMN_INDEX = 3;
     static final String SORT_ORDER_PHONE_NUMBER = CommonDataKinds.Phone.NUMBER + " ASC";
 
     static final String[] CONTACTS_PROJECTION = new String[] {
@@ -290,10 +291,11 @@ public class BluetoothPbapVcardManager {
                 for (contactCursor.moveToFirst(); !contactCursor.isAfterLast(); contactCursor
                         .moveToNext()) {
                     String name = contactCursor.getString(SIM_NAME_COLUMN_INDEX);
+                    long id = contactCursor.getLong(SIM_ID_COLUMN_INDEX);
                     if (TextUtils.isEmpty(name)) {
                         name = mContext.getString(android.R.string.unknownName);
                     }
-                    allnames.add(name);
+                    allnames.add(name + "," + id);
                 }
             }
         } catch (CursorWindowAllocationException e) {
@@ -371,7 +373,7 @@ public class BluetoothPbapVcardManager {
 
     public final ArrayList<String> getSIMContactNamesByNumber(final String phoneNumber) {
         ArrayList<String> nameList = new ArrayList<String>();
-        ArrayList<String> startNameList = new ArrayList<String>();
+        ArrayList<String> tempNameList = new ArrayList<String>();
         StringBuilder onlyphoneNumber = new StringBuilder();
         for (int j=0; j<phoneNumber.length(); j++) {
             char c = phoneNumber.charAt(j);
@@ -404,23 +406,16 @@ public class BluetoothPbapVcardManager {
                     }
                     String tmpNumber = onlyNumber.toString();
                     if (V) Log.v(TAG, "number: "+number+" onlyNumber:"+onlyNumber+" tmpNumber:"+tmpNumber);
-                    if (tmpNumber.endsWith(SearchOnlyNumber)) {
+                    if (tmpNumber.equals(SearchOnlyNumber)) {
                         String name = contactCursor.getString(SIM_NAME_COLUMN_INDEX);
+                        long id = contactCursor.getLong(SIM_ID_COLUMN_INDEX);
                         if (TextUtils.isEmpty(name)) {
                             name = mContext.getString(android.R.string.unknownName);
                         }
-                        if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber);
-                        if (V) Log.v(TAG, "Adding to end name list");
-                        nameList.add(name);
-                    }
-                    if (tmpNumber.startsWith(SearchOnlyNumber)) {
-                        String name = contactCursor.getString(SIM_NAME_COLUMN_INDEX);
-                        if (TextUtils.isEmpty(name)) {
-                            name = mContext.getString(android.R.string.unknownName);
-                        }
-                        if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber);
-                        if (V) Log.v(TAG, "Adding to start name list");
-                        startNameList.add(name);
+
+                        if (V) Log.v(TAG, "got name " + name + " by number " + phoneNumber + "@" + id);
+                        if (V) Log.v(TAG, "Adding to name list");
+                        tempNameList.add(name + "," + id);
                     }
                 }
             }
@@ -432,9 +427,9 @@ public class BluetoothPbapVcardManager {
                 contactCursor = null;
             }
         }
-        int startListSize = startNameList.size();
-        for (int index = 0; index < startListSize; index++) {
-            String object = startNameList.get(index);
+        int tempListSize = tempNameList.size();
+        for (int index = 0; index < tempListSize; index++) {
+            String object = tempNameList.get(index);
             if (!nameList.contains(object))
                 nameList.add(object);
         }
