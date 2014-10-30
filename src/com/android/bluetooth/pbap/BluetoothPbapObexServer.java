@@ -688,7 +688,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             // query the number, to get the names
             if(SIM) {
                 names = mVcardManager.getSIMContactNamesByNumber(searchValue);
-            } else{
+            } else {
                   names = mVcardManager.getContactNamesByNumber(searchValue);
             }
             for (int i = 0; i < names.size(); i++) {
@@ -700,7 +700,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
                     if (D) Log.d(TAG, "currentValue=" + currentValue);
                     if (currentValue.equals(compareValue)) {
                         itemsFound++;
-                        if(!SIM)
+                        if (currentValue.contains(","))
                             currentValue = currentValue.substring(0, currentValue.lastIndexOf(','));
                         writeVCardEntry(pos, currentValue,result);
                     }
