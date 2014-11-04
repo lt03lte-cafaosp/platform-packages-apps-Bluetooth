@@ -76,6 +76,10 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
     private Handler mCallback;
 
+    private PowerManager pm;
+
+    private long position;
+
     public BluetoothOppObexClientSession(Context context, ObexTransport transport) {
         if (transport == null) {
             throw new NullPointerException("transport is null");
@@ -122,21 +126,14 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
     }
     private class ContentResolverUpdateThread extends Thread {
 
-        private static final int sSleepTime = 1000;
         private Uri contentUri;
         private Context mContext1;
-        private long position;
         private volatile boolean interrupted = false;
 
-        public ContentResolverUpdateThread(Context context, Uri cntUri, long pos) {
+        public ContentResolverUpdateThread(Context context, Uri cntUri) {
             super("BtOpp ContentResolverUpdateThread");
             mContext1 = context;
             contentUri = cntUri;
-            position = pos;
-        }
-
-        public void updateProgress (long pos) {
-            position = pos;
         }
 
         @Override
@@ -146,10 +143,12 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
 
             while (true) {
-                updateValues = new ContentValues();
-                updateValues.put(BluetoothShare.CURRENT_BYTES, position);
-                mContext1.getContentResolver().update(contentUri, updateValues,
-                        null, null);
+                if (pm.isScreenOn()) {
+                    updateValues = new ContentValues();
+                    updateValues.put(BluetoothShare.CURRENT_BYTES, position);
+                    mContext1.getContentResolver().update(contentUri, updateValues,
+                            null, null);
+                }
 
                 /*
                     Check if the Operation is interrupted before entering sleep
@@ -160,7 +159,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                 }
 
                 try {
-                    Thread.sleep(sSleepTime);
+                    Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
                 } catch (InterruptedException e1) {
                     if (V) Log.v(TAG, "ContentResolverUpdateThread was interrupted (1), exiting");
                     return;
@@ -206,7 +205,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             waitingForShare = true;
             mWaitingForRemote = false;
             mNumShares = initialNumShares;
-            PowerManager pm = (PowerManager)mContext1.getSystemService(Context.POWER_SERVICE);
+            pm = (PowerManager)mContext1.getSystemService(Context.POWER_SERVICE);
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
         }
 
@@ -406,7 +405,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
             ContentValues updateValues;
             ContentResolverUpdateThread uiUpdateThread = null;
             HeaderSet reply;
-            long position = 0;
+            position = 0;
             reply = new HeaderSet();
             HeaderSet request;
             request = new HeaderSet();
@@ -555,10 +554,8 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
                                 if (uiUpdateThread == null) {
                                     uiUpdateThread = new ContentResolverUpdateThread (mContext1,
-                                                                    contentUri, position);
+                                                                    contentUri);
                                     uiUpdateThread.start ( );
-                                } else {
-                                    uiUpdateThread.updateProgress (position);
                                 }
 
                             }
@@ -593,6 +590,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                         Log.i(TAG, "SendFile finished sending file " + fileInfo.mFileName
                                 + " length " + fileInfo.mLength
                                 + "Bytes in " + (endTime - beginTime) + "ms"  );
+                        status = BluetoothShare.STATUS_SUCCESS;
                         outputStream.close();
                     } else {
                         error = true;
