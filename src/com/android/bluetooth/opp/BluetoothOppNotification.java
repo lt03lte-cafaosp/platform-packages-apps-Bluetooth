@@ -44,6 +44,7 @@ import android.database.CursorWindowAllocationException;
 import android.database.sqlite.SQLiteException;
 import android.net.Uri;
 import android.util.Log;
+import android.os.PowerManager;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Process;
@@ -101,6 +102,8 @@ class BluetoothOppNotification {
 
     private NotificationUpdateThread mUpdateNotificationThread;
 
+    private PowerManager mPowerManager;
+
     private static final int NOTIFICATION_ID_OUTBOUND = -1000005;
 
     private static final int NOTIFICATION_ID_INBOUND = -1000006;
@@ -145,6 +148,7 @@ class BluetoothOppNotification {
         mNotificationMgr = (NotificationManager)mContext
                 .getSystemService(Context.NOTIFICATION_SERVICE);
         mNotifications = new HashMap<String, NotificationItem>();
+        mPowerManager = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
     }
 
     /**
@@ -184,7 +188,7 @@ class BluetoothOppNotification {
                 synchronized (BluetoothOppNotification.this) {
                     if (mUpdateNotificationThread != this) {
                         throw new IllegalStateException(
-                            "multiple UpdateThreads in BluetoothOppNotification");
+                                "multiple UpdateThreads in BluetoothOppNotification");
                     }
                 }
                 updateActiveNotification();
@@ -192,14 +196,16 @@ class BluetoothOppNotification {
                 updateIncomingFileConfirmNotification();
 
                 try {
-                    Thread.sleep(1000);
+                    if (mPowerManager.isScreenOn()) {
+                        Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
+                    }
                 } catch (InterruptedException e) {
                     if (V) Log.v(TAG, "NotificationThread was interrupted (1), exiting");
                     return;
                 }
 
                 if (V) Log.v(TAG, "Running = " + mRunning);
-            } while (mRunning > 0);
+            } while ((mRunning > 0) && mPowerManager.isScreenOn());
 
             synchronized (BluetoothOppNotification.this) {
                 mUpdateNotificationThread = null;
