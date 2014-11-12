@@ -105,6 +105,16 @@ public class ScanManager {
         mRegularScanClients.clear();
         mBatchClients.clear();
         mScanNative.cleanup();
+
+        if (mHandler != null) {
+            // Shut down the thread
+            mHandler.removeCallbacksAndMessages(null);
+            Looper looper = mHandler.getLooper();
+            if (looper != null) {
+                looper.quit();
+            }
+            mHandler = null;
+        }
     }
 
     /**
