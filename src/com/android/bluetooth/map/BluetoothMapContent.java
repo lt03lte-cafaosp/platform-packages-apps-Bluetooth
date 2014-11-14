@@ -1675,7 +1675,6 @@ public class BluetoothMapContent {
     private boolean smsSelected(FilterInfo fi, BluetoothMapAppParams ap) {
         int msgType = ap.getFilterMessageType();
         int phoneType = fi.phoneType;
-
         if (msgType == -1)
             return true;
         if ((msgType & 0x03) == 0)
@@ -2199,12 +2198,13 @@ public class BluetoothMapContent {
     }
 
     public BluetoothMapMessageListing msgListingEmail(String folder, BluetoothMapAppParams ap) {
-        Log.d(TAG, "msgListing: folder = " + folder);
         String urlEmail = "content://com.android.email.provider/message";
         Uri uriEmail = Uri.parse(urlEmail);
         BluetoothMapMessageListing bmList = new BluetoothMapMessageListing();
         BluetoothMapMessageListingElement e = null;
 
+        if (V)Log.d(TAG, "msgListing: folder = " + folder +
+            " maxListCount: " + ap.getMaxListCount());
         /* Cache some info used throughout filtering */
         FilterInfo fi = new FilterInfo();
         setFilterInfo(fi);
@@ -2213,13 +2213,19 @@ public class BluetoothMapContent {
             fi.msgType = FilterInfo.TYPE_EMAIL;
 
             String where = setWhereFilter(folder, fi, ap);
-            Log.d(TAG, "where clause is = " + where);
+            where+= " AND "+ Message.FLAG_LOADED_SELECTION;
+            where+= " order by timeStamp desc ";
+            //Fetch only MaxListCount emails from database
+            if(ap.getMaxListCount() > 0 && ap.getMaxListCount() < 65536) {
+                where+=" LIMIT "+ap.getMaxListCount();
+            }
+            if (V) Log.d(TAG, "where clause is = " + where);
             try {
                 Cursor c = mResolver.query(uriEmail,
-                EMAIL_PROJECTION, where + " AND " + Message.FLAG_LOADED_SELECTION, null, "timeStamp desc");
+                EMAIL_PROJECTION, where, null,null);
                 if(c == null) {
                    Log.e(TAG, "Cursor is null. Returning from here");
-        }
+                }
 
                 if (c != null) {
                     while (c.moveToNext()) {
@@ -2320,7 +2326,6 @@ public class BluetoothMapContent {
         /* Cache some info used throughout filtering */
         FilterInfo fi = new FilterInfo();
         setFilterInfo(fi);
-
         if (smsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_SMS;
             if(ap.getFilterPriority() != 1){ /*SMS cannot have high priority*/

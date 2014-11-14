@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.HashMap;
 
 import android.app.AlarmManager;
-import javax.btobex.ServerSession;
+
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -59,6 +59,7 @@ import com.android.bluetooth.R;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.ProfileService;
+import javax.btobex.ServerSession;
 
 
 public class BluetoothMapService extends ProfileService {
@@ -437,13 +438,15 @@ public class BluetoothMapService extends ProfileService {
         mSessionStatusHandler.sendMessage(mSessionStatusHandler
                 .obtainMessage(START_LISTENER));
         }
-        // Register EmailAccountObserver for dynamic SDP update
-        try {
-            if (DEBUG) Log.d(TAG,"Registering observer");
-            getContentResolver().registerContentObserver(
-               EMAIL_ACCOUNT_URI, false, mEmailAccountObserver);
-        } catch (SQLiteException e) {
-            Log.e(TAG, "SQLite exception: " + e);
+        if(mIsEmailEnabled ) {
+            // Register EmailAccountObserver for dynamic SDP update
+            try {
+                if (DEBUG) Log.d(TAG,"Registering observer");
+                getContentResolver().registerContentObserver(
+                   EMAIL_ACCOUNT_URI, false, mEmailAccountObserver);
+            } catch (SQLiteException e) {
+                Log.e(TAG, "SQLite exception: " + e);
+            }
         }
         return true;
     }
@@ -490,7 +493,7 @@ public class BluetoothMapService extends ProfileService {
             for (int i = 0; i < numberOfSupportedInstances; i ++) {
                 mConnections.add(new BluetoothMapObexConnection(
                         MAS_INS_INFO[i], i ));
-            MapClientList.put(i, null);
+                MapClientList.put(i, null);
             }
         }
 
@@ -600,6 +603,7 @@ public class BluetoothMapService extends ProfileService {
         public void startAll() {
             for (BluetoothMapObexConnection connection : mConnections) {
                 connection.startRfcommSocketListener();
+                connection.startL2capSocketListener();
             }
         }
         public boolean isMapEmailON () {
@@ -620,6 +624,7 @@ public class BluetoothMapService extends ProfileService {
                 isMapEmailRequestON = true;
                 // Start Listener and add email support in SDP
                 connect.startRfcommSocketListener();
+                connect.startL2capSocketListener();
             }
             // SET Email Inprogress OFF
             isMapEmailRequestON = false;
@@ -658,6 +663,7 @@ public class BluetoothMapService extends ProfileService {
                 if (VERBOSE) Log.v(TAG, "Connection request from unknown device");
                 return false;
             }
+            Log.d(TAG, "Check if Connection alllowed  from " +remoteAddress +" MASID: "+masId);
             if(MapClientList.get(masId)==null) {
                if(MapClientList.get((masId^1)) == null) {
                   if (VERBOSE) Log.v(TAG, "Allow Connection request from " +remoteAddress
@@ -685,10 +691,15 @@ public class BluetoothMapService extends ProfileService {
         private BluetoothMapObexServer mMapServer = null;
         private BluetoothServerSocket mServerSocket = null;
         private SocketAcceptThread mAcceptThread = null;
+        private BluetoothServerSocket mL2capServerSocket = null;
+        private L2capSocketAcceptThread mL2capAcceptThread = null;
         private BluetoothSocket mConnSocket = null;
         private ServerSession mServerSession = null;
         private int mSupportedMessageTypes;
         private int mMasId;
+        public static final int TYPE_RFCOMM = 0;
+        public static final int TYPE_L2CAP = 1;
+        private int mTransportType;
         private Context context;
         boolean mWaitingForConfirmation = false;
 
@@ -698,6 +709,33 @@ public class BluetoothMapService extends ProfileService {
             Log.d(TAG, "masId "+masId);
             mSupportedMessageTypes = supportedMessageTypes;
             mMasId = masId;
+        }
+        private void startL2capSocketListener() {
+            if (VERBOSE){
+                Log.v(TAG, "Map Service startL2capSocketListener");
+                Log.v(TAG, "mMasId is "+mMasId);
+            }
+
+            context = getApplicationContext();
+            // Promote Email Instance only if primary email account configured
+            if(mMasId == 1) {
+               if (BluetoothMapUtils.getEmailAccountId(context) == -1) {
+                   if (VERBOSE) Log.v(TAG, "account is not configured");
+                   return;
+               }
+            }
+
+            if (mL2capServerSocket == null) {
+                if (!initL2capSocket()) {
+                    closeConnection();
+                    return;
+                }
+            }
+            if (mL2capAcceptThread == null) {
+                mL2capAcceptThread = new L2capSocketAcceptThread(mMasId);
+                mL2capAcceptThread.setName("BluetoothMapL2capAcceptThread " + mMasId);
+                mL2capAcceptThread.start();
+            }
         }
 
         private void startRfcommSocketListener() {
@@ -723,10 +761,74 @@ public class BluetoothMapService extends ProfileService {
             }
             if (mAcceptThread == null) {
                 mAcceptThread = new SocketAcceptThread(mMasId);
-                mAcceptThread.setName("BluetoothMapAcceptThread " + mMasId);
+                mAcceptThread.setName("BluetoothMapRfcommAcceptThread " + mMasId);
                 mAcceptThread.start();
             }
         }
+        private final boolean initL2capSocket() {
+            if (VERBOSE) {
+                Log.v(TAG, "Map Service initL2capSocket");
+                Log.v(TAG, "mMasId is "+mMasId);
+            }
+
+            boolean initSocketOK = false;
+            final int CREATE_RETRY_TIME = 10;
+            mInterrupted = false;
+
+            // It's possible that create will fail in some cases. retry for 10 times
+            for (int i = 0; i < CREATE_RETRY_TIME && !mInterrupted; i++) {
+                try {
+                    if(mSupportedMessageTypes == MESSAGE_TYPE_EMAIL)
+                       mL2capServerSocket  =
+                           mAdapter.listenUsingL2capWithServiceRecord("Email Message Access",
+                               BluetoothUuid.MAS.getUuid());
+                    else
+                       mL2capServerSocket  =
+                          mAdapter.listenUsingL2capWithServiceRecord("SMS/MMS Message Access",
+                              BluetoothUuid.MAS.getUuid());
+                    initSocketOK = true;
+                } catch (IOException e) {
+                    Log.e(TAG, "Error create L2capServerSocket " + e.toString());
+                    initSocketOK = false;
+                }
+
+                if (!initSocketOK) {
+                    // Need to break out of this loop if BT is being turned off.
+                    if (mAdapter == null) {
+                        break;
+                    }
+                    int state = mAdapter.getState();
+                    if ((state != BluetoothAdapter.STATE_TURNING_ON) &&
+                        (state != BluetoothAdapter.STATE_ON)) {
+                         Log.w(TAG, "initL2capSocket failed as BT is (being) turned off");
+                         break;
+                     }
+
+                    synchronized (this) {
+                        try {
+                            if (VERBOSE) Log.v(TAG, "wait 3 seconds");
+                            Thread.sleep(300);
+                        } catch (InterruptedException e) {
+                            Log.e(TAG, "socketAcceptThread thread was interrupted (3)");
+                            mInterrupted = true;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (initSocketOK) {
+                if (VERBOSE)
+                    Log.v(TAG, "Succeed to create L2cap listening socket for mMasId "
+                            + mMasId);
+            } else {
+                Log.e(TAG, "Error to create l2cap listening socket after "
+                        + CREATE_RETRY_TIME + " try");
+            }
+            return initSocketOK;
+        }
+
 
         private final boolean initSocket() {
             if (VERBOSE) {
@@ -801,6 +903,15 @@ public class BluetoothMapService extends ProfileService {
                    Log.e(TAG, "Close Server Socket error: " + ex);
                 }
             }
+            if (mL2capServerSocket != null) {
+                try {
+                   // this will cause mServerSocket.accept() return early with IOException
+                   mL2capServerSocket.close();
+                   mL2capServerSocket = null;
+                } catch (IOException ex) {
+                   Log.e(TAG, "Close L2cap Server Socket error: " + ex);
+                }
+            }
         }
         private final synchronized void closeConnectionSocket() {
             if (mConnSocket != null) {
@@ -825,6 +936,15 @@ public class BluetoothMapService extends ProfileService {
                     mAcceptThread = null;
                 } catch (InterruptedException ex) {
                      Log.w(TAG, "mAcceptThread close error" + ex);
+                }
+            }
+            if (mL2capAcceptThread != null) {
+                try {
+                    mL2capAcceptThread.shutdown();
+                    mL2capAcceptThread.join();
+                    mL2capAcceptThread = null;
+                } catch (InterruptedException ex) {
+                     Log.w(TAG, "mL2capAcceptThread close error" + ex);
                 }
             }
             if (mServerSession != null) {
@@ -856,9 +976,14 @@ public class BluetoothMapService extends ProfileService {
                mAuth.setChallenged(false);
                mAuth.setCancelled(false);
             }
-            // setup RFCOMM transport
-            BluetoothMapRfcommTransport transport = new BluetoothMapRfcommTransport(mConnSocket);
+            Log.d(TAG, "Map Service startObexServerSession Transport : "+mTransportType);
+            BluetoothMapTransport transport =
+                new BluetoothMapTransport(mConnSocket, mTransportType);
             mServerSession = new ServerSession(transport, mMapServer, mAuth);
+            // Turn on/off SRM based on transport capability (whether OBEX-over-L2CAP, or not)
+            Log.d(TAG, "Map Service obexServerSession SRM CAPABILITY Transport : "
+                +transport.isSrmCapable());
+            mServerSession.mSrmServer.setLocalSrmCapability(transport.isSrmCapable());
             setState(BluetoothMap.STATE_CONNECTED);
             if (DEBUG) {
                 Log.d(TAG, "startObexServerSession() success!");
@@ -872,17 +997,6 @@ public class BluetoothMapService extends ProfileService {
                 Log.d(TAG, "mMasId is "+mMasId);
             }
 
-            if (mAcceptThread != null) {
-                try {
-                    mAcceptThread.shutdown();
-                    mAcceptThread.join();
-                } catch (InterruptedException ex) {
-                    Log.w(TAG, "mAcceptThread  close error" + ex);
-                } finally {
-                    mAcceptThread = null;
-                }
-            }
-
             if (mServerSession != null) {
                 mServerSession.close();
                 mServerSession = null;
@@ -893,19 +1007,14 @@ public class BluetoothMapService extends ProfileService {
             mConnectionManager.removeFromMapClientList(mMasId);
             closeConnectionSocket();
 
-            // Last obex transaction is finished, we start to listen for incoming
-            // connection again
-            if (mAdapter.isEnabled()) {
-                startRfcommSocketListener();
-            }
             setState(BluetoothMap.STATE_DISCONNECTED);
         }
 
         /**
          * A thread that runs in the background waiting for remote rfcomm
-         * connect.Once a remote socket connected, this thread shall be
-         * shutdown.When the remote disconnect,this thread shall run again waiting
-         * for next request.
+         * connect. To Keep MAP SDP listed even while MAP ongoing sessions,
+         * this thread is shutdown only with MapService.
+         * Multiple connections on same MAS Instance are NOT ALLOWED.
          */
         private class SocketAcceptThread extends Thread {
             private boolean stopped = false;
@@ -923,43 +1032,37 @@ public class BluetoothMapService extends ProfileService {
                     return;
                   }
                }
-
-               mConnectionManager.removeFromMapClientList(mMasId);
                while (!stopped) {
                    try {
-                       if (DEBUG) Log.d(TAG, "Accepting socket connection...");
+                       if (DEBUG) Log.d(TAG, "Waiting to Accept Rfcommsocket connections..");
                        serverSocket = mServerSocket;
                         if(serverSocket == null) {
-                           Log.w(TAG, "mServerSocket is null");
+                           Log.w(TAG, "mServerSocket RFCOMM is null");
                            break;
                        }
-                       mConnSocket = serverSocket.accept();
-                       if (DEBUG) Log.d(TAG, "Accepted socket connection...");
+                       BluetoothSocket ConnSocket = serverSocket.accept();
+                       if (DEBUG) Log.d(TAG, "Accepted Rfcommsocket connection");
                        synchronized (BluetoothMapService.this) {
-                           if (mConnSocket == null) {
-                               Log.w(TAG, "mConnSocket is null");
+                           if (ConnSocket == null || ConnSocket.getRemoteDevice() == null) {
+                               Log.w(TAG, "ConnSocket is null");
                                break;
-                           }
-                           mRemoteDevice = mConnSocket.getRemoteDevice();
-                       }
-                       if (mRemoteDevice == null) {
-                          Log.i(TAG, "getRemoteDevice() = null");
-                          break;
-                       }
-
-                       sRemoteDeviceName = mRemoteDevice.getName();
-                      // In case getRemoteName failed and return null
+                          }
+                      }
+                      if (!mConnectionManager.isAllowedConnection(ConnSocket.getRemoteDevice(),mMasId)) {
+                          Log.w(TAG, "mRemoteDevice not allowed" + mRemoteDevice);
+                          ConnSocket.close();
+                          ConnSocket = null;
+                          continue;
+                     }
+                     mConnSocket = ConnSocket;
+                     mTransportType = TYPE_RFCOMM;
+                     mRemoteDevice = ConnSocket.getRemoteDevice();
+                     sRemoteDeviceName = mRemoteDevice.getName();
+                     // In case getRemoteName failed and return null
                       if (TextUtils.isEmpty(sRemoteDeviceName)) {
                           sRemoteDeviceName = getString(R.string.defaultname);
                       }
-                      if (!mConnectionManager.isAllowedConnection(mRemoteDevice,mMasId)) {
-                          mConnSocket.close();
-                          mConnSocket = null;
-                          continue;
-                      }
-
                       mConnectionManager.addToMapClientList(mRemoteDevice.getAddress(), mMasId);
-
                       mConnectionManager.setWaitingForConfirmation(mMasId);
                       isWaitingAuthorization = true;
                       Intent intent = new
@@ -979,7 +1082,7 @@ public class BluetoothMapService extends ProfileService {
                       removeTimeoutMsg = true;
                       mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
                           .obtainMessage(USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
-                      stopped = true; // job done ,close this thread;
+                      //stopped = true; // job done ,close this thread;
                     } catch (IOException ex) {
                        stopped=true;
                        if (DEBUG) Log.v(TAG, "Accept exception: " + ex.toString());
@@ -992,8 +1095,89 @@ public class BluetoothMapService extends ProfileService {
                interrupt();
             }
         }
-    };
+        /**
+         * A thread that runs in the background waiting for remote rfcomm
+         * connect. To Keep MAP SDP listed even while MAP ongoing sessions,
+         * this thread is shutdown only with MapService.
+         * Multiple connections on same MAS Instance are NOT ALLOWED.
+         */
+        private class L2capSocketAcceptThread extends Thread {
+            private boolean stopped = false;
+            private int mMasId;
 
+            public L2capSocketAcceptThread(int masId) {
+             Log.d(TAG, "inside L2capSocketAcceptThread");
+                mMasId = masId;
+            }
+           @Override
+           public void run() {
+               BluetoothServerSocket serverSocket;
+               if (mL2capServerSocket == null) {
+                  if (!initL2capSocket()) {
+                    return;
+                  }
+               }
+               while (!stopped) {
+                    try {
+                        if (DEBUG) Log.d(TAG, "Waiting on L2cap for socket connection...");
+                        serverSocket = mL2capServerSocket;
+                        if(serverSocket == null) {
+                           Log.w(TAG, "mServerSocket L2cap is null");
+                           break;
+                        }
+                        BluetoothSocket ConnSocket = serverSocket.accept();
+                        synchronized (BluetoothMapService.this) {
+                            if (ConnSocket == null || ConnSocket.getRemoteDevice() == null) {
+                                Log.w(TAG, "ConnSocket is null");
+                                break;
+                            }
+                        }
+                        if (DEBUG) Log.d(TAG, "Accepted L2CAP socket connection...");
+                        if (!mConnectionManager.isAllowedConnection( ConnSocket.getRemoteDevice(),
+                                                  mMasId)) {
+                            ConnSocket.close();
+                            ConnSocket = null;
+                            continue;
+                        }
+                        mConnSocket = ConnSocket;
+                        mTransportType = TYPE_L2CAP;
+                        mRemoteDevice = ConnSocket.getRemoteDevice();
+                        sRemoteDeviceName = mRemoteDevice.getName();
+                        // In case getRemoteName failed and return null
+                        if (TextUtils.isEmpty(sRemoteDeviceName)) {
+                            sRemoteDeviceName = getString(R.string.defaultname);
+                        }
+                        mConnectionManager.addToMapClientList(mRemoteDevice.getAddress(), mMasId);
+                        mConnectionManager.setWaitingForConfirmation(mMasId);
+                        isWaitingAuthorization = true;
+                        Intent intent = new
+                            Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
+                        intent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
+                        intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                            BluetoothDevice.REQUEST_TYPE_MESSAGE_ACCESS);
+                        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
+                        sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                        if (DEBUG) Log.d(TAG, "waiting for authorization for connection from: "
+                              + sRemoteDeviceName);
+                        //Queue USER_TIMEOUT to disconnect MAP OBEX session. If user doesn't
+                        //accept or reject authorization request.
+                        removeTimeoutMsg = true;
+                        mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
+                          .obtainMessage(USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
+                        //stopped = true; // job done ,close this thread;
+                    } catch (IOException ex) {
+                       stopped=true;
+                       if (DEBUG) Log.v(TAG, "Accept exception: " + ex.toString());
+                   }
+               }
+            }
+
+            void shutdown() {
+               stopped = true;
+               interrupt();
+            }
+         }
+    }
     private MapBroadcastReceiver mMapReceiver = new MapBroadcastReceiver();
 
     private class MapBroadcastReceiver extends BroadcastReceiver {

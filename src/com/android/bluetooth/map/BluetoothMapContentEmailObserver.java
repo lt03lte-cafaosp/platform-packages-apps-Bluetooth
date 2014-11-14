@@ -626,7 +626,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
 
     @Override
     public long sendEmailMessage(String folder, String[] toList, BluetoothMapbMessageMmsEmail msg) {
-        Log.d(TAG, "sendMessage for " + folder);
+        Log.d(TAG, "sendMessageEmail for " + folder);
         /*
          *strategy:
          *1) parse message into parts

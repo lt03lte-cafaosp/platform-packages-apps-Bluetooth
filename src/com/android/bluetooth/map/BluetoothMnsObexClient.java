@@ -35,6 +35,7 @@ import javax.btobex.ClientOperation;
 import javax.btobex.ClientSession;
 import javax.btobex.HeaderSet;
 import javax.btobex.ObexTransport;
+import javax.btobex.ObexHelper;
 import javax.btobex.ResponseCodes;
 
 /**
@@ -246,17 +247,27 @@ public class BluetoothMnsObexClient {
         Log.d(TAG, "handleRegistration: connect 2");
 
         BluetoothSocket btSocket = null;
+        int mnsTransportType = BluetoothMnsTransport.TYPE_L2CAP;
         try {
-            btSocket = mRemoteDevice.createInsecureRfcommSocketToServiceRecord(
+            btSocket = mRemoteDevice.createInsecureL2capSocketToServiceRecord(
                     BluetoothUuid_ObexMns.getUuid());
+            mnsTransportType = BluetoothMnsTransport.TYPE_L2CAP;
             btSocket.connect();
         } catch (IOException e) {
-            Log.e(TAG, "BtSocket Connect error " + e.getMessage(), e);
-            // TODO: do we need to report error somewhere?
-            return;
+            Log.e(TAG, "BtL2CAPSocket Connect error. Switch to RFCOMM " + e.getMessage(), e);
+            //Switch to RFCOMM if L2CAP failed
+            try {
+                btSocket = mRemoteDevice.createInsecureRfcommSocketToServiceRecord(
+                       BluetoothUuid_ObexMns.getUuid());
+                mnsTransportType = BluetoothMnsTransport.TYPE_RFCOMM;
+                btSocket.connect();
+            } catch (IOException e1) {
+               Log.e(TAG, "BtRFCOMMSocket Connect error " + e.getMessage(), e);
+               return;
+            }
         }
 
-        mTransport = new BluetoothMnsRfcommTransport(btSocket);
+        mTransport = new BluetoothMnsTransport(btSocket, mnsTransportType);
 
         try {
             mClientSession = new ClientSession(mTransport);
@@ -288,6 +299,9 @@ public class BluetoothMnsObexClient {
             synchronized (this) {
                 mWaitingForRemote = false;
         }
+        // Turn on/off SRM based on transport capability based on OBEX-over-L2CAP capable
+        mClientSession.mSrmClient.setLocalSrmCapability(
+                    ((BluetoothMnsTransport)(mTransport)).isSrmCapable());
         Log.d(TAG, "Exiting from connect");
     }
 
@@ -356,7 +370,16 @@ public class BluetoothMnsObexClient {
             } else {
                 Log.w(TAG, "sendEvent: no connection ID");
             }
-
+            // Add the SRM header if client capable
+            if (clientSession.mSrmClient.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+               Log.v(TAG, "SRM status: Enable SRM for first PUT");
+               clientSession.mSrmClient.setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+               request.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
+            } else {
+               Log.v(TAG, "SRM status: Disable SRM for first PUT");
+               clientSession.mSrmClient.setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+            }
+            clientSession.mSrmClient.setLocalSrmpWait(false);
             synchronized (this) {
                 mWaitingForRemote = true;
             }
@@ -382,17 +405,16 @@ public class BluetoothMnsObexClient {
                     error = true;
                 }
             }
-
             if (!error) {
-
                 maxChunkSize = putOperation.getMaxPacketSize();
-
+                if (V) Log.v(TAG, "bytesWritten: "+bytesWritten +
+                    " eventBytes: "+ eventBytes.length);
                 while (bytesWritten < eventBytes.length) {
                     bytesToWrite = Math.min(maxChunkSize, eventBytes.length - bytesWritten);
+                    if (V) Log.v(TAG, "bytesToWrite: "+bytesToWrite);
                     outputStream.write(eventBytes, bytesWritten, bytesToWrite);
                     bytesWritten += bytesToWrite;
                 }
-
                 if (bytesWritten == eventBytes.length) {
                     Log.i(TAG, "SendEvent finished send length" + eventBytes.length);
                     if (outputStream != null) {
