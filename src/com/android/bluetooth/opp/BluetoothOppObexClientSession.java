@@ -122,7 +122,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
     }
     private class ContentResolverUpdateThread extends Thread {
 
-        private static final int sSleepTime = 500;
+        private static final int sSleepTime = 1000;
         private Uri contentUri;
         private Context mContext1;
         private long position;
