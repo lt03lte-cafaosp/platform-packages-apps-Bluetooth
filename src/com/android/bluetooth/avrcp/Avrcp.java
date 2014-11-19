@@ -1254,8 +1254,8 @@ public final class Avrcp {
     void updateNowPlayingEntriesReceived(long[] playList) {
         int status = OPERATION_SUCCESSFUL;
         int numItems = 0;
-        int reqItems = (mCachedRequest.mEnd - mCachedRequest.mStart) + 1;
-        int availableItems = 0;
+        long reqItems = (mCachedRequest.mEnd - mCachedRequest.mStart) + 1;
+        long availableItems = 0;
         Cursor cursor = null;
         int[] itemType = new int[MAX_BROWSE_ITEM_TO_SEND];
         long[] uid = new long[MAX_BROWSE_ITEM_TO_SEND];
@@ -1283,7 +1283,7 @@ public final class Avrcp {
             return;
         }
 
-        if ((mCachedRequest.mStart < 0) || (mCachedRequest.mEnd< 0) ||
+        if ((mCachedRequest.mStart < 0) || (mCachedRequest.mEnd < 0) ||
                             (mCachedRequest.mStart > mCachedRequest.mEnd)) {
             Log.i(TAG, "wrong start / end index");
             getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType, uid, type,
@@ -1292,18 +1292,23 @@ public final class Avrcp {
         }
 
         availableItems = availableItems - mCachedRequest.mStart;
+        Log.i(TAG, "start Index: " + mCachedRequest.mStart);
+        Log.i(TAG, "end Index: " + mCachedRequest.mEnd);
+        Log.i(TAG, "availableItems: " + availableItems);
         if (availableItems > MAX_BROWSE_ITEM_TO_SEND)
             availableItems = MAX_BROWSE_ITEM_TO_SEND;
         if (reqItems > availableItems)
             reqItems = availableItems;
+        Log.i(TAG, "reqItems: " + reqItems);
 
         for (index = 0; index < reqItems; index++) {
             try {
                 cursor = mContext.getContentResolver().query(
                      mMediaUri, mCursorCols,
                      MediaStore.Audio.Media.IS_MUSIC + "=1 AND _id=" +
-                                                playList[index], null, null);
+                         playList[index + (int)mCachedRequest.mStart], null, null);
                 if (cursor != null) {
+                    int validAttrib = 0;
                     cursor.moveToFirst();
                     itemType[index] = TYPE_MEDIA_ELEMENT_ITEM;
                     uid[index] = cursor.getLong(cursor.getColumnIndexOrThrow("_id"));
@@ -1311,20 +1316,25 @@ public final class Avrcp {
                     playable[index] = 0;
                     displayName[index] = cursor.getString(cursor.getColumnIndexOrThrow(
                                                             MediaStore.Audio.Media.TITLE));
-                    numAtt[index] = mCachedRequest.mAttrCnt;
                     for (int attIndex = 0; attIndex < mCachedRequest.mAttrCnt; attIndex++) {
                         int attr = mCachedRequest.mAttrList.get(attIndex).intValue();
-                        attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
-                                                    cursor, attr);
-                        attIds[(7 * index) + attIndex] = attr;
+                        if ((attr <= MEDIA_ATTR_MAX) && (attr >= MEDIA_ATTR_MIN)) {
+                            attValues[(7 * index) + attIndex] =
+                                getAttributeStringFromCursor(cursor, attr);
+                            attIds[(7 * index) + attIndex] = attr;
+                            validAttrib ++;
+                        }
                     }
-                    cursor.close();
+                    numAtt[index] = (byte)validAttrib;
                 }
             } catch(Exception e) {
-                Log.i(TAG, "Exception e"+ e);
-                cursor.close();
+                Log.i(TAG, "Exception "+ e);
                 getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
                             uid, type, playable, displayName, numAtt, attValues, attIds);
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
             }
         }
         numItems = index;
@@ -1333,11 +1343,11 @@ public final class Avrcp {
     }
 
     class CachedRequest {
-        int mStart;
-        int mEnd;
+        long mStart;
+        long mEnd;
         byte mAttrCnt;
         ArrayList<Integer> mAttrList;
-        public CachedRequest(int start, int end, byte attrCnt, int[] attrs) {
+        public CachedRequest(long start, long end, byte attrCnt, int[] attrs) {
             mStart = start;
             mEnd = end;
             mAttrCnt = attrCnt;
@@ -1350,12 +1360,12 @@ public final class Avrcp {
 
     class FolderListEntries {
         byte mScope;
-        int mStart;
-        int mEnd;
+        long mStart;
+        long mEnd;
         int mAttrCnt;
         int mNumAttr;
         ArrayList<Integer> mAttrList;
-        public FolderListEntries(byte scope, int start, int end, int attrCnt, int numAttr,
+        public FolderListEntries(byte scope, long start, long end, int attrCnt, int numAttr,
                                                                                 int[] attrs) {
             mScope = scope;
             mStart = start;
@@ -1617,11 +1627,13 @@ public final class Avrcp {
                             status = NOT_A_DIRECTORY;
                         else
                             status = DOES_NOT_EXIST;
-                        cursor.close();
                     } catch (Exception e) {
                         Log.e(TAG, "Exception " + e);
-                        cursor.close();
                         changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                     break;
                 default:
@@ -1656,12 +1668,14 @@ public final class Avrcp {
                             } else{
                                 numberOfItems = cursor.getCount();
                                 mCurrentPathUid = String.valueOf(folderUid);
-                                cursor.close();
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Exception " + e);
-                            cursor.close();
                             changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        } finally {
+                            if (cursor != null) {
+                                cursor.close();
+                            }
                         }
                     } else { // Path @ Individual Album id
                         Cursor cursor = null;
@@ -1677,11 +1691,13 @@ public final class Avrcp {
                                 status = NOT_A_DIRECTORY;
                             else
                                 status = DOES_NOT_EXIST;
-                            cursor.close();
                         } catch (Exception e) {
                             Log.e(TAG, "Exception " + e);
-                            cursor.close();
                             changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        } finally {
+                            if (cursor != null) {
+                                cursor.close();
+                            }
                         }
                     }
                     break;
@@ -1718,12 +1734,14 @@ public final class Avrcp {
                                 numberOfItems = cursor.getCount();
                                 mCurrentPathUid = String.valueOf(folderUid);
                                 mCurrentPath = PATH_ARTISTS;
-                                cursor.close();
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Exception " + e);
-                            cursor.close();
                             changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        } finally {
+                            if (cursor != null) {
+                                cursor.close();
+                            }
                         }
                     } else {
                         Cursor cursor = null;
@@ -1737,11 +1755,13 @@ public final class Avrcp {
                                 status = NOT_A_DIRECTORY;
                             else
                                 status = DOES_NOT_EXIST;
-                            cursor.close();
                         } catch (Exception e) {
                             Log.e(TAG, "Exception " + e);
-                            cursor.close();
                             changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        } finally {
+                            if (cursor != null) {
+                                cursor.close();
+                            }
                         }
                     }
                     break;
@@ -1784,12 +1804,14 @@ public final class Avrcp {
                                 numberOfItems = cursor.getCount();
                                 mCurrentPathUid = String.valueOf(folderUid);
                                 mCurrentPath = PATH_PLAYLISTS;
-                                cursor.close();
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Exception " + e);
-                            cursor.close();
                             changePathRspNative(INTERNAL_ERROR, numberOfItems);
+                        } finally {
+                            if (cursor != null) {
+                                cursor.close();
+                            }
                         }
                     } else {
                         numberOfItems = 0;
@@ -1824,13 +1846,15 @@ public final class Avrcp {
                 return 0;
             } else {
                 long count = cursor.getCount();
-                cursor.close();
                 return count;
             }
         } catch (Exception e) {
             Log.e(TAG, "Exception " + e);
-            cursor.close();
             return 0;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
         }
     }
 
@@ -1848,7 +1872,6 @@ public final class Avrcp {
                 return 0;
             } else if (path.equals(PATH_TITLES)) {
                 long count = cursor.getCount();
-                cursor.close();
                 return count;
             } else if (path.equals(PATH_ALBUMS) || path.equals(PATH_ARTISTS)){
                 long elemCount = 0;
@@ -1867,12 +1890,14 @@ public final class Avrcp {
                     count--;
                 }
                 Log.i(TAG, "element Count is "+ elemCount);
-                cursor.close();
                 return elemCount;
             }
         } catch (Exception e) {
             Log.e(TAG, "Exception " + e);
-            cursor.close();
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
         }
         return 0;
     }
@@ -1919,13 +1944,15 @@ public final class Avrcp {
                         playItemRspNative(DOES_NOT_EXIST);
                     } else {
                         Log.i(TAG, "Play uid:" + uid);
-                        cursor.close();
                         mRemoteController.setRemoteControlClientPlayItem(uid, scope);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Exception " + e);
-                    cursor.close();
                     playItemRspNative(INTERNAL_ERROR);
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                    }
                 }
             } else if (mCurrentPath.equals(PATH_ALBUMS)) {
                 if (mCurrentPathUid == null) {
@@ -1944,13 +1971,15 @@ public final class Avrcp {
                             playItemRspNative(DOES_NOT_EXIST);
                         } else {
                             Log.i(TAG, "Play uid:" + uid);
-                            cursor.close();
                             mRemoteController.setRemoteControlClientPlayItem(uid, scope);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Exception " + e);
-                        cursor.close();
                         playItemRspNative(INTERNAL_ERROR);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 }
             } else if (mCurrentPath.equals(PATH_ARTISTS)) {
@@ -1970,13 +1999,15 @@ public final class Avrcp {
                             playItemRspNative(DOES_NOT_EXIST);
                         } else {
                             Log.i(TAG, "Play uid:" + uid);
-                            cursor.close();
                             mRemoteController.setRemoteControlClientPlayItem(uid, scope);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Exception " + e);
-                        cursor.close();
                         playItemRspNative(INTERNAL_ERROR);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 }
             } else if (mCurrentPath.equals(PATH_PLAYLISTS)) {
@@ -2009,13 +2040,15 @@ public final class Avrcp {
                             playItemRspNative(DOES_NOT_EXIST);
                         } else {
                             Log.i(TAG, "Play uid:" + uid);
-                            cursor.close();
                             mRemoteController.setRemoteControlClientPlayItem(uid, scope);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Exception " + e);
-                        cursor.close();
                         playItemRspNative(INTERNAL_ERROR);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 }
             } else {
@@ -2078,16 +2111,23 @@ public final class Avrcp {
                     Log.i(TAG, "Invalid track UID");
                     getItemAttrRspNative((byte)0, attrs, textArray);
                 } else {
+                    int validAttrib = 0;
                     cursor.moveToFirst();
                     for (int i = 0; i < numAttr; ++i) {
-                        textArray[i] = getAttributeStringFromCursor(cursor, attrs[i]);
+                        if ((attrs[i] <= MEDIA_ATTR_MAX) && (attrs[i] >= MEDIA_ATTR_MIN)) {
+                            textArray[i] = getAttributeStringFromCursor(cursor, attrs[i]);
+                            validAttrib ++;
+                        }
                     }
-                    getItemAttrRspNative(numAttr, attrs, textArray);
-                    cursor.close();
+                    getItemAttrRspNative((byte)validAttrib, attrs, textArray);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Exception " + e); cursor.close();
+                Log.e(TAG, "Exception " + e);
                 getItemAttrRspNative((byte)0, attrs, textArray);
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
             }
         } else {
             Log.i(TAG, "Invalid scope");
@@ -2148,7 +2188,7 @@ public final class Avrcp {
         }
     }
 
-    private void getFolderItems(byte scope, int start, int end, int attrCnt,
+    private void getFolderItems(byte scope, long start, long end, int attrCnt,
                                                         int numAttr, int[] attrs) {
         if (DEBUG) Log.v(TAG, "getFolderItems");
         if (DEBUG) Log.v(TAG, "scope: " + scope + " attrCnt: " + attrCnt);
@@ -2163,7 +2203,7 @@ public final class Avrcp {
         mHandler.sendMessage(msg);
     }
 
-    private void processGetFolderItems(byte scope, int start, int end, int size,
+    private void processGetFolderItems(byte scope, long start, long end, int size,
                                                                 int numAttr, int[] attrs) {
         if (DEBUG) Log.v(TAG, "processGetFolderItems");
         if (DEBUG) Log.v(TAG, "scope: " + scope + " size: " + size);
@@ -2178,7 +2218,7 @@ public final class Avrcp {
         }
     }
 
-    private void processGetMediaPlayerItems(byte scope, int start, int end, int size,
+    private void processGetMediaPlayerItems(byte scope, long start, long end, int size,
                                                                 int numAttr, int[] attrs) {
         byte[] folderItems = new byte[size];
         int[] folderItemLengths = new int[32];
@@ -2218,12 +2258,12 @@ public final class Avrcp {
         return false;
     }
 
-    private void processGetFolderItemsInternal(byte scope, int start, int end, int size,
+    private void processGetFolderItemsInternal(byte scope, long start, long end, long size,
                                                                     byte numAttr, int[] attrs) {
 
         int status = OPERATION_SUCCESSFUL;
-        int numItems = 0;
-        int reqItems = (end - start) + 1;
+        long numItems = 0;
+        long reqItems = (end - start) + 1;
         int[] itemType = new int[MAX_BROWSE_ITEM_TO_SEND];
         long[] uid = new long[MAX_BROWSE_ITEM_TO_SEND];
         int[] type = new int[MAX_BROWSE_ITEM_TO_SEND];
@@ -2264,7 +2304,7 @@ public final class Avrcp {
             }
 
             if (mCurrentPath.equals(PATH_ROOT)) {
-                int availableItems = NUM_ROOT_ELEMENTS;
+                long availableItems = NUM_ROOT_ELEMENTS;
                 if (start >= availableItems) {
                     Log.i(TAG, "startIteam exceeds the available item index");
                     getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType, uid,
@@ -2283,8 +2323,8 @@ public final class Avrcp {
                 numItems = reqItems;
 
                 for (int count = 0; count < reqItems; count ++) {
-                    int index = start + count;
-                    switch (index) {
+                    long index = start + count;
+                    switch ((int)index) {
                         case ALBUMS_ITEM_INDEX:
                             itemType[count] = TYPE_FOLDER_ITEM;
                             uid[count] = UID_ALBUM;
@@ -2331,7 +2371,7 @@ public final class Avrcp {
                 getFolderItemsRspNative((byte)status, numItems, itemType, uid, type,
                                     playable, displayName, numAtt, attValues, attIds);
             } else if (mCurrentPath.equals(PATH_TITLES)) {
-                int availableItems = 0;
+                long availableItems = 0;
                 Cursor cursor = null;
                 try {
                     cursor = mContext.getContentResolver().query(
@@ -2345,7 +2385,6 @@ public final class Avrcp {
                             getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
                             itemType, uid, type, playable, displayName, numAtt, attValues,
                                                                                     attIds);
-                            cursor.close();
                             return;
                         }
                         cursor.moveToFirst();
@@ -2377,23 +2416,30 @@ public final class Avrcp {
                         displayName[index] =
                             cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
                                                                     Audio.Media.TITLE));
-                        numAtt[index] = numAttr;
+                        int validAttrib = 0;
                         for (attIndex = 0; attIndex < numAttr; attIndex++) {
-                            attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
-                                                                    cursor, attrs[attIndex]);
-                            attIds[(7 * index) + attIndex] = attrs[attIndex];
+                            if ((attrs[attIndex] <= MEDIA_ATTR_MAX) &&
+                                        (attrs[attIndex] >= MEDIA_ATTR_MIN)) {
+                                attValues[(7 * index) + attIndex] =
+                                    getAttributeStringFromCursor(cursor, attrs[attIndex]);
+                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                validAttrib ++;
+                            }
                         }
+                        numAtt[index] = (byte)validAttrib;
                         cursor.moveToNext();
                     }
                     numItems = index;
                     getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
                                         type, playable, displayName, numAtt, attValues, attIds);
-                    cursor.close();
                 } catch(Exception e) {
                     Log.i(TAG, "Exception e" + e);
-                    cursor.close();
                     getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
                                             playable, displayName, numAtt, attValues, attIds);
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                    }
                 }
             } else if (mCurrentPath.equals(PATH_ALBUMS)) {
                 if (mCurrentPathUid == null) {
@@ -2472,16 +2518,18 @@ public final class Avrcp {
                                 itemType, uid, type, playable, displayName, numAtt, attValues,
                                 attIds);
                         }
-                        cursor.close();
                     } catch(Exception e) {
                         Log.i(TAG, "Exception e" + e);
-                        cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
                                         playable, displayName, numAtt, attValues, attIds);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 } else {
                     long folderUid = Long.valueOf(mCurrentPathUid);
-                    int availableItems = 0;
+                    long availableItems = 0;
                     Cursor cursor = null;
                     try {
                         cursor = mContext.getContentResolver().query(
@@ -2497,7 +2545,6 @@ public final class Avrcp {
                                 getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
                                     itemType, uid, type, playable, displayName, numAtt,
                                     attValues, attIds);
-                                cursor.close();
                                 return;
                             }
                             cursor.moveToFirst();
@@ -2530,24 +2577,31 @@ public final class Avrcp {
                             playable[index] = 0;
                             displayName[index] =
                                 cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
-                                                                        Audio.Media.TITLE));
-                            numAtt[index] = numAttr;
+                                                                        Audio.Media.TITLE));                            
+                            int validAttrib = 0;
                             for (attIndex = 0; attIndex < numAttr; attIndex++) {
-                                attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
-                                                                            cursor, attrs[attIndex]);
-                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                if ((attrs[attIndex] <= MEDIA_ATTR_MAX) &&
+                                            (attrs[attIndex] >= MEDIA_ATTR_MIN)) {
+                                    attValues[(7 * index) + attIndex] =
+                                        getAttributeStringFromCursor(cursor, attrs[attIndex]);
+                                    attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                    validAttrib ++;
+                                }
                             }
+                            numAtt[index] = (byte)validAttrib;
                             cursor.moveToNext();
                         }
                         numItems = index;
                         getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
                                             type, playable, displayName, numAtt, attValues, attIds);
-                        cursor.close();
                     } catch(Exception e) {
                         Log.i(TAG, "Exception e" + e);
-                        cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
                                         playable, displayName, numAtt, attValues, attIds);
+                    } finally {
+                        if (cursor != null) {
+                        cursor.close();
+                        }
                     }
                 }
             } else if (mCurrentPath.equals(PATH_ARTISTS)) {
@@ -2625,16 +2679,18 @@ public final class Avrcp {
                             getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems, itemType,
                                 uid, type, playable, displayName, numAtt, attValues, attIds);
                         }
-                        cursor.close();
                     } catch(Exception e) {
                         Log.i(TAG, "Exception e" + e);
-                        cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
                                         playable, displayName, numAtt, attValues, attIds);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 } else {
                     long folderUid = Long.valueOf(mCurrentPathUid);
-                    int availableItems = 0;
+                    long availableItems = 0;
                     Cursor cursor = null;
                     try {
                         cursor = mContext.getContentResolver().query(
@@ -2650,7 +2706,6 @@ public final class Avrcp {
                                 getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
                                 itemType, uid, type, playable, displayName, numAtt, attValues,
                                                                                         attIds);
-                                cursor.close();
                                 return;
                             }
                             cursor.moveToFirst();
@@ -2683,23 +2738,30 @@ public final class Avrcp {
                             displayName[index] =
                                 cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
                                                                         Audio.Media.TITLE));
-                            numAtt[index] = numAttr;
+                            int validAttrib = 0;
                             for (attIndex = 0; attIndex < numAttr; attIndex++) {
-                                attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
-                                                                        cursor, attrs[attIndex]);
-                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                if ((attrs[attIndex] <= MEDIA_ATTR_MAX) &&
+                                            (attrs[attIndex] >= MEDIA_ATTR_MIN)) {
+                                    attValues[(7 * index) + attIndex] =
+                                        getAttributeStringFromCursor(cursor, attrs[attIndex]);
+                                    attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                    validAttrib ++;
+                                }
                             }
+                            numAtt[index] = (byte)validAttrib;
                             cursor.moveToNext();
                         }
                         numItems = index;
                         getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType,
                             uid, type, playable, displayName, numAtt, attValues, attIds);
-                        cursor.close();
                     } catch(Exception e) {
                         Log.i(TAG, "Exception e" + e);
-                        cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid,
                                         type, playable, displayName, numAtt, attValues, attIds);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 }
             } else if (mCurrentPath.equals(PATH_PLAYLISTS)) {
@@ -2771,16 +2833,18 @@ public final class Avrcp {
                                 itemType, uid, type, playable, displayName, numAtt,
                                 attValues, attIds);
                         }
-                        cursor.close();
                     } catch(Exception e) {
                         Log.i(TAG, "Exception e" + e);
-                        cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
                             uid, type, playable, displayName, numAtt, attValues, attIds);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 } else {
                     long folderUid = Long.valueOf(mCurrentPathUid);
-                    int availableItems = 0;
+                    long availableItems = 0;
                     Cursor cursor = null;
 
                     String[] playlistMemberCols = new String[] {
@@ -2811,7 +2875,6 @@ public final class Avrcp {
                                 getFolderItemsRspNative((byte)RANGE_OUT_OF_BOUNDS, numItems,
                                     itemType, uid, type, playable, displayName, numAtt,
                                     attValues, attIds);
-                                cursor.close();
                                 return;
                             }
                             cursor.moveToFirst();
@@ -2845,23 +2908,30 @@ public final class Avrcp {
                             displayName[index] =
                                 cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.
                                                                         Audio.Media.TITLE));
-                            numAtt[index] = numAttr;
+                            int validAttrib = 0;
                             for (attIndex = 0; attIndex < numAttr; attIndex++) {
-                                attValues[(7 * index) + attIndex] = getAttributeStringFromCursor(
-                                                                        cursor, attrs[attIndex]);
-                                attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                if ((attrs[attIndex] <= MEDIA_ATTR_MAX) &&
+                                            (attrs[attIndex] >= MEDIA_ATTR_MIN)) {
+                                    attValues[(7 * index) + attIndex] =
+                                        getAttributeStringFromCursor(cursor, attrs[attIndex]);
+                                    attIds[(7 * index) + attIndex] = attrs[attIndex];
+                                    validAttrib ++;
+                                }
                             }
+                            numAtt[index] = (byte)validAttrib;
                             cursor.moveToNext();
                         }
                         numItems = index;
                         getFolderItemsRspNative((byte)OPERATION_SUCCESSFUL, numItems, itemType, uid,
                                             type, playable, displayName, numAtt, attValues, attIds);
-                        cursor.close();
                     } catch(Exception e) {
                         Log.e(TAG, "Exception e" + e);
-                        cursor.close();
                         getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType, uid, type,
                                         playable, displayName, numAtt, attValues, attIds);
+                    } finally {
+                        if (cursor != null) {
+                            cursor.close();
+                        }
                     }
                 }
             } else {
@@ -3092,7 +3162,7 @@ public final class Avrcp {
     }
 
     private String getAttributeStringFromCursor(Cursor cursor, int attrId) {
-        String attrStr = null;
+        String attrStr = "<unknown>";
         switch (attrId) {
             case MEDIA_ATTR_TITLE:
                 attrStr = cursor.getString(cursor.getColumnIndexOrThrow(
@@ -3433,6 +3503,7 @@ private void updateLocalPlayerSettings( byte[] data) {
     final static short PLAYSTATUS_ERROR = 255;
 
     // match up with btrc_media_attr_t enum of bt_rc.h
+    final static int MEDIA_ATTR_MIN = 1;
     final static int MEDIA_ATTR_TITLE = 1;
     final static int MEDIA_ATTR_ARTIST = 2;
     final static int MEDIA_ATTR_ALBUM = 3;
@@ -3440,6 +3511,7 @@ private void updateLocalPlayerSettings( byte[] data) {
     final static int MEDIA_ATTR_NUM_TRACKS = 5;
     final static int MEDIA_ATTR_GENRE = 6;
     final static int MEDIA_ATTR_PLAYING_TIME = 7;
+    final static int MEDIA_ATTR_MAX = 7;
 
     // match up with btrc_event_id_t enum of bt_rc.h
     final static int EVT_PLAY_STATUS_CHANGED = 1;
@@ -3779,7 +3851,7 @@ private void updateLocalPlayerSettings( byte[] data) {
     private native boolean setAdressedPlayerRspNative(byte statusCode);
     private native boolean getMediaPlayerListRspNative(byte statusCode, int uidCounter,
                                     int itemCount, byte[] folderItems, int[] folderItemLengths);
-    private native boolean getFolderItemsRspNative(byte statusCode, int numItems,
+    private native boolean getFolderItemsRspNative(byte statusCode, long numItems,
         int[] itemType, long[] uid, int[] type, byte[] playable, String[] displayName,
         byte[] numAtt, String[] attValues, int[] attIds);
     private native boolean getListPlayerappAttrRspNative(byte attr, byte[] attrIds);
