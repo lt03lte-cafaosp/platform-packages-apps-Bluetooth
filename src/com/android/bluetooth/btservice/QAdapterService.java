@@ -337,6 +337,12 @@ public class QAdapterService extends Service {
               if (service == null) return;
               service.enableRssiMonitor(address, enable);
           }
+
+          public boolean sendSmpPairOnBredr(BluetoothDevice device){
+              QAdapterService service = getService();
+              if (service == null) return false;
+              return service.sendSmpPairOnBredr(device);
+          }
     }
 
 
@@ -402,6 +408,13 @@ public class QAdapterService extends Service {
          }
      }
 
+     boolean sendSmpPairOnBredr(BluetoothDevice device){
+         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+         debugLog("in AdapterService, calling the native fn for sendSmpPairOnBredr for addr:"+device.getAddress());
+         byte[] addr = Utils.getBytesFromAddress(device.getAddress());
+         return sendSmpPairOnBredrNative(addr);
+     }
+
     private void debugLog(String msg) {
         Log.d(TAG +"(" +hashCode()+")", msg);
     }
@@ -419,7 +432,7 @@ public class QAdapterService extends Service {
     private native void btLeLppEnableRssiMonitorNative(String address, boolean enable);
 
     private native void btLeLppReadRssiThresholdNative(String address);
-
+    private native  boolean sendSmpPairOnBredrNative(byte[] address);
 
     protected void finalize() {
         cleanup();

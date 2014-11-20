@@ -283,6 +283,17 @@ static void btLeLppReadRssiThresholdNative(JNIEnv* env, jobject object,
     qcBluetoothInterface->le_lpp_read_rssi_threshold(&bda);
 }
 
+static jboolean sendSmpPairOnBredrNative(JNIEnv *env, jobject obj,  jbyteArray address)
+{
+    ALOGV("%s:",__FUNCTION__);
+    jbyte *addr=NULL;
+    jboolean result = JNI_FALSE;
+    addr = env->GetByteArrayElements(address, NULL);
+    int ret = qcBluetoothInterface->smp_pair_on_bredr((bt_bdaddr_t *)addr);
+    result = (ret == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+    return result;
+}
+
 static JNINativeMethod qMethods[] = {
     /* name, signature, funcPtr */
     {"classInitNative", "()V", (void *) classInitNative},
@@ -291,7 +302,7 @@ static JNINativeMethod qMethods[] = {
     {"btLeLppWriteRssiThresholdNative", "(Ljava/lang/String;BB)V", (void*)btLeLppWriteRssiThresholdNative},
     {"btLeLppEnableRssiMonitorNative", "(Ljava/lang/String;Z)V", (void*)btLeLppEnableRssiMonitorNative},
     {"btLeLppReadRssiThresholdNative", "(Ljava/lang/String;)V", (void*)btLeLppReadRssiThresholdNative},
-
+    {"sendSmpPairOnBredrNative", "([B)Z", (void*)sendSmpPairOnBredrNative},
 };
 
 int register_com_android_bluetooth_btservice_QAdapterService(JNIEnv* env)
