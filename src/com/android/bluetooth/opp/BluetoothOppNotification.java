@@ -44,6 +44,7 @@ import android.database.CursorWindowAllocationException;
 import android.database.sqlite.SQLiteException;
 import android.net.Uri;
 import android.util.Log;
+import android.os.PowerManager;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Process;
@@ -101,7 +102,7 @@ class BluetoothOppNotification {
 
     private NotificationUpdateThread mUpdateNotificationThread;
 
-    private int mPendingUpdate = 0;
+    private PowerManager mPowerManager;
 
     private static final int NOTIFICATION_ID_OUTBOUND = -1000005;
 
@@ -113,6 +114,7 @@ class BluetoothOppNotification {
     private int mInboundActiveNotificationId = 0;
     private int mOutboundActiveNotificationId = 0;
     private int mIncomingShownId = 0;
+    private int mRunning = 0;
 
     /**
      * This inner class is used to describe some properties for one transfer.
@@ -146,6 +148,7 @@ class BluetoothOppNotification {
         mNotificationMgr = (NotificationManager)mContext
                 .getSystemService(Context.NOTIFICATION_SERVICE);
         mNotifications = new HashMap<String, NotificationItem>();
+        mPowerManager = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
     }
 
     /**
@@ -153,14 +156,10 @@ class BluetoothOppNotification {
      */
     public void updateNotification() {
         synchronized (BluetoothOppNotification.this) {
-            mPendingUpdate++;
-            if (mPendingUpdate > 1) {
-                if (V) Log.v(TAG, "update too frequent, put in queue " + mPendingUpdate);
-                return;
-            }
-            if (!mHandler.hasMessages(NOTIFY)) {
-                if (V) Log.v(TAG, "send message");
-                mHandler.sendMessage(mHandler.obtainMessage(NOTIFY));
+            if (mUpdateNotificationThread == null) {
+                if (V) Log.v(TAG, "new notify thread!!!");
+                mUpdateNotificationThread = new NotificationUpdateThread();
+                mUpdateNotificationThread.start();
             }
         }
     }
@@ -172,40 +171,9 @@ class BluetoothOppNotification {
             mInboundUpdateCompleteNotification = true;
             mOutboundUpdateCompleteNotification = true;
             updateCompletedNotification();
-            mPendingUpdate = 0;
             cancelIncomingFileConfirmNotification();
-            mHandler.removeMessages(NOTIFY);
         }
     }
-
-    private static final int NOTIFY = 0;
-    // Use 1 second timer to limit notification frequency.
-    // 1. On the first notification, create the update thread.
-    //    Buffer other updates.
-    // 2. Update thread will clear mPendingUpdate.
-    // 3. Handler sends a delayed message to self
-    // 4. Handler checks if there are any more updates after 1 second.
-    // 5. If there is an update, update it else stop.
-    private Handler mHandler = new Handler() {
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case NOTIFY:
-                    synchronized (BluetoothOppNotification.this) {
-                        if (mPendingUpdate > 0 && mUpdateNotificationThread == null) {
-                            if (V) Log.v(TAG, "new notify threadi!");
-                            mUpdateNotificationThread = new NotificationUpdateThread();
-                            mUpdateNotificationThread.start();
-                            if (V) Log.v(TAG, "send delay message");
-                            mHandler.sendMessageDelayed(mHandler.obtainMessage(NOTIFY), 1000);
-                        } else if (mPendingUpdate > 0) {
-                            if (V) Log.v(TAG, "previous thread is not finished yet");
-                            mHandler.sendMessageDelayed(mHandler.obtainMessage(NOTIFY), 1000);
-                        }
-                        break;
-                    }
-              }
-         }
-    };
 
     private class NotificationUpdateThread extends Thread {
 
@@ -216,18 +184,32 @@ class BluetoothOppNotification {
         @Override
         public void run() {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-            synchronized (BluetoothOppNotification.this) {
-                if (mUpdateNotificationThread != this) {
-                    throw new IllegalStateException(
-                            "multiple UpdateThreads in BluetoothOppNotification");
+            do {
+                synchronized (BluetoothOppNotification.this) {
+                    if (mUpdateNotificationThread != this) {
+                        throw new IllegalStateException(
+                                "multiple UpdateThreads in BluetoothOppNotification");
+                    }
                 }
-                mPendingUpdate = 0;
-            }
-            updateActiveNotification();
-            updateCompletedNotification();
-            updateIncomingFileConfirmNotification();
+                updateActiveNotification();
+                updateCompletedNotification();
+                updateIncomingFileConfirmNotification();
+
+                try {
+                    if (mPowerManager.isScreenOn()) {
+                        Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
+                    }
+                } catch (InterruptedException e) {
+                    if (V) Log.v(TAG, "NotificationThread was interrupted (1), exiting");
+                    return;
+                }
+
+                if (V) Log.v(TAG, "Running = " + mRunning);
+            } while ((mRunning > 0) && mPowerManager.isScreenOn());
+
             synchronized (BluetoothOppNotification.this) {
                 mUpdateNotificationThread = null;
+                if (V) Log.v(TAG, "NotificationThread is stopped!!!");
             }
         }
     }
@@ -250,6 +232,7 @@ class BluetoothOppNotification {
             cursor = null;
             cursor = mContext.getContentResolver().query(BluetoothShare.CONTENT_URI, null,
                 WHERE_RUNNING, null, BluetoothShare._ID);
+            mRunning  = cursor.getCount();
         } catch (SQLiteException e) {
             if (cursor != null) {
                 cursor.close();
