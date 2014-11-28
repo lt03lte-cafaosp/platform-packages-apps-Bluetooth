@@ -56,6 +56,8 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.util.Log;
 
+import com.android.bluetooth.a2dp.A2dpService;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -659,6 +661,16 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             }
         }
         private void connectRfcommSocket() {
+
+            //do not allow new connections with active multicast
+            A2dpService a2dpService = A2dpService.getA2dpService();
+            if (a2dpService != null &&
+                    a2dpService.isMulticastOngoing()) {
+                Log.i(TAG,"A2dp Multicast is Ongoing, ignore OPP send");
+                mSessionHandler.obtainMessage(TRANSPORT_ERROR).sendToTarget();
+                return ;
+            }
+
             /* Use BluetoothSocket to connect */
             int btOppTransportType = BluetoothOppTransport.TYPE_RFCOMM;
             Log.v(TAG,"RFCOMM Socket");
@@ -755,6 +767,16 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     mSessionHandler.obtainMessage(TRANSPORT_CONNECTED, transport).sendToTarget();
                 }
             } else {
+
+                //do not allow new connections with active multicast
+                A2dpService a2dpService = A2dpService.getA2dpService();
+                if (a2dpService != null &&
+                        a2dpService.isMulticastOngoing()) {
+                    Log.i(TAG,"A2dp Multicast is Ongoing, ignore OPP send");
+                    mSessionHandler.obtainMessage(TRANSPORT_ERROR).sendToTarget();
+                    return ;
+                }
+
                 int btOppTransportType = BluetoothOppTransport.TYPE_L2CAP;
                 /* Use BluetoothSocket to connect */
                 try {

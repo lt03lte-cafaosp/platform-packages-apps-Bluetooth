@@ -25,6 +25,7 @@ import android.bluetooth.BluetoothUuid;
 import android.bluetooth.IBluetoothA2dp;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.os.ParcelUuid;
 import android.provider.Settings;
 import android.os.SystemProperties;
@@ -47,6 +48,7 @@ public class A2dpService extends ProfileService {
 
     private A2dpStateMachine mStateMachine;
     private Avrcp mAvrcp;
+    private AudioManager mAudioManager;
     private static A2dpService sAd2dpService;
     static final ParcelUuid[] A2DP_SOURCE_UUID = {
         BluetoothUuid.AudioSource
@@ -66,16 +68,27 @@ public class A2dpService extends ProfileService {
 
     protected boolean start() {
         int maxConnections = 1;
-
+        int multiCastState = 0;
         int maxA2dpConnection =
                 SystemProperties.getInt("persist.bt.max.a2dp.connections", 1);
+        int a2dpMultiCastState =
+                SystemProperties.getInt("persist.bt.enable.multicast", 0);
+        if (a2dpMultiCastState == 1)
+                multiCastState = a2dpMultiCastState;
         if (maxA2dpConnection == 2)
                 maxConnections = maxA2dpConnection;
+        // enable soft hands-off also when multicast is enabled.
+        if (multiCastState == 1 && maxConnections != 2) {
+            Log.i(TAG,"Enable soft handsoff as multicast is enabled");
+            maxConnections = 2;
+        }
         log( "maxA2dpConnections = " + maxConnections);
+        log( "multiCastState = " + multiCastState);
         mAvrcp = Avrcp.make(this, this, maxConnections);
         mStateMachine = A2dpStateMachine.make(this, this,
-                maxConnections);
+                maxConnections, multiCastState);
         setA2dpService(this);
+        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         return true;
     }
 
@@ -233,8 +246,21 @@ public class A2dpService extends ProfileService {
         mAvrcp.setA2dpConnectedDevice(device);
     }
 
-    public BluetoothDevice getA2dpPlayingDevice() {
+    public List<BluetoothDevice> getA2dpPlayingDevice() {
         return mStateMachine.getPlayingDevice();
+    }
+
+    // return status of multicast,needed for blocking outgoing connections
+    public boolean isMulticastOngoing() {
+
+        Log.i(TAG,"audio isMusicActive is " + mAudioManager.isMusicActive());
+
+        if ((getA2dpPlayingDevice().size() == 2) &&
+                (mAudioManager.isMusicActive())) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     synchronized boolean isA2dpPlaying(BluetoothDevice device) {

@@ -147,7 +147,8 @@ static btav_callbacks_t sBluetoothA2dpCallbacks = {
     bta2dp_audio_state_callback,
     bta2dp_audio_config_callback,
     NULL,
-    bta2dp_audio_focus_request_callback
+    bta2dp_audio_focus_request_callback,
+    NULL
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
@@ -170,7 +171,8 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 
-static void initNative(JNIEnv *env, jobject object, jint maxA2dpConnections) {
+static void initNative(JNIEnv *env, jobject object, jint maxA2dpConnections,
+        jint multiCastState) {
     const bt_interface_t* btInf;
     bt_status_t status;
 
@@ -198,7 +200,7 @@ static void initNative(JNIEnv *env, jobject object, jint maxA2dpConnections) {
     }
 
     if ( (status = sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks,
-            maxA2dpConnections)) != BT_STATUS_SUCCESS) {
+            maxA2dpConnections, multiCastState)) != BT_STATUS_SUCCESS) {
         ALOGE("Failed to initialize Bluetooth A2DP Sink, status: %d", status);
         sBluetoothA2dpInterface = NULL;
         return;
@@ -298,7 +300,7 @@ static void resumeA2dpNative(JNIEnv *env, jobject object) {
 }
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
-    {"initNative", "(I)V", (void *) initNative},
+    {"initNative", "(II)V", (void *) initNative},
     {"cleanupNative", "()V", (void *) cleanupNative},
     {"connectA2dpNative", "([B)Z", (void *) connectA2dpNative},
     {"disconnectA2dpNative", "([B)Z", (void *) disconnectA2dpNative},

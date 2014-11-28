@@ -101,6 +101,7 @@ final class A2dpSinkStateMachine extends StateMachine {
     private int mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
 
     private static final int maxA2dpSinkConnections = 1;
+    private static final int multiCastState = 0;
 
     // mCurrentDevice is the device connected before the state changes
     // mTargetDevice is the device to be connected
@@ -142,7 +143,8 @@ final class A2dpSinkStateMachine extends StateMachine {
         mContext = context;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        initNative(maxA2dpSinkConnections);
+        // for sink soft handsoff and multicast are disabled
+        initNative(maxA2dpSinkConnections, multiCastState);
 
         mDisconnected = new Disconnected();
         mPending = new Pending();
@@ -1015,7 +1017,8 @@ final class A2dpSinkStateMachine extends StateMachine {
     final static int AUDIO_STATE_STARTED = 2;
 
     private native static void classInitNative();
-    private native void initNative(int maxA2dpConnectionsAllowed);
+    private native void initNative(int maxA2dpConnectionsAllowed,
+            int multiCastState);
     private native void cleanupNative();
     private native boolean connectA2dpNative(byte[] address);
     private native boolean disconnectA2dpNative(byte[] address);
