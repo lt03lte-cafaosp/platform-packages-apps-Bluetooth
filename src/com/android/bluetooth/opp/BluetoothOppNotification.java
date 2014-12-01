@@ -111,6 +111,7 @@ class BluetoothOppNotification {
     private boolean mOutboundUpdateCompleteNotification = true;
     private boolean mInboundUpdateCompleteNotification = true;
 
+    private int confirmation = 0;
     private int mInboundActiveNotificationId = 0;
     private int mOutboundActiveNotificationId = 0;
     private int mIncomingShownId = 0;
@@ -196,7 +197,8 @@ class BluetoothOppNotification {
                 updateIncomingFileConfirmNotification();
 
                 try {
-                    if (mPowerManager.isScreenOn()) {
+                    if ((confirmation == BluetoothShare.USER_CONFIRMATION_HANDOVER_CONFIRMED)
+                            || mPowerManager.isScreenOn()) {
                         Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
                     }
                 } catch (InterruptedException e) {
@@ -205,7 +207,8 @@ class BluetoothOppNotification {
                 }
 
                 if (V) Log.v(TAG, "Running = " + mRunning);
-            } while ((mRunning > 0) && mPowerManager.isScreenOn());
+            } while ((mRunning > 0) && (mPowerManager.isScreenOn()
+                || (confirmation == BluetoothShare.USER_CONFIRMATION_HANDOVER_CONFIRMED)));
 
             synchronized (BluetoothOppNotification.this) {
                 mUpdateNotificationThread = null;
@@ -283,7 +286,7 @@ class BluetoothOppNotification {
             int id = cursor.getInt(idIndex);
             long total = cursor.getLong(totalBytesIndex);
             long current = cursor.getLong(currentBytesIndex);
-            int confirmation = cursor.getInt(confirmIndex);
+            confirmation = cursor.getInt(confirmIndex);
 
             String destination = cursor.getString(destinationIndex);
             String fileName = cursor.getString(dataIndex);
@@ -351,6 +354,7 @@ class BluetoothOppNotification {
                 intent.putExtra(Constants.EXTRA_BT_OPP_TRANSFER_PROGRESS, progress);
                 intent.putExtra(Constants.EXTRA_BT_OPP_ADDRESS, item.destination);
                 mContext.sendBroadcast(intent, Constants.HANDOVER_STATUS_PERMISSION);
+                if (V) Log.v(TAG, "Handover OPP transfer is inprogress");
                 continue;
             }
             // Build the notification object
