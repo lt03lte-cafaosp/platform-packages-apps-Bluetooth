@@ -169,6 +169,16 @@ class BluetoothOppNotification {
     public void btOffNotification() {
         if (V) Log.v(TAG, "Update Notification while BT is Turning OFF");
         synchronized (BluetoothOppNotification.this) {
+            if (mUpdateNotificationThread != null) {
+                try {
+                    mUpdateNotificationThread.interrupt();
+                    mUpdateNotificationThread.join();
+                    mUpdateNotificationThread = null;
+                } catch (InterruptedException ie) {
+                    Log.e(TAG, "Notification thread join interrupted");
+                }
+            }
+
             updateActiveNotification();
             mInboundUpdateCompleteNotification = true;
             mOutboundUpdateCompleteNotification = true;
@@ -203,7 +213,7 @@ class BluetoothOppNotification {
                         Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
                     }
                 } catch (InterruptedException e) {
-                    if (V) Log.v(TAG, "NotificationThread was interrupted (1), exiting");
+                    if (V) Log.v(TAG, "NotificationThread sleep is interrupted (1), exiting");
                     return;
                 }
 
