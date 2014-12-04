@@ -881,7 +881,7 @@ public class BluetoothMapContent {
     }
 
     private String getContactNameFromPhone(String phone) {
-        String name = null;
+        String name = "";
         if (TextUtils.isEmpty(phone)) {
            return name;
         }
