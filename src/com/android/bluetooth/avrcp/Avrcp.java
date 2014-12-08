@@ -310,6 +310,7 @@ public final class Avrcp {
     private final String UPDATE_ATTRIB_TEXT = "UpdateAttributesText";
     private final String UPDATE_VALUE_TEXT = "UpdateValuesText";
     private ArrayList <Integer> mPendingCmds;
+    private ArrayList <Integer> mPendingSetAttributes;
 
     static {
         classInitNative();
@@ -359,6 +360,7 @@ public final class Avrcp {
         Looper looper = thread.getLooper();
         mHandler = new AvrcpMessageHandler(looper);
         mPendingCmds = new ArrayList<Integer>();
+        mPendingSetAttributes = new ArrayList<Integer>();
         mCurrentPath = PATH_INVALID;
         mCurrentPathUid = null;
         mMediaUri = Uri.EMPTY;
@@ -402,14 +404,19 @@ public final class Avrcp {
                                                       GET_INVALID);
                 byte [] data;
                 String [] text;
+                boolean isSetAttrValRsp = false;
                 synchronized (mPendingCmds) {
                     Integer val = new Integer(getResponse);
                     if (mPendingCmds.contains(val)) {
+                        if (getResponse == SET_ATTRIBUTE_VALUES) {
+                            isSetAttrValRsp = true;
+                            if (DEBUG) Log.v(TAG,"Response received for SET_ATTRIBUTE_VALUES");
+                        }
                         mHandler.removeMessages(MESSAGE_PLAYERSETTINGS_TIMEOUT);
                         mPendingCmds.remove(val);
                     }
                 }
-                if (DEBUG) Log.v(TAG,"getResponse" + getResponse);
+                if (DEBUG) Log.v(TAG,"getResponse " + getResponse);
                 switch (getResponse) {
                     case GET_ATTRIBUTE_IDS:
                         data = intent.getByteArrayExtra(EXTRA_ATTIBUTE_ID_ARRAY);
@@ -420,35 +427,34 @@ public final class Avrcp {
                     case GET_VALUE_IDS:
                         data = intent.getByteArrayExtra(EXTRA_VALUE_ID_ARRAY);
                         numAttr = (byte) data.length;
-                        if (DEBUG) Log.v(TAG,"GET_VALUE_IDS" + numAttr);
+                        if (DEBUG) Log.v(TAG,"GET_VALUE_IDS " + numAttr);
                         getPlayerAppValueRspNative(numAttr, data);
                     break;
                     case GET_ATTRIBUTE_VALUES:
                         data = intent.getByteArrayExtra(EXTRA_ATTRIB_VALUE_PAIRS);
                         updateLocalPlayerSettings(data);
                         numAttr = (byte) data.length;
-                        if (DEBUG) Log.v(TAG,"GET_ATTRIBUTE_VALUES" + numAttr);
+                        if (DEBUG) Log.v(TAG,"GET_ATTRIBUTE_VALUES " + numAttr);
                         SendCurrentPlayerValueRspNative(numAttr, data);
                     break;
                     case SET_ATTRIBUTE_VALUES:
                         data = intent.getByteArrayExtra(EXTRA_ATTRIB_VALUE_PAIRS);
                         updateLocalPlayerSettings(data);
-                        Log.v(TAG,"SET_ATTRIBUTE_VALUES: " + data[0] + ", " + data[1]);
-                        if (data[0] == ATTRIBUTE_EQUALIZER ||
-                            data[0] == ATTRIBUTE_REPEATMODE ||
-                            data[0] == ATTRIBUTE_SHUFFLEMODE) {
-                            if (mPlayerStatusChangeNT == NOTIFICATION_TYPE_INTERIM) {
-                                Log.v(TAG,"Send Player appl attribute changed response");
-                                mPlayerStatusChangeNT = NOTIFICATION_TYPE_CHANGED;
-                                sendPlayerAppChangedRsp(mPlayerStatusChangeNT);
+                        Log.v(TAG,"SET_ATTRIBUTE_VALUES: ");
+                        if (isSetAttrValRsp){
+                            isSetAttrValRsp = false;
+                            Log.v(TAG,"Respond to SET_ATTRIBUTE_VALUES request");
+                            if (checkPlayerAttributeResponse(data)) {
+                               SendSetPlayerAppRspNative(OPERATION_SUCCESSFUL);
                             } else {
-                                Log.v(TAG,"Respond to SET_ATTRIBUTE_VALUES request");
-                                if (data[1] == ATTRIBUTE_NOTSUPPORTED) {
-                                   SendSetPlayerAppRspNative(INTERNAL_ERROR);
-                                } else {
-                                   SendSetPlayerAppRspNative(OPERATION_SUCCESSFUL);
-                                }
+                               SendSetPlayerAppRspNative(INTERNAL_ERROR);
                             }
+                        } else if (mPlayerStatusChangeNT == NOTIFICATION_TYPE_INTERIM) {
+                            Log.v(TAG,"Send Player appl attribute changed response");
+                            mPlayerStatusChangeNT = NOTIFICATION_TYPE_CHANGED;
+                            sendPlayerAppChangedRsp(mPlayerStatusChangeNT);
+                        } else {
+                            Log.v(TAG,"Drop Set Attr Val update from media player");
                         }
                     break;
                     case GET_ATTRIBUTE_TEXT:
@@ -1423,11 +1429,16 @@ public final class Avrcp {
                 final MediaPlayerInfo di = rccIterator.next();
                 if (di.GetPlayerFocus()) {
                     if (DEBUG) Log.v(TAG, "resetting current MetaData");
-                    mMetadata = di.GetMetadata();
+                    mMetadata.artist = di.GetMetadata().artist;
+                    mMetadata.trackTitle = di.GetMetadata().trackTitle;
+                    mMetadata.albumTitle = di.GetMetadata().albumTitle;
+                    mMetadata.genre = di.GetMetadata().genre;
+                    mMetadata.tracknum = di.GetMetadata().tracknum;
                     break;
                 }
             }
         }
+
         String oldMetadata = mMetadata.toString();
         mMetadata.artist = data.getString(MediaMetadataRetriever.METADATA_KEY_ARTIST, null);
         mMetadata.trackTitle = data.getString(MediaMetadataRetriever.METADATA_KEY_TITLE, null);
@@ -1436,7 +1447,8 @@ public final class Avrcp {
         mTrackNumber = data.getLong(MediaMetadataRetriever.METADATA_KEY_NUM_TRACKS, -1L);
         mMetadata.tracknum = data.getLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, -1L);
 
-        Log.v(TAG,"mMetadata.toString() = " + mMetadata.toString());
+        Log.v(TAG,"old Metadata = " + oldMetadata);
+        Log.v(TAG,"new MetaData " + mMetadata.toString());
 
         if (mMediaPlayers.size() > 0) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
@@ -1449,6 +1461,7 @@ public final class Avrcp {
                 }
             }
         }
+
         if (!oldMetadata.equals(mMetadata.toString())) {
             updateTrackNumber();
             Log.v(TAG,"new mMetadata, mTrackNumber update to " + mTrackNumber);
@@ -3350,8 +3363,10 @@ public final class Avrcp {
         return (int) Math.ceil((double) volume*AVRCP_MAX_VOL/mAudioStreamMax);
     }
 
-private void updateLocalPlayerSettings( byte[] data) {
+    private void updateLocalPlayerSettings( byte[] data) {
+        if (DEBUG) Log.v(TAG, "updateLocalPlayerSettings");
         for (int i = 0; i < data.length; i += 2) {
+            if (DEBUG) Log.v(TAG, "ID: " + data[i] + " Value: " + data[i+1]);
             switch (data[i]) {
                 case ATTRIBUTE_EQUALIZER:
                     settingValues.eq_value = data[i+1];
@@ -3367,6 +3382,45 @@ private void updateLocalPlayerSettings( byte[] data) {
                 break;
             }
         }
+    }
+
+    private boolean checkPlayerAttributeResponse( byte[] data) {
+        boolean ret = false;
+        if (DEBUG) Log.v(TAG, "checkPlayerAttributeResponse");
+        for (int i = 0; i < data.length; i += 2) {
+            if (DEBUG) Log.v(TAG, "ID: " + data[i] + " Value: " + data[i+1]);
+            switch (data[i]) {
+                case ATTRIBUTE_EQUALIZER:
+                    if (mPendingSetAttributes.contains(new Integer(ATTRIBUTE_EQUALIZER))) {
+                        if(data[i+1] == ATTRIBUTE_NOTSUPPORTED) {
+                            ret = false;
+                        } else {
+                            ret = true;
+                        }
+                    }
+                break;
+                case ATTRIBUTE_REPEATMODE:
+                    if (mPendingSetAttributes.contains(new Integer(ATTRIBUTE_REPEATMODE))) {
+                        if(data[i+1] == ATTRIBUTE_NOTSUPPORTED) {
+                            ret = false;
+                        } else {
+                            ret = true;
+                        }
+                    }
+                break;
+                case ATTRIBUTE_SHUFFLEMODE:
+                    if (mPendingSetAttributes.contains(new Integer(ATTRIBUTE_SHUFFLEMODE))) {
+                        if(data[i+1] == ATTRIBUTE_NOTSUPPORTED) {
+                            ret = false;
+                        } else {
+                            ret = true;
+                        }
+                    }
+                break;
+            }
+        }
+        mPendingSetAttributes.clear();
+        return ret;
     }
 
     //PDU ID 0x11
@@ -3425,12 +3479,13 @@ private void updateLocalPlayerSettings( byte[] data) {
     //PDU 0x14
     private void setPlayerAppSetting( byte num , byte [] attr_id , byte [] attr_val )
     {
-        if (DEBUG) Log.v(TAG, "setPlayerAppSetting" + num );
+        if (DEBUG) Log.v(TAG, "setPlayerAppSetting " + num );
         byte[] array = new byte[num*2];
         for ( int i = 0; i < num; i++)
         {
             array[i] = attr_id[i] ;
             array[i+1] = attr_val[i];
+            mPendingSetAttributes.add(new Integer(attr_id[i]));
         }
         Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
         intent.putExtra(COMMAND, CMDSET);
@@ -3440,7 +3495,7 @@ private void updateLocalPlayerSettings( byte[] data) {
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
         msg.arg1 = SET_ATTRIBUTE_VALUES;
         mPendingCmds.add(new Integer(msg.arg1));
-        mHandler.sendMessageDelayed(msg, 130);
+        mHandler.sendMessageDelayed(msg, 500);
     }
 
     //PDU 0x15
@@ -3961,6 +4016,8 @@ private void updateLocalPlayerSettings( byte[] data) {
             mMetadata.albumTitle = metaData.albumTitle;
             mMetadata.artist = metaData.artist;
             mMetadata.trackTitle = metaData.trackTitle;
+            mMetadata.genre = metaData.genre;
+            mMetadata.tracknum = metaData.tracknum;
         }
         public byte GetPlayState() {
             return mPlayState;
