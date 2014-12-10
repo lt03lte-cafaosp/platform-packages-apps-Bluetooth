@@ -43,7 +43,7 @@ import java.util.NoSuchElementException;
 /** @hide */
 public class HidDevService extends ProfileService {
 
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     private static final String TAG = HidDevService.class.getSimpleName();
 
@@ -84,7 +84,10 @@ public class HidDevService extends ProfileService {
                     boolean success = (msg.arg1 != 0);
 
                     try {
-                        mCallback.onAppStatusChanged(device, mAppConfig, success);
+                        if (mCallback != null)
+                            mCallback.onAppStatusChanged(device, mAppConfig, success);
+                        else
+                            break;
                     } catch (RemoteException e) {
                         Log.e(TAG, "e=" + e.toString());
                         e.printStackTrace();
@@ -93,23 +96,27 @@ public class HidDevService extends ProfileService {
                     if (success) {
                         mDeathRcpt = new BluetoothHidDeviceDeathRecipient(HidDevService.this,
                                 mAppConfig);
-                        IBinder binder = mCallback.asBinder();
-                        try {
-                            binder.linkToDeath(mDeathRcpt, 0);
-                            Log.i(TAG, "IBinder.linkToDeath() ok");
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
+                        if (mCallback != null) {
+                            IBinder binder = mCallback.asBinder();
+                            try {
+                                binder.linkToDeath(mDeathRcpt, 0);
+                                Log.i(TAG, "IBinder.linkToDeath() ok");
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
                         }
                     } else if (mDeathRcpt != null) {
-                        IBinder binder = mCallback.asBinder();
-                        try {
-                            binder.unlinkToDeath(mDeathRcpt, 0);
-                            Log.i(TAG, "IBinder.unlinkToDeath() ok");
-                        } catch (NoSuchElementException e) {
-                            e.printStackTrace();
+                        if (mCallback != null) {
+                            IBinder binder = mCallback.asBinder();
+                            try {
+                                binder.unlinkToDeath(mDeathRcpt, 0);
+                                Log.i(TAG, "IBinder.unlinkToDeath() ok");
+                            } catch (NoSuchElementException e) {
+                                e.printStackTrace();
+                            }
+                            mDeathRcpt.cleanup();
+                            mDeathRcpt = null;
                         }
-                        mDeathRcpt.cleanup();
-                        mDeathRcpt = null;
                     }
 
                     if (!success) {
@@ -255,7 +262,7 @@ public class HidDevService extends ProfileService {
         public boolean registerApp(BluetoothHidDeviceAppConfiguration config,
                 BluetoothHidDeviceAppSdpSettings sdp, BluetoothHidDeviceAppQosSettings inQos,
                 BluetoothHidDeviceAppQosSettings outQos, IBluetoothHidDeviceCallback callback) {
-            if (DBG) Log.v(TAG, "unregisterApp()");
+            if (DBG) Log.v(TAG, "registerApp()");
 
             HidDevService service = getService();
             if (service == null) {

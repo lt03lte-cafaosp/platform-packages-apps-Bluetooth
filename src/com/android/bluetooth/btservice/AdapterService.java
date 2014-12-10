@@ -409,8 +409,6 @@ public class AdapterService extends Service {
 
         checkA2dpState();
 
-        checkHidState();
-
         checkHfpState();
 
         //Start profile services
@@ -2143,36 +2141,6 @@ public class AdapterService extends Service {
         } else {
             setProfileServiceState(a2dp_sink, BluetoothAdapter.STATE_OFF);
             setProfileServiceState(a2dp_src, BluetoothAdapter.STATE_ON);
-        }
-    }
-
-    @SuppressWarnings("rawtypes")
-    private synchronized void checkHidState() {
-        final Class hh[] = { HidService.class };
-        final Class hd[] = { HidDevService.class };
-
-        boolean isHidDev = SystemProperties.getBoolean("persist.service.bdroid.hid.dev", false);
-        Log.d(TAG, "checkHidState: isHidDev = " + isHidDev);
-
-        if (isHidDev) {
-            mDisabledProfiles.add(HidService.class.getName());
-            mDisabledProfiles.remove(HidDevService.class.getName());
-        } else {
-            mDisabledProfiles.remove(HidService.class.getName());
-            mDisabledProfiles.add(HidDevService.class.getName());
-        }
-
-        if (mAdapterStateMachine.isTurningOn() || mAdapterStateMachine.isTurningOff()) {
-            Log.e(TAG, "checkHidState: returning");
-            return;
-        }
-
-        if (isHidDev) {
-            setProfileServiceState(hh, BluetoothAdapter.STATE_OFF);
-            setProfileServiceState(hd, BluetoothAdapter.STATE_ON);
-        } else {
-            setProfileServiceState(hd, BluetoothAdapter.STATE_OFF);
-            setProfileServiceState(hh, BluetoothAdapter.STATE_ON);
         }
     }
 
