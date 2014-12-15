@@ -777,14 +777,18 @@ public class BluetoothMapContent {
 
     private void setReplytoAddressing(BluetoothMapMessageListingElement e, Cursor c,
         FilterInfo fi, BluetoothMapAppParams ap) {
-            String address = null;
-            if (fi.msgType == FilterInfo.TYPE_EMAIL) {
-                int replyToInd = c.getColumnIndex(MessageColumns.REPLY_TO_LIST);
-                if (D) Log.d(TAG, "setReplytoAddressing: " +c.getString(replyToInd));
-                address = c.getString(replyToInd);
+            if ((ap.getParameterMask() & MASK_REPLYTO_ADDRESSING) != 0) {
+                String address = null;
+                if (fi.msgType == FilterInfo.TYPE_EMAIL) {
+                    int replyToInd = c.getColumnIndex(MessageColumns.REPLY_TO_LIST);
+                    if (D) Log.d(TAG, "setReplytoAddressing: " +c.getString(replyToInd));
+                    address = c.getString(replyToInd);
+                if (address == null)
+                    address = "";
+                }
+                if (D) Log.d(TAG, "setReplytoAddressing: " + address);
+                e.setReplytoAddressing(address);
             }
-            if (D) Log.d(TAG, "setReplytoAddressing: " + address);
-            e.setReplytoAddressing(address);
     }
 
     private void setSenderAddressing(BluetoothMapMessageListingElement e, Cursor c,
@@ -993,7 +997,7 @@ public class BluetoothMapContent {
         setDateTime(e, c, fi, ap);
         setSenderName(e, c, fi, ap);
         setSenderAddressing(e, c, fi, ap);
-        //setReplytoAddressing(e, c, fi, ap);
+        setReplytoAddressing(e, c, fi, ap);
         setRecipientName(e, c, fi, ap);
         setRecipientAddressing(e, c, fi, ap);
         setType(e, c, fi, ap);
