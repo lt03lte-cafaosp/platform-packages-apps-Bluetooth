@@ -619,8 +619,20 @@ public class BluetoothOppService extends Service {
                     return;
                 }
 
-                if (V) Log.v(TAG, "Batch size= " + mBatchs.size());
-            } while ((mBatchs.size() > 0) && mPowerManager.isScreenOn());
+                if (V) {
+                    if (mServerSession != null) {
+                        Log.v(TAG, "Server Session is active");
+                    } else {
+                        Log.v(TAG, "No active Server Session");
+                    }
+
+                    if (mTransfer != null) {
+                        Log.v(TAG, "Client Session is active");
+                    } else {
+                        Log.v(TAG, "No active Client Session");
+                    }
+                }
+            } while (mPowerManager.isScreenOn() && ((mServerSession != null) || (mTransfer != null)));
 
             synchronized (BluetoothOppService.this) {
                 mUpdateThread = null;
