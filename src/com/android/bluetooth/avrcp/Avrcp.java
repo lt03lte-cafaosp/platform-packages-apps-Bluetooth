@@ -543,20 +543,19 @@ public final class Avrcp {
                                     }
                                 }
                             }
-                        } else {
-                            for (int i = 0; i < maxAvrcpConnections; i++) {
-                                if (deviceFeatures[i].mPlayerStatusChangeNT ==
-                                        NOTIFICATION_TYPE_INTERIM) {
+                        }
+                        for (int i = 0; i < maxAvrcpConnections; i++) {
+                            if (deviceFeatures[i].mPlayerStatusChangeNT ==
+                                    NOTIFICATION_TYPE_INTERIM) {
                                 Log.v(TAG,"device has registered for"+
-                                        "mPlayerStatusChangeNT");
+                                    "mPlayerStatusChangeNT");
                                 deviceFeatures[i].mPlayerStatusChangeNT =
                                         NOTIFICATION_TYPE_CHANGED;
                                 sendPlayerAppChangedRsp(deviceFeatures[i].mPlayerStatusChangeNT,
                                         deviceFeatures[i].mCurrentDevice);
                                } else {
                                    Log.v(TAG,"Drop Set Attr Val update from media player");
-                               }
-                           }
+                            }
                         }
                     break;
                     case GET_ATTRIBUTE_TEXT:
