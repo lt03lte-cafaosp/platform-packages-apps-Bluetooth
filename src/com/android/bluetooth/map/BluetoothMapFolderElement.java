@@ -35,17 +35,28 @@ import android.util.Xml;
  */
 public class BluetoothMapFolderElement {
     private String name;
+    private String serverId;
+    private String parentServerId;
     private BluetoothMapFolderElement parent = null;
     protected ArrayList<BluetoothMapFolderElement> subFolders;
 
-    public BluetoothMapFolderElement( String name, BluetoothMapFolderElement parrent ){
+    public BluetoothMapFolderElement( String name, BluetoothMapFolderElement parent ){
+        this(name, null, null, parent);
+    }
+    public BluetoothMapFolderElement( String name, String serverId, String parentServerId,
+            BluetoothMapFolderElement parent) {
         this.name = name;
-        this.parent = parrent;
+        this.parent = parent;
+        this.serverId = serverId;
+        this.parentServerId = parentServerId;
         subFolders = new ArrayList<BluetoothMapFolderElement>();
     }
-
     public String getName() {
         return name;
+    }
+
+    public String getServerId() {
+        return serverId;
     }
 
     /**
@@ -73,7 +84,19 @@ public class BluetoothMapFolderElement {
      * @return the added folder element.
      */
     public BluetoothMapFolderElement addFolder(String name){
-        BluetoothMapFolderElement newFolder = new BluetoothMapFolderElement(name, this);
+        return addFolder(name, null, null);
+    }
+    /**
+     * Add a folder.
+     * @param name the displayName of the folder to add.
+     * @param serverId the serverId of the folder to add.
+     * @param parentServerId the parentServerId of the folder to add.
+     * @return the added folder element.
+     */
+    public BluetoothMapFolderElement addFolder(String name, String serverId, String parentServerId)
+    {
+        BluetoothMapFolderElement newFolder =
+                new BluetoothMapFolderElement(name, serverId, parentServerId, this);
         subFolders.add(newFolder);
         return newFolder;
     }
