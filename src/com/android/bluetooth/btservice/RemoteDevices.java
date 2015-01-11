@@ -552,7 +552,7 @@ final class RemoteDevices {
     }
 
     void deviceMasInstancesFoundCallback(int status, byte[] address, String[] name, int[] scn,
-            int[] id, int[] msgtype) {
+            int[] id, int[] msgtype, int[] l2capPsm) {
         BluetoothDevice device = getDevice(address);
 
         if (device == null) {
@@ -560,15 +560,15 @@ final class RemoteDevices {
             return;
         }
 
-        debugLog("deviceMasInstancesFoundCallback: found " + name.length + " instances");
+         Log.d(TAG,"deviceMasInstancesFoundCallback: found " + name.length);
 
         ArrayList<BluetoothMasInstance> instances = new ArrayList<BluetoothMasInstance>();
 
         for (int i = 0; i < name.length; i++) {
             BluetoothMasInstance inst = new BluetoothMasInstance(id[i], name[i],
-                    scn[i], msgtype[i]);
+                    scn[i], msgtype[i], l2capPsm[i]);
 
-            debugLog(inst.toString());
+            Log.d(TAG, inst.toString());
 
             instances.add(inst);
         }

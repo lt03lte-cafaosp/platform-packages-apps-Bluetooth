@@ -83,7 +83,8 @@ final class JniCallbacks {
     }
 
     void deviceMasInstancesFoundCallback(int status, byte[] address, String[] name, int[] scn,
-            int[] id, int[] msgtype) {
-        mRemoteDevices.deviceMasInstancesFoundCallback(status, address, name, scn, id, msgtype);
+            int[] id, int[] msgtype, int[] l2capPsm) {
+        mRemoteDevices.deviceMasInstancesFoundCallback(status, address, name, scn, id, msgtype,
+               l2capPsm);
     }
 }
