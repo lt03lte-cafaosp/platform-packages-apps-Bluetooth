@@ -2121,7 +2121,7 @@ public class AdapterService extends Service {
         final Class a2dp_src[]  =  { A2dpService.class };
         final Class a2dp_sink[] = { A2dpSinkService.class };
 
-        boolean isA2dpSinkEnabled = SystemProperties.getBoolean("persist.service.bt.a2dp.sink", false);
+        boolean isA2dpSinkEnabled = SystemProperties.getBoolean("persist.service.bt.a2dp.sink", true);
         Log.d(TAG, "checkA2dpState: isA2dpSinkEnabled = " + isA2dpSinkEnabled);
 
         if (isA2dpSinkEnabled) {
@@ -2182,7 +2182,7 @@ public class AdapterService extends Service {
         final Class hfp_hs[] = { HeadsetClientService.class };
 
         boolean isHfpClientEnabled = SystemProperties.getBoolean("persist.service.bt.hfp.client",
-                false);
+                true);
         Log.d(TAG, "checkHfpState: isHfpClientEnabled = " + isHfpClientEnabled);
 
         if (isHfpClientEnabled) {
