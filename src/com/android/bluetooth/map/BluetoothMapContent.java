@@ -929,6 +929,10 @@ public class BluetoothMapContent {
                 }
 
             }
+            if (name == null) {
+                //Set empty value
+                name  = "";
+            }
             if (D) Log.d(TAG, "setSenderName: " + name);
             e.setSenderName(name);
         }
@@ -2215,9 +2219,12 @@ public class BluetoothMapContent {
             String where = setWhereFilter(folder, fi, ap);
             where+= " AND "+ Message.FLAG_LOADED_SELECTION;
             where+= " order by timeStamp desc ";
-            //Fetch only MaxListCount emails from database
+            //Fetch only maxListCount emails from  startOffset
             if(ap.getMaxListCount() > 0 && ap.getMaxListCount() < 65536) {
                 where+=" LIMIT "+ap.getMaxListCount();
+            }
+            if(ap.getStartOffset() > 0 && ap.getStartOffset() < 65536) {
+                where+=" OFFSET "+ap.getStartOffset();
             }
             if (V) Log.d(TAG, "where clause is = " + where);
             try {
@@ -2245,7 +2252,8 @@ public class BluetoothMapContent {
 
         /* Enable this if post sorting and segmenting needed */
         bmList.sort();
-        bmList.segment(ap.getMaxListCount(), ap.getStartOffset());
+        //Handle OFFSET and MAXLISTCOUNT from DB query
+        //bmList.segment(ap.getMaxListCount(), ap.getStartOffset());
 
         return bmList;
     }
@@ -2330,10 +2338,18 @@ public class BluetoothMapContent {
             fi.msgType = FilterInfo.TYPE_SMS;
             if(ap.getFilterPriority() != 1){ /*SMS cannot have high priority*/
                 String where = setWhereFilter(folder, fi, ap);
-
-                Cursor c = mResolver.query(Sms.CONTENT_URI,
-                    SMS_PROJECTION, where, null, "date DESC");
-
+                Cursor c =null;
+                //Fetch only maxListCount messages from  startOffset
+                if(ap.getStartOffset() > 0 && ap.getStartOffset() < 65536) {
+                    c = mResolver.query(Sms.CONTENT_URI,
+                        SMS_PROJECTION, where, null, "date DESC" + " limit " +
+                            ap.getMaxListCount()+" offset "+ ap.getStartOffset());
+                }else {
+                    c = mResolver.query(Sms.CONTENT_URI,
+                        SMS_PROJECTION, where, null, "date DESC" + " limit " +
+                            ap.getMaxListCount());
+                }
+                if (V) Log.d(TAG, "where clause is = " + where);
                 if (c != null) {
                     while (c.moveToNext()) {
                         if (matchAddresses(c, fi, ap)) {
@@ -2349,12 +2365,20 @@ public class BluetoothMapContent {
 
         if (mmsSelected(fi, ap)) {
             fi.msgType = FilterInfo.TYPE_MMS;
-
             String where = setWhereFilter(folder, fi, ap);
             where += " AND " + INTERESTED_MESSAGE_TYPE_CLAUSE;
-            Cursor c = mResolver.query(Mms.CONTENT_URI,
-                MMS_PROJECTION, where, null, "date DESC");
-
+            Cursor c =null;
+            //Fetch only maxListCount messages from  startOffset
+            if(ap.getStartOffset() > 0 && ap.getStartOffset() < 65536) {
+                c = mResolver.query(Mms.CONTENT_URI,
+                    MMS_PROJECTION, where, null, "date DESC" + " limit " +
+                        ap.getMaxListCount()+" offset "+ ap.getStartOffset());
+            } else {
+                c = mResolver.query(Mms.CONTENT_URI,
+                    MMS_PROJECTION, where, null, "date DESC" + " limit " +
+                        ap.getMaxListCount());
+            }
+            if (V) Log.d(TAG, "where clause is = " + where);
             if (c != null) {
                 int cnt = 0;
                 while (c.moveToNext()) {
@@ -2367,10 +2391,10 @@ public class BluetoothMapContent {
                 c.close();
             }
         }
-
         /* Enable this if post sorting and segmenting needed */
         bmList.sort();
-        bmList.segment(ap.getMaxListCount(), ap.getStartOffset());
+        //Handle OFFSET and MAXLISTCOUNT from DB query
+        //bmList.segment(ap.getMaxListCount(), ap.getStartOffset());
 
         return bmList;
     }
