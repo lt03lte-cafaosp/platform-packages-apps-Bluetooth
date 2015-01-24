@@ -21,22 +21,28 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import android.util.Log;
 
 import javax.btobex.ObexTransport;
 
-public class BluetoothMnsRfcommTransport implements ObexTransport {
+public class BluetoothMnsTransport implements ObexTransport {
 
+    public static final int TYPE_RFCOMM = 0;
+    public static final int TYPE_L2CAP = 1;
     private final BluetoothSocket mSocket;
-
-    public BluetoothMnsRfcommTransport(BluetoothSocket socket) {
+    private final int mType;
+    private static final String TAG = "BluetoothMnsTransport";
+    public BluetoothMnsTransport(BluetoothSocket socket, int type) {
         super();
         this.mSocket = socket;
+        this.mType = type;
     }
 
     public void close() throws IOException {
         mSocket.close();
     }
-
     public DataInputStream openDataInputStream() throws IOException {
         return new DataInputStream(openInputStream());
     }
@@ -75,5 +81,7 @@ public class BluetoothMnsRfcommTransport implements ObexTransport {
             return null;
         return mSocket.getRemoteDevice().getAddress();
     }
-
+    public boolean isSrmCapable() {
+        return mType == TYPE_L2CAP;
+    }
 }

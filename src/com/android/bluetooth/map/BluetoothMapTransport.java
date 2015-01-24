@@ -25,12 +25,16 @@ import java.io.OutputStream;
 
 import javax.btobex.ObexTransport;
 
-public class BluetoothMapRfcommTransport implements ObexTransport {
+public class BluetoothMapTransport implements ObexTransport {
+    public static final int TYPE_RFCOMM = 0;
+    public static final int TYPE_L2CAP = 1;
     private BluetoothSocket mSocket = null;
+    private final int mType;
 
-    public BluetoothMapRfcommTransport(BluetoothSocket rfs) {
+    public BluetoothMapTransport(BluetoothSocket rfs, int type) {
         super();
         this.mSocket = rfs;
+        this.mType = type;
     }
 
     public void close() throws IOException {
@@ -68,5 +72,7 @@ public class BluetoothMapRfcommTransport implements ObexTransport {
     public boolean isConnected() throws IOException {
         return true;
     }
-
+    public boolean isSrmCapable() {
+        return mType == TYPE_L2CAP;
+    }
 }

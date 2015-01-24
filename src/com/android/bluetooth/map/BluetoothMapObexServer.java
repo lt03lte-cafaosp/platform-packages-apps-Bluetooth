@@ -22,11 +22,15 @@ import java.util.Calendar;
 
 import javax.btobex.HeaderSet;
 import javax.btobex.Operation;
+import javax.btobex.ServerOperation;
 import javax.btobex.ResponseCodes;
 import javax.btobex.ServerRequestHandler;
+import javax.btobex.ObexHelper;
+import javax.btobex.HeaderSet;
 
 import com.android.bluetooth.map.BluetoothMapUtils;
 import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
+import com.android.bluetooth.map.BluetoothMapTransport;
 
 import android.content.Context;
 import android.os.Handler;
@@ -57,6 +61,7 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     private static final String TYPE_GET_FOLDER_LISTING  = "x-obex/folder-listing";
     private static final String TYPE_GET_MESSAGE_LISTING = "x-bt/MAP-msg-listing";
     private static final String TYPE_MESSAGE             = "x-bt/message";
+    private static final String TYPE_MASINSTANCEINFO     = "x-bt/MASInstanceInformation";
     private static final String TYPE_SET_MESSAGE_STATUS  = "x-bt/messageStatus";
     private static final String TYPE_SET_NOTIFICATION_REGISTRATION = "x-bt/MAP-NotificationRegistration";
     private static final String TYPE_MESSAGE_UPDATE      = "x-bt/MAP-messageUpdate";
@@ -98,7 +103,6 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
             = {INBOX, DRAFT, OUTBOX, SENT, DELETED};
 
     public static boolean sIsAborted = false;
-
     BluetoothMapContent mOutContent;
 
     public BluetoothMapObexServer(Handler callback, Context context,
@@ -246,6 +250,36 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
         }
 
         if(D) Log.d(TAG,"type = " + type + ", name = " + name);
+        if (type == null) {
+            if (V) Log.d(TAG, "type is null");
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+        }
+
+
+        try {
+            if (((ServerOperation)op).mSrmServerSession.getLocalSrmCapability() ==
+                   ObexHelper.SRM_CAPABLE) {
+                if (V) Log.v(TAG, "Local Device SRM: Capable");
+                Byte srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                    if (V) Log.v(TAG, "SRM status: Enabled");
+                        ((ServerOperation)op).mSrmServerSession
+                            .setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                    } else {
+                        if (V) Log.v(TAG, "SRM status: Disabled");
+                        ((ServerOperation)op).mSrmServerSession
+                            .setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                    }
+                }
+            else {
+                if (V) Log.v(TAG, "Local Device SRM: Incapable");
+                ((ServerOperation)op).mSrmServerSession
+                    .setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+            }
+        } catch (IOException e ){
+            Log.v(TAG, "onPut "+e.toString());
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+        }
         if (type.equals(TYPE_MESSAGE_UPDATE)) {
             if(V) {
                 Log.d(TAG,"TYPE_MESSAGE_UPDATE:");
@@ -479,6 +513,30 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
                 return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
             }
 
+            try {
+                if (((ServerOperation)op).mSrmServerSession.getLocalSrmCapability() ==
+                    ObexHelper.SRM_CAPABLE) {
+                    if (V) Log.v(TAG, "Local Device SRM: Capable");
+                    Byte srm = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                    if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                        if (V) Log.v(TAG, "SRM status: Enabled");
+                        ((ServerOperation)op).mSrmServerSession
+                            .setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                    } else {
+                        if (V) Log.v(TAG, "SRM status: Disabled");
+                        ((ServerOperation)op).mSrmServerSession
+                            .setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                    }
+                }
+                else {
+                    if (V) Log.v(TAG, "Local Device SRM: Incapable");
+                    ((ServerOperation)op).mSrmServerSession
+                        .setLocalSrmStatus(ObexHelper.LOCAL_SRM_DISABLED);
+                }
+            } catch (IOException e) {
+                Log.e(TAG,"onGet "+ e.toString());
+                return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
+            }
             if (type.equals(TYPE_GET_FOLDER_LISTING)) {
                 if (V && appParams != null) {
                     Log.d(TAG,"TYPE_GET_FOLDER_LISTING: MaxListCount = " + appParams.getMaxListCount() +
@@ -508,6 +566,12 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
                         ", FractionRequest = " + appParams.getFractionRequest());
                 }
                 return sendGetMessageRsp(op, name, appParams); // Block until all packets have been send.
+            }
+            else if (type.equals(TYPE_MASINSTANCEINFO)){
+                if(V && appParams != null) {
+                    Log.d(TAG,"TYPE_MESSAGEINSTANCEINFO (GET): " + appParams.getMasInstanceId());
+                }
+                return sendGetMASInstanceInfoRsp(op, appParams);
             }
             else {
                 Log.w(TAG, "unknown type request: " + type);
@@ -578,10 +642,11 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
                 appParams.setStartOffset(0);
 
             if(appParams.getMaxListCount() != 0) {
-               if(mMasId == 0)
-                outList = mOutContent.msgListing(folderName, appParams);
-               else
-                  outList = mOutContent.msgListingEmail(folderName, appParams);
+                if(mMasId == 0)
+                   outList = mOutContent.msgListing(folderName, appParams);
+                else {
+                   outList = mOutContent.msgListingEmail(folderName, appParams);
+                }
                 // Generate the byte stream
                 outAppParams.setMessageListingSize(outList.getCount());
                 outBytes = outList.encode();
@@ -628,6 +693,17 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
             try {
                 while (bytesWritten < outBytes.length && sIsAborted == false) {
                     bytesToWrite = Math.min(maxChunkSize, outBytes.length - bytesWritten);
+                    /* Do not write down anything on the socket once we get
+                     * a abort for the current operation
+                     */
+                    if (((ServerOperation)op).mSrmServerSession.getLocalSrmStatus() ==
+                        ObexHelper.LOCAL_SRM_ENABLED) {
+                        if (((ServerOperation)op).isAborted()) {
+                           ((ServerOperation)op).isAborted = true;
+                           sIsAborted = false;
+                           break;
+                      }
+                    }
                     outStream.write(outBytes, bytesWritten, bytesToWrite);
                     bytesWritten += bytesToWrite;
                 }
@@ -777,6 +853,17 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
             try {
                 while (bytesWritten < outBytes.length && sIsAborted == false) {
                     bytesToWrite = Math.min(maxChunkSize, outBytes.length - bytesWritten);
+                    /* Do not write down anything on the socket once we get
+                     * a abort for the current operation
+                     */
+                    if (((ServerOperation)op).mSrmServerSession.getLocalSrmStatus() ==
+                        ObexHelper.LOCAL_SRM_ENABLED) {
+                        if (((ServerOperation)op).isAborted()) {
+                           ((ServerOperation)op).isAborted = true;
+                           sIsAborted = false;
+                           break;
+                      }
+                    }
                     outStream.write(outBytes, bytesWritten, bytesToWrite);
                     bytesWritten += bytesToWrite;
                 }
@@ -839,9 +926,94 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
         maxChunkSize = op.getMaxPacketSize(); // This must be called after setting the headers.
 
         if(outBytes != null) {
+            Log.v(TAG,"outBytes: "+ outBytes.length);
             try {
                 while (bytesWritten < outBytes.length && sIsAborted == false) {
                     bytesToWrite = Math.min(maxChunkSize, outBytes.length - bytesWritten);
+                    /* Do not write down anything on the socket once we get
+                     * a abort for the current operation
+                     */
+                    if (((ServerOperation)op).mSrmServerSession.getLocalSrmStatus() ==
+                        ObexHelper.LOCAL_SRM_ENABLED) {
+                        if (((ServerOperation)op).isAborted()) {
+                           ((ServerOperation)op).isAborted = true;
+                           sIsAborted = false;
+                           break;
+                      }
+                    }
+                    outStream.write(outBytes, bytesWritten, bytesToWrite);
+                    bytesWritten += bytesToWrite;
+                }
+            } catch (IOException e) {
+                // We were probably aborted or disconnected
+            } finally {
+                if(outStream != null) {
+                    try {
+                        outStream.close();
+                    } catch (IOException e) {
+                        // If an error occurs during close, there is no more cleanup to do
+                    }
+                }
+            }
+            if(bytesWritten == outBytes.length)
+                return ResponseCodes.OBEX_HTTP_OK;
+            else
+                return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+        }
+
+        return ResponseCodes.OBEX_HTTP_OK;
+    }
+    /**
+     * Send the get masInstance Information response based on an application
+     * parameter header masInstance ID.
+     *
+     * @param op
+     *            The OBEX operation.
+     * @param appParams
+     *            The application parameter header
+     * @return {@link ResponseCodes.OBEX_HTTP_OK} on success or
+     *         {@link ResponseCodes.OBEX_HTTP_BAD_REQUEST} on error.
+     */
+    private int sendGetMASInstanceInfoRsp(Operation op, BluetoothMapAppParams appParams) {
+        OutputStream outStream ;
+        byte[] outBytes;
+        int maxChunkSize, bytesToWrite, bytesWritten = 0;
+        int masInstanceId = appParams.getMasInstanceId();
+        if (V) Log.v(TAG, "sendGetMASInstanceInfo Instance Id "+masInstanceId);
+        String masInstanceDescription;
+        if(masInstanceId == 0 ){
+            masInstanceDescription = "MAS Instance to access SMS and MMS Type messages";
+
+        } else if (masInstanceId == 1) {
+            masInstanceDescription = "MAS Instance to access  EMAIL Type messages";
+        } else {
+            masInstanceDescription = "No MAS Instance Supported for Requested ID: "+masInstanceId;
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+        }
+        try {
+            outStream = op.openOutputStream();
+            outBytes = masInstanceDescription.getBytes("UTF-8");
+        } catch (IOException e) {
+            Log.w(TAG,"sendGetMASInstanceInfoRsp: IOException - sending OBEX_HTTP_BAD_REQUEST", e);
+            return ResponseCodes.OBEX_HTTP_BAD_REQUEST;
+        }
+
+        maxChunkSize = op.getMaxPacketSize(); // This must be called after setting the headers.
+        if(outBytes != null) {
+            try {
+                while (bytesWritten < outBytes.length && sIsAborted == false) {
+                    bytesToWrite = Math.min(maxChunkSize, outBytes.length - bytesWritten);
+                    /* Do not write down anything on the socket once we get
+                     * a abort for the current operation
+                     */
+                    if (((ServerOperation)op).mSrmServerSession.getLocalSrmStatus() ==
+                        ObexHelper.LOCAL_SRM_ENABLED) {
+                        if (((ServerOperation)op).isAborted()) {
+                           ((ServerOperation)op).isAborted = true;
+                           sIsAborted = false;
+                           break;
+                      }
+                    }
                     outStream.write(outBytes, bytesWritten, bytesToWrite);
                     bytesWritten += bytesToWrite;
                 }
