@@ -658,6 +658,7 @@ static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_ad
     jbyteArray addr = NULL;
     jobjectArray a_name = NULL;
     jintArray a_scn = NULL;
+    jintArray a_l2capPsm = NULL;
     jintArray a_masid = NULL;
     jintArray a_msgtype = NULL;
     jclass mclass;
@@ -675,6 +676,9 @@ static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_ad
     a_scn = callbackEnv->NewIntArray(num_instances);
     if (a_scn == NULL) goto clean;
 
+    a_l2capPsm= callbackEnv->NewIntArray(num_instances);
+    if (a_l2capPsm == NULL) goto clean;
+
     a_masid = callbackEnv->NewIntArray(num_instances);
     if (a_masid == NULL) goto clean;
 
@@ -686,6 +690,7 @@ static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_ad
 
         callbackEnv->SetObjectArrayElement(a_name, i, name);
         callbackEnv->SetIntArrayRegion(a_scn, i, 1, &instances[i].scn);
+        callbackEnv->SetIntArrayRegion(a_l2capPsm, i, 1, &instances[i].l2cap_psm);
         callbackEnv->SetIntArrayRegion(a_masid, i, 1, &instances[i].id);
         callbackEnv->SetIntArrayRegion(a_msgtype, i, 1, &instances[i].msg_types);
 
@@ -694,7 +699,8 @@ static void remote_mas_instances_callback(bt_status_t status, bt_bdaddr_t *bd_ad
 
     if (sJniCallbacksObj) {
         callbackEnv->CallVoidMethod(sJniCallbacksObj, method_deviceMasInstancesFoundCallback,
-                                    (jint) status, addr, a_name, a_scn, a_masid, a_msgtype);
+                                    (jint) status, addr, a_name, a_scn, a_masid, a_msgtype,
+                                    a_l2capPsm);
     }
     checkAndClearExceptionFromCallback(callbackEnv, __FUNCTION__);
 
@@ -702,6 +708,7 @@ clean:
     if (addr != NULL) callbackEnv->DeleteLocalRef(addr);
     if (a_name != NULL) callbackEnv->DeleteLocalRef(a_name);
     if (a_scn != NULL) callbackEnv->DeleteLocalRef(a_scn);
+    if (a_l2capPsm != NULL) callbackEnv->DeleteLocalRef(a_l2capPsm);
     if (a_masid != NULL) callbackEnv->DeleteLocalRef(a_masid);
     if (a_msgtype != NULL) callbackEnv->DeleteLocalRef(a_msgtype);
     callbackEnv->PopLocalFrame(NULL);
@@ -756,7 +763,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     method_releaseWakeLock = env->GetMethodID(clazz, "releaseWakeLock", "(Ljava/lang/String;)Z");
     method_deviceMasInstancesFoundCallback = env->GetMethodID(jniCallbackClass,
                                                     "deviceMasInstancesFoundCallback",
-                                                    "(I[B[Ljava/lang/String;[I[I[I)V");
+                                                    "(I[B[Ljava/lang/String;[I[I[I[I)V");
     method_energyInfo = env->GetMethodID(clazz, "energyInfoCallback", "(IIJJJJ)V");
 
     char value[PROPERTY_VALUE_MAX];
