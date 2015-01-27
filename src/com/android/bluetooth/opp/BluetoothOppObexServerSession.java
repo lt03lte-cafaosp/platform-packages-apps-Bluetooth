@@ -140,9 +140,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
      * Header then wait for user confirmation
      */
     public void preStart(Handler handler) {
-        if (D) Log.d(TAG, "acquire full WakeLock");
         mPreTransferCallback = handler;
-        mWakeLock.acquire();
         try {
             if (D) Log.d(TAG, "Create ServerSession with transport " + mTransport.toString());
             mSession = new ServerSession(mTransport, this, null);
@@ -411,6 +409,8 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         mLocalShareInfoId = Integer.parseInt(contentUri.getPathSegments().get(1));
 
         if (needConfirm) {
+            if (D) Log.d(TAG, "acquire full WakeLock");
+            mWakeLock.acquire();
             Intent in = new Intent(BluetoothShare.INCOMING_FILE_CONFIRMATION_REQUEST_ACTION);
             in.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             mContext.sendBroadcast(in);
@@ -419,11 +419,9 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         if (V) Log.v(TAG, "insert contentUri: " + contentUri);
         if (V) Log.v(TAG, "mLocalShareInfoId = " + mLocalShareInfoId);
 
-        if (V) Log.v(TAG, "acquire partial WakeLock");
-
-
         synchronized (this) {
             if (mWakeLock.isHeld()) {
+                if (V) Log.v(TAG, "acquire partial WakeLock");
                 mPartialWakeLock.acquire();
                 mWakeLock.release();
             }
