@@ -96,6 +96,8 @@ public class BluetoothOppService extends Service {
     /** Class to handle Notification Manager updates */
     private BluetoothOppNotification mNotifier;
 
+    private boolean mPendingUpdate = true;
+
     private UpdateThread mUpdateThread;
 
     private ArrayList<BluetoothOppShareInfo> mShares;
@@ -436,7 +438,9 @@ public class BluetoothOppService extends Service {
     };
 
     private void updateFromProvider() {
+        if (V) Log.v(TAG, "Updating the provider");
         synchronized (BluetoothOppService.this) {
+            mPendingUpdate = true;
             if ((mUpdateThread == null) && (mAdapter != null)
                 && mAdapter.isEnabled()) {
                 if (V) Log.v(TAG, "Starting a new thread");
@@ -465,6 +469,7 @@ public class BluetoothOppService extends Service {
                     }
                     if (V) Log.v(TAG, "keepUpdateThread is " + keepService + " sListenStarted is "
                             + mListenStarted);
+                    mPendingUpdate = false;
                 }
                 Cursor cursor;
                 try {
@@ -600,15 +605,6 @@ public class BluetoothOppService extends Service {
                 cursor.close();
                 cursor = null;
 
-                try {
-                    if (mPowerManager.isScreenOn()) {
-                        Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
-                    }
-                } catch (InterruptedException e) {
-                    if (V) Log.v(TAG, "OppService UpdateThread was interrupted (1), exiting");
-                    return;
-                }
-
                 if (V) {
                     if (mServerSession != null) {
                         Log.v(TAG, "Server Session is active");
@@ -622,7 +618,18 @@ public class BluetoothOppService extends Service {
                         Log.v(TAG, "No active Client Session");
                     }
                 }
-            } while (mPowerManager.isScreenOn() && ((mServerSession != null) || (mTransfer != null)));
+
+                try {
+                    if (mPowerManager.isScreenOn()) {
+                        Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
+                    }
+                } catch (InterruptedException e) {
+                    if (V) Log.v(TAG, "OppService Thread sleep is interrupted (1), exiting");
+                    return;
+                }
+
+                if(V) Log.v(TAG, "PendingUpdate is " + mPendingUpdate);
+            } while (mPendingUpdate);
 
             synchronized (BluetoothOppService.this) {
                 mUpdateThread = null;
