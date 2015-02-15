@@ -161,12 +161,13 @@ public class BluetoothOppService extends Service {
         mBatchId = 1;
         mNotifier = new BluetoothOppNotification(this);
         mNotifier.mNotificationMgr.cancelAll();
-        mNotifier.updateNotification();
 
         final ContentResolver contentResolver = getContentResolver();
         new Thread("trimDatabase") {
             public void run() {
-                trimDatabase(contentResolver);
+                synchronized (BluetoothOppService.this) {
+                    trimDatabase(contentResolver);
+                }
             }
         }.start();
 
@@ -416,6 +417,17 @@ public class BluetoothOppService extends Service {
                         break;
                     case BluetoothAdapter.STATE_TURNING_OFF:
                         if (V) Log.v(TAG, "Receiver DISABLED_ACTION ");
+
+                        if (mUpdateThread != null) {
+                            try {
+                                mUpdateThread.interrupt();
+                                mUpdateThread.join();
+                                mUpdateThread = null;
+                            } catch (InterruptedException ie) {
+                                Log.e(TAG, "OPPService Thread join interrupted");
+                            }
+                        }
+
                         mNotifier.btOffNotification();
                         //FIX: Don't block main thread
                         /*
@@ -600,15 +612,6 @@ public class BluetoothOppService extends Service {
                 cursor.close();
                 cursor = null;
 
-                try {
-                    if (mPowerManager.isScreenOn()) {
-                        Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
-                    }
-                } catch (InterruptedException e) {
-                    if (V) Log.v(TAG, "OppService UpdateThread was interrupted (1), exiting");
-                    return;
-                }
-
                 if (V) {
                     if (mServerSession != null) {
                         Log.v(TAG, "Server Session is active");
@@ -621,6 +624,16 @@ public class BluetoothOppService extends Service {
                     } else {
                         Log.v(TAG, "No active Client Session");
                     }
+                }
+
+                try {
+                    if (((mServerSession != null) || (mTransfer != null))
+                            && mPowerManager.isScreenOn()) {
+                        Thread.sleep(BluetoothShare.UI_UPDATE_INTERVAL);
+                    }
+                } catch (InterruptedException e) {
+                    if (V) Log.v(TAG, "OppService Thread sleep is interrupted (1), exiting");
+                    return;
                 }
             } while (mPowerManager.isScreenOn() && ((mServerSession != null) || (mTransfer != null)));
 
@@ -827,8 +840,7 @@ public class BluetoothOppService extends Service {
         info.mConfirm = newConfirm;
         int newStatus = cursor.getInt(statusColumn);
         int oldStatus = info.mStatus;
-        if (!BluetoothShare.isStatusCompleted(info.mStatus)
-                && BluetoothShare.isStatusCompleted(newStatus)) {
+        if (BluetoothShare.isStatusCompleted(info.mStatus)) {
             mNotifier.mNotificationMgr.cancel(info.mId);
         }
 
@@ -1056,18 +1068,54 @@ public class BluetoothOppService extends Service {
                 WHERE_INVISIBLE_COMPLETE_INBOUND_FAILED, null);
         if (V) Log.v(TAG, "Deleted complete inbound failed shares, number = " + delNum);
 
-        // remove outbound share interrupted by battery removal
+        ContentValues updateValues;
+        // Update interrupted outbound share status
         final String WHERE_OUTBOUND_INTERRUPTED_ON_POWER_OFF = BluetoothShare.DIRECTION + "="
                 + BluetoothShare.DIRECTION_OUTBOUND + " AND " + BluetoothShare.STATUS + "="
                 + BluetoothShare.STATUS_PENDING + " OR " + BluetoothShare.STATUS + "="
                 + BluetoothShare.STATUS_RUNNING;
 
-        try {
-            delNum = contentResolver.delete(BluetoothShare.CONTENT_URI,
-                    WHERE_OUTBOUND_INTERRUPTED_ON_POWER_OFF, null);
-            if (V) Log.v(TAG, "Delete interrupted outbound share, number = " + delNum);
-        } catch (SQLiteException e) {
-                Log.e(TAG, "trimDatabase: could not deleted interrupted outbound failed shares: " + e);
+        Cursor cursorToUpdate = contentResolver.query(BluetoothShare.CONTENT_URI, null,
+                    WHERE_OUTBOUND_INTERRUPTED_ON_POWER_OFF, null, null);
+        if (cursorToUpdate != null) {
+            for (cursorToUpdate.moveToFirst(); !cursorToUpdate.isAfterLast();
+                    cursorToUpdate.moveToNext()) {
+                updateValues = new ContentValues();
+                updateValues.put(BluetoothShare.STATUS, BluetoothShare.STATUS_UNKNOWN_ERROR);
+                int mId = cursorToUpdate.getInt(cursorToUpdate.getColumnIndexOrThrow(
+                                    BluetoothShare._ID));
+                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + mId);
+                contentResolver.update(contentUri, updateValues, null, null);
+            }
+            if (V) Log.v(TAG, "Update interrupted outbound share status, number = "
+                        + cursorToUpdate.getCount());
+            cursorToUpdate.close();
+            cursorToUpdate = null;
+        }
+
+        // Update unconfirmed interrupted inbound shares status
+        final String WHERE_CONFIRMATION_PENDING_INBOUND = BluetoothShare.DIRECTION + "="
+                + BluetoothShare.DIRECTION_INBOUND + " AND " + BluetoothShare.USER_CONFIRMATION
+                + "=" + BluetoothShare.USER_CONFIRMATION_PENDING;
+
+        cursorToUpdate = contentResolver.query(BluetoothShare.CONTENT_URI, null,
+                    WHERE_CONFIRMATION_PENDING_INBOUND, null, null);
+
+        if (cursorToUpdate != null) {
+            if (cursorToUpdate.moveToFirst()) {
+                updateValues = new ContentValues();
+                updateValues.put(BluetoothShare.USER_CONFIRMATION,
+                        BluetoothShare.USER_CONFIRMATION_DENIED);
+                updateValues.put(BluetoothShare.STATUS, BluetoothShare.STATUS_UNKNOWN_ERROR);
+                int mId = cursorToUpdate.getInt(cursorToUpdate.getColumnIndexOrThrow(
+                                    BluetoothShare._ID));
+                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + mId);
+                contentResolver.update(contentUri, updateValues, null, null);
+            }
+            if (V) Log.v(TAG, "Update interrupted inbound share status, number = "
+                        + cursorToUpdate.getCount());
+            cursorToUpdate.close();
+            cursorToUpdate = null;
         }
 
         final String WHERE_INBOUND_INTERRUPTED_ON_POWER_OFF = BluetoothShare.DIRECTION + "="
@@ -1093,14 +1141,6 @@ public class BluetoothOppService extends Service {
             cursorToFile.close();
             cursorToFile = null;
         }
-
-        // on boot : remove unconfirmed inbound shares.
-        final String WHERE_CONFIRMATION_PENDING_INBOUND = BluetoothShare.DIRECTION + "="
-                + BluetoothShare.DIRECTION_INBOUND + " AND " + BluetoothShare.USER_CONFIRMATION
-                + "=" + BluetoothShare.USER_CONFIRMATION_PENDING;
-        delNum = contentResolver.delete(BluetoothShare.CONTENT_URI,
-                 WHERE_CONFIRMATION_PENDING_INBOUND, null);
-        if (V) Log.v(TAG, "Deleted unconfirmed incoming shares, number = " + delNum);
 
         // Only keep the inbound and successful shares for LiverFolder use
         // Keep the latest 1000 to easy db query
