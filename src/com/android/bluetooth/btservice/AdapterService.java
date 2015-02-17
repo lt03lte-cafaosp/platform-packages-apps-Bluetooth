@@ -93,6 +93,7 @@ public class AdapterService extends Service {
     private static final String delayConnectTimeoutDevice[] = {"00:23:3D"}; // volkswagen carkit
     //For Debugging only
     private static int sRefCount=0;
+    private static int mScanmode;
 
     private int mStackReportedState;
     private int mTxTimeTotalMs;
@@ -193,6 +194,7 @@ public class AdapterService extends Service {
         if (TRACE_REF) {
             synchronized (AdapterService.class) {
                 sRefCount++;
+                mScanmode = BluetoothAdapter.SCAN_MODE_CONNECTABLE;
                 debugLog("AdapterService() - REFCOUNT: CREATED. INSTANCE_COUNT" + sRefCount);
             }
         }
@@ -774,6 +776,15 @@ public class AdapterService extends Service {
                 return false;
             }
 
+            //do not allow setmode when multicast is active
+            A2dpService a2dpService = A2dpService.getA2dpService();
+            if (a2dpService != null &&
+                    a2dpService.isMulticastOngoing()) {
+                Log.i(TAG,"A2dp Multicast is Ongoing, ignore setmode " + mode);
+                mScanmode = mode;
+                return false;
+            }
+
             AdapterService service = getService();
             if (service == null) return false;
             return service.setScanMode(mode,duration);
@@ -1318,7 +1329,6 @@ public class AdapterService extends Service {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         setDiscoverableTimeout(duration);
-
         int newMode = convertScanModeToHal(mode);
         return mAdapterProperties.setScanMode(newMode);
     }
@@ -1338,6 +1348,13 @@ public class AdapterService extends Service {
      boolean startDiscovery() {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                        "Need BLUETOOTH ADMIN permission");
+        //do not allow new connections with active multicast
+        A2dpService a2dpService = A2dpService.getA2dpService();
+        if (a2dpService != null &&
+                a2dpService.isMulticastOngoing()) {
+            Log.i(TAG,"A2dp Multicast is Ongoing, ignore discovery");
+            return false;
+        }
 
         return startDiscoveryNative();
     }
@@ -1567,7 +1584,8 @@ public class AdapterService extends Service {
 
             // proceed connection only if a2dp is connected to this device
             // add here as if is already overloaded
-            if (a2dpConnDevList.contains(device)) {
+            if (a2dpConnDevList.contains(device)  ||
+                    (hsService.getPriority(device) >= BluetoothProfile.PRIORITY_ON)) {
                 hsService.connect(device);
             } else {
                 Log.v(TAG,"do not initiate connect as A2dp is not connected");
@@ -1588,7 +1606,8 @@ public class AdapterService extends Service {
             }
             // proceed connection only if HFP is connected to this device
             // add here as if is already overloaded
-            if (hfConnDevList.contains(device)) {
+            if (hfConnDevList.contains(device) ||
+                    (a2dpService.getPriority(device) >= BluetoothProfile.PRIORITY_ON)) {
                 a2dpService.connect(device);
             } else {
                 Log.v(TAG,"do not initiate connect as HFP is not connected");
@@ -2073,6 +2092,10 @@ public class AdapterService extends Service {
             "idle_time = " + idle_time + "energy_used = " + energy_used +
             "ctrl_state = " + ctrl_state);
         }
+    }
+
+    public boolean resetScanMode() {
+        return setScanMode(mScanmode,getDiscoverableTimeout());
     }
 
     private void debugLog(String msg) {
