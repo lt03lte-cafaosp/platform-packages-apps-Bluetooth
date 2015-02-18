@@ -1026,7 +1026,7 @@ public class BluetoothPbapVcardManager {
         }
 
         private boolean checkValidFilter (String attr) {
-            if((attr.startsWith("N:")) || (attr.startsWith("TEL"))
+            if((attr.startsWith("N:")) || (attr.startsWith("N;")) || (attr.startsWith("TEL"))
                 || (attr.startsWith("VERSION")) || (attr.startsWith("URL"))
                 || (attr.startsWith("FN")) || (attr.startsWith("BDAY"))
                 || (attr.startsWith("ADR")) || (attr.startsWith("EMAIL"))
