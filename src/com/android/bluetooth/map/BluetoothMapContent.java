@@ -116,6 +116,7 @@ public class BluetoothMapContent {
     public static final String RECORD_ID = "_id";
     public static final String DISPLAY_NAME = "displayName";
     public static final String SERVER_ID = "serverId";
+    public static final String PARENT_SERVER_ID = "parentServerId";
     public static final String ACCOUNT_KEY = "accountKey";
     public static final String MAILBOX_KEY = "mailboxKey";
     public static final String EMAIL_ADDRESS = "emailAddress";
@@ -1714,6 +1715,64 @@ public class BluetoothMapContent {
             if (D) Log.d(TAG, "phone type = " + fi.phoneType +
                 " phone num = " + fi.phoneNum +
                 " phone alpha tag = " + fi.phoneAlphaTag);
+        }
+    }
+    void setEmailSubFolders(Context context, long id, BluetoothMapFolderElement currentFolder) {
+        if (V) {
+            Log.v(TAG, "setEmailSubFolders: id = " + id
+                    + "currentFolder: " + currentFolder.getName());
+        }
+        String currentFolderName = currentFolder.getName();
+        String where = setWhereFilterAccountKey(id);
+        if (currentFolderName.equals("msg")) {
+            //Parent folders indicated with parentServerId -1 or NULL
+            where += " AND ( parentServerId LIKE -1 OR parentServerId ISNULL )";
+        } else {
+            // subFolders parentServerId is the serverId of the current parent folder
+            String serverId = currentFolder.getServerId();
+            if (serverId != null) {
+                where += " AND parentServerId LIKE '" + serverId +"'";
+            } else {
+                Log.w(TAG, "setEmailSubFolders: No ServerId to fetch subfolders :  currentFolder: "
+                        + currentFolder.getName());
+                return;
+            }
+        }
+        if (V) Log.v(TAG, "Query: [  "+ where+" ] ");
+        //Mandatory folders must be already available at "/root/telecom/msg"
+        ArrayList<BluetoothMapFolderElement> tempSubFolders =
+                new ArrayList<BluetoothMapFolderElement>();
+        for (BluetoothMapFolderElement folder : currentFolder.subFolders) {
+            tempSubFolders.add(folder);
+        }
+        Cursor cr = context.getContentResolver().query(EMAIL_BOX_URI, null, where, null, null);
+        if (cr != null) {
+            if (cr.moveToFirst()) {
+                do {
+                    final String newDisplayName= cr.getString(cr.getColumnIndex(DISPLAY_NAME));
+                    final String newServerId =  cr.getString(cr.getColumnIndex(SERVER_ID));
+                    final String newParentServerId =
+                            cr.getString(cr.getColumnIndex(PARENT_SERVER_ID));
+                    if (V) {
+                        Log.v(TAG, "adding: " + newDisplayName +" : "+ newServerId+" : "
+                                + newParentServerId);
+                    }
+                    for (BluetoothMapFolderElement tmpFolder : tempSubFolders) {
+                        //Avoid duplicate entries for mandatory folders at "/root/telecom/msg"
+                        if (currentFolderName.equals("msg") &&
+                                (tmpFolder.getName()).equalsIgnoreCase(newDisplayName)) {
+                            if (V) Log.v(TAG, " Removing duplicate : "+ tmpFolder.getName());
+                            currentFolder.subFolders.remove(tmpFolder);
+                        } else {
+                            //Clear obsolete non-mandatory entries
+                            if (V) Log.v(TAG, " Removing obsolete: "+ tmpFolder.getName());
+                            currentFolder.subFolders.remove(tmpFolder);
+                        }
+                    }
+                    currentFolder.addFolder(newDisplayName, newServerId, newParentServerId);
+                } while(cr.moveToNext());
+            }
+            cr.close();
         }
     }
 

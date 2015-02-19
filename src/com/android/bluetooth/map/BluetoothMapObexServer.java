@@ -770,62 +770,14 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
 
             if(listStartOffset == BluetoothMapAppParams.INVALID_VALUE_PARAMETER)
                 listStartOffset = 0;
-
             if(maxListCount == BluetoothMapAppParams.INVALID_VALUE_PARAMETER)
                 maxListCount = 1024;
-                Log.v(TAG,"mMasId is " + mMasId);
-                if(mMasId == 1) {
-                   long id = BluetoothMapUtils.getEmailAccountId(mContext);
-                   list = mOutContent.getEmailFolderListAtPath(mContext,id,mCurrentFolder.getName());
-                   if(mCurrentFolder.getName().equals("telecom") || mCurrentFolder.getName().equals("msg")) {
-                      if(V) Log.v(TAG, "Doing no processing");
-                      for (String str : list) {
-                        finalList.add(str);
-                      }
-                   } else {
-                      if (V) Log.v(TAG, "processing for special folders");
-                      for (String str : list) {
-                           String folderStr = str.substring(mCurrentFolder.getName().length()+ 1);
-                           if(V) Log.v(TAG, "folderStr is " +folderStr);
-                           String folder[] = folderStr.split("/");
-                           if(folder.length == 1){
-                              if (V) Log.v(TAG, " Add Folder:" + folder[0]);
-                              finalList.add(folder[0]);
-                           }
-                      }
-                   }
-
-                   tempSubFolders.clear();
-                   for (BluetoothMapFolderElement fold : mCurrentFolder.subFolders) {
-                        tempSubFolders.add(fold);
-                   }
-
-                   if(!(mCurrentFolder.getName().equals("root") ||
-                               mCurrentFolder.getName().equals("telecom"))) {
-
-                      for (int i = 0; i < tempSubFolders.size(); i ++) {
-                           if(!(finalList.contains(tempSubFolders.get(i).getName()))) {
-                              if (V) Log.v(TAG, " removing : "+ tempSubFolders.get(i).getName());
-                                 mCurrentFolder.subFolders.remove(tempSubFolders.get(i));
-                           }
-                      }
-
-                      for (int i = 0; i < mCurrentFolder.subFolders.size(); i ++) {
-                           if(finalList.contains(mCurrentFolder.subFolders.get(i).getName())) {
-                              if (V) Log.v(TAG, " listing already contains, hence removing folder : "
-                                                              + mCurrentFolder.subFolders.get(i).getName());
-                              finalList.remove(mCurrentFolder.subFolders.get(i).getName());
-                           }
-                      }
-                   }
-
-                    if (V) Log.v(TAG, "final list");
-                    for (String str : finalList) {
-                         if (V) Log.v(TAG, "" + str);
-                         mCurrentFolder.addFolder(str);
-                    }
-                }
-
+            Log.v(TAG,"mMasId is " + mMasId);
+            if (mMasId == 1 && !mCurrentFolder.getName().equals("telecom") &&
+                    !mCurrentFolder.getName().equals("root")) {
+                long id = BluetoothMapUtils.getEmailAccountId(mContext);
+                mOutContent.setEmailSubFolders(mContext, id, mCurrentFolder);
+            }
             if(maxListCount != 0) {
                 outBytes = mCurrentFolder.encode(listStartOffset, maxListCount);
                 outStream = op.openOutputStream();
