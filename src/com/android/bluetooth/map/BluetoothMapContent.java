@@ -678,6 +678,14 @@ public class BluetoothMapContent {
                 size = subject.length();
             } else if (fi.msgType == FilterInfo.TYPE_MMS) {
                 size = c.getInt(c.getColumnIndex(Mms.MESSAGE_SIZE));
+                //MMS complete size = attachment_size + subject length
+                String subject = e.getSubject();
+                if (subject == null || subject.length() == 0 ) {
+                    // Handle setSubject if not done case
+                    setSubject(e, c, fi, ap);
+                }
+                if (subject != null && subject.length() != 0 )
+                    size += subject.length();
             } else  if (fi.msgType == FilterInfo.TYPE_EMAIL) {
                 long msgId = Long.valueOf(c.getString(c.getColumnIndex("_id")));
                 String textContent, htmlContent;
@@ -2623,6 +2631,7 @@ public class BluetoothMapContent {
         if (TextUtils.isEmpty(phone)) {
            return;
         }
+        if (V) Log.v(TAG," setVCardFromPhoneNumber :: " + phone);
         String contactId = null, contactName = null;
         String[] phoneNumbers = null;
         String[] emailAddresses = null;
@@ -2684,10 +2693,13 @@ public class BluetoothMapContent {
                 p.close();
             }
         }
-        if(incoming == true)
+        if(incoming == true) {
+            if(V) Log.v(TAG," setVCardFromPhoneNumber addOrg: "+contactName+ "->"+phoneNumbers[0]);
             message.addOriginator(contactName, contactName, phoneNumbers, emailAddresses); // Use version 3.0 as we only have a formatted name
-        else
+        } else {
+            if(V) Log.v(TAG," setVCardFromPhone addRecpinet: "+contactName+ "-> "+phoneNumbers[0]);
             message.addRecipient(contactName, contactName, phoneNumbers, emailAddresses); // Use version 3.0 as we only have a formatted name
+        }
     }
 
     public static final int MAP_MESSAGE_CHARSET_NATIVE = 0;
@@ -2728,7 +2740,11 @@ public class BluetoothMapContent {
             msgBody = c.getString(c.getColumnIndex(Sms.BODY));
 
             String phone = c.getString(c.getColumnIndex(Sms.ADDRESS));
-
+            if ((phone == null) && type == Sms.MESSAGE_TYPE_DRAFT) {
+                //Fetch address for Drafts from "canonical_address" table
+                phone  = getMessageSmsRecipientAddress(threadId);
+            }
+            if(V)  Log.v(TAG, "threadId = " + threadId + " phone:" + phone +"\n");
             time = c.getLong(c.getColumnIndex(Sms.DATE));
             if(type == 1) // Inbox message needs to set the vCard as originator
                 setVCardFromPhoneNumber(message, phone, true);

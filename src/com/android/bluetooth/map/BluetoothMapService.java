@@ -970,6 +970,7 @@ public class BluetoothMapService extends ProfileService {
             mBluetoothMnsObexClient.initObserver(mSessionStatusHandler, mMasId);
             mMapServer = new BluetoothMapObexServer(mSessionStatusHandler, context,
             mBluetoothMnsObexClient, mMasId);
+            mMapServer.onSetMessageTypes(mSupportedMessageTypes);
             synchronized (this) {
                // We need to get authentication now that obex server is up
                mAuth = new BluetoothMapAuthenticator(mSessionStatusHandler);
