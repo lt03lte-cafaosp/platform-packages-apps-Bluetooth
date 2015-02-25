@@ -342,7 +342,7 @@ public class GattService extends ProfileService {
             //do not allow new connections with active multicast
             A2dpService a2dpService = A2dpService.getA2dpService();
             if (a2dpService != null &&
-                    a2dpService.isMulticastOngoing()) {
+                    a2dpService.isMulticastOngoing(null)) {
                 Log.i(TAG,"A2dp Multicast is Ongoing, ignore Connection Request");
                 return;
             }
@@ -480,7 +480,7 @@ public class GattService extends ProfileService {
             //do not allow new connections with active multicast
             A2dpService a2dpService = A2dpService.getA2dpService();
             if (a2dpService != null &&
-                    a2dpService.isMulticastOngoing()) {
+                    a2dpService.isMulticastOngoing(null)) {
                 Log.i(TAG,"A2dp Multicast is Ongoing, ignore Connection Request");
                 return;
             }
