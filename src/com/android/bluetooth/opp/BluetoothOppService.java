@@ -168,7 +168,9 @@ public class BluetoothOppService extends Service {
         final ContentResolver contentResolver = getContentResolver();
         new Thread("trimDatabase") {
             public void run() {
-                trimDatabase(contentResolver);
+                synchronized (BluetoothOppService.this) {
+                    trimDatabase(contentResolver);
+                }
             }
         }.start();
 
