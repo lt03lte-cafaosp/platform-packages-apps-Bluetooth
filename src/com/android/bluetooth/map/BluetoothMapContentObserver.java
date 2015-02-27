@@ -44,6 +44,7 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.text.format.Time;
+import android.text.TextUtils;
 import android.os.Handler;
 import android.provider.BaseColumns;
 import android.provider.Telephony;
@@ -736,7 +737,6 @@ public class BluetoothMapContentObserver {
             Log.d(TAG, "empty recipient list");
             return -1;
         }
-
         for (BluetoothMapbMessage.vCard recipient : recipientList) {
             if(recipient.getEnvLevel() == 0) // Only send the message to the top level recipient
             {
@@ -759,6 +759,11 @@ public class BluetoothMapContentObserver {
                         /* Add the message to the database */
                         String phone = recipient.getFirstPhoneNumber();
                         String msgBody = ((BluetoothMapbMessageSms) msg).getSmsBody();
+                        if (TextUtils.isEmpty(msgBody)) {
+                            Log.d(TAG, "PushMsg: Empty msgBody ");
+                            /* not allowed to push empty message */
+                            throw new IllegalArgumentException("push EMPTY message: Invalid Body");
+                        }
                         Uri contentUri = Uri.parse("content://sms/" + folder);
                         Uri uri = Sms.addMessageToUri(mResolver, contentUri, phone, msgBody,
                             "", System.currentTimeMillis(), read, deliveryReport);
@@ -1037,27 +1042,29 @@ public class BluetoothMapContentObserver {
         SmsManager smsMng = SmsManager.getDefault();
         ArrayList<String> parts = smsMng.divideMessage(msgBody);
         msgInfo.parts = parts.size();
-
         ArrayList<PendingIntent> deliveryIntents = new ArrayList<PendingIntent>(msgInfo.parts);
         ArrayList<PendingIntent> sentIntents = new ArrayList<PendingIntent>(msgInfo.parts);
-
-        for (int i = 0; i < msgInfo.parts; i++) {
-            Intent intent;
-            intent = new Intent(ACTION_MESSAGE_DELIVERY, null);
-            intent.putExtra("HANDLE", msgInfo.id);
-            deliveryIntents.add(PendingIntent.getBroadcast(mContext,(int)System.currentTimeMillis(),
-                intent, PendingIntent.FLAG_UPDATE_CURRENT));
-
-            intent = new Intent(ACTION_MESSAGE_SENT, null);
-            intent.putExtra("HANDLE", msgInfo.id);
-            sentIntents.add(PendingIntent.getBroadcast(mContext, (int)System.currentTimeMillis(),
-                intent,PendingIntent.FLAG_UPDATE_CURRENT));
+        if (V) {
+            Log.d(TAG, "sendMessage Body " + msgBody );
+            Log.d(TAG, "sendMessage to " + msgInfo.phone );
+            Log.d(TAG, "sendMessage parts size " + parts.size());
         }
+        if (parts != null && parts.size() > 0) {
+            for (int i = 0; i < msgInfo.parts; i++) {
+                Intent intent;
+                intent = new Intent(ACTION_MESSAGE_DELIVERY, null);
+                intent.putExtra("HANDLE", msgInfo.id);
+                deliveryIntents.add(PendingIntent.getBroadcast(mContext,
+                   (int)System.currentTimeMillis(), intent, PendingIntent.FLAG_UPDATE_CURRENT));
 
-        Log.d(TAG, "sendMessage to " + msgInfo.phone);
-
-        smsMng.sendMultipartTextMessage(msgInfo.phone, null, parts, sentIntents,
-            deliveryIntents);
+                intent = new Intent(ACTION_MESSAGE_SENT, null);
+                intent.putExtra("HANDLE", msgInfo.id);
+                sentIntents.add(PendingIntent.getBroadcast(mContext,
+                    (int)System.currentTimeMillis(), intent,PendingIntent.FLAG_UPDATE_CURRENT));
+            }
+            smsMng.sendMultipartTextMessage(msgInfo.phone, null, parts, sentIntents,
+                    deliveryIntents);
+        }
     }
 
     private static final String ACTION_MESSAGE_DELIVERY =

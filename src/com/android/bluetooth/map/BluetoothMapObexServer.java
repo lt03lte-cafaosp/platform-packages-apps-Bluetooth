@@ -75,6 +75,8 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
     private Context mContext;
 
     private int mMasId;
+
+    private int mSupportedMsgTypes;
     // Types of mailboxes. From EmailContent.java
     // inbox
     public static final int TYPE_INBOX = 0;
@@ -151,7 +153,9 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
         tmpFolder.addFolder("sent");
         tmpFolder.addFolder("drafts");
     }
-
+    public void onSetMessageTypes(int supportedMsgTypes) {
+        mSupportedMsgTypes = supportedMsgTypes;
+    }
     @Override
     public int onConnect(final HeaderSet request, HeaderSet reply) {
         if (D) Log.d(TAG, "onConnect():");
@@ -363,7 +367,20 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
             if (observer == null) {
                 return ResponseCodes.OBEX_HTTP_UNAVAILABLE; // Should not happen.
             }
-
+            if(D) {
+                Log.d(TAG, "PushMessage RequestedType: "+ message.getType() + " ON MasID" +mMasId);
+                Log.d(TAG, "PushMessage supportedMsgType: "+ mSupportedMsgTypes);
+            }
+            //Handle Push UnSupported Message Type
+            if (BluetoothMapService.MESSAGE_TYPE_EMAIL == mSupportedMsgTypes &&
+                    message.getType() != TYPE.EMAIL) {
+                return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
+            }
+            if (mSupportedMsgTypes == BluetoothMapService.MESSAGE_TYPE_SMS_MMS &&
+                    !( message.getType() == TYPE.SMS_CDMA || message.getType() == TYPE.SMS_GSM
+                            || message.getType() == TYPE.MMS)) {
+                return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
+            }
             long handle = observer.pushMessage(message, folderName, appParams);
             if (D) Log.d(TAG, "pushMessage handle: " + handle);
             if (handle < 0) {
