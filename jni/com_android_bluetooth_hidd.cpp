@@ -298,6 +298,11 @@ static jboolean registerAppNative(JNIEnv *env, jobject thiz, jstring name, jstri
     jsize size;
     uint8_t *data;
 
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
+
     size = env->GetArrayLength(descriptors);
     data = (uint8_t *) malloc(size);
 
@@ -338,6 +343,11 @@ static jboolean registerAppNative(JNIEnv *env, jobject thiz, jstring name, jstri
 static jboolean unregisterAppNative(JNIEnv *env, jobject thiz) {
     ALOGV("%s enter", __FUNCTION__);
 
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
+
     jboolean result = JNI_FALSE;
 
     bt_status_t ret = sHiddIf->unregister_app();
@@ -356,6 +366,11 @@ static jboolean unregisterAppNative(JNIEnv *env, jobject thiz) {
 
 static jboolean sendReportNative(JNIEnv *env, jobject thiz, jint id, jbyteArray data) {
     ALOGV("%s enter", __FUNCTION__);
+
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
 
     jboolean result = JNI_FALSE;
     jsize size;
@@ -386,6 +401,11 @@ static jboolean sendReportNative(JNIEnv *env, jobject thiz, jint id, jbyteArray 
 
 static jboolean replyReportNative(JNIEnv *env, jobject thiz, jbyte type, jbyte id, jbyteArray data) {
     ALOGV("%s enter", __FUNCTION__);
+
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
 
     jboolean result = JNI_FALSE;
     jsize size;
@@ -418,6 +438,11 @@ static jboolean replyReportNative(JNIEnv *env, jobject thiz, jbyte type, jbyte i
 static jboolean reportErrorNative(JNIEnv *env, jobject thiz, jbyte error) {
     ALOGV("%s enter", __FUNCTION__);
 
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
+
     jboolean result = JNI_FALSE;
 
     bt_status_t ret = sHiddIf->report_error(error);
@@ -436,6 +461,11 @@ static jboolean reportErrorNative(JNIEnv *env, jobject thiz, jbyte error) {
 
 static jboolean unplugNative(JNIEnv *env, jobject thiz) {
     ALOGV("%s enter", __FUNCTION__);
+
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
 
     jboolean result = JNI_FALSE;
 
@@ -456,6 +486,11 @@ static jboolean unplugNative(JNIEnv *env, jobject thiz) {
 static jboolean connectNative(JNIEnv *env, jobject thiz) {
     ALOGV("%s enter", __FUNCTION__);
 
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
+
     jboolean result = JNI_FALSE;
 
     bt_status_t ret = sHiddIf->connect();
@@ -474,6 +509,11 @@ static jboolean connectNative(JNIEnv *env, jobject thiz) {
 
 static jboolean disconnectNative(JNIEnv *env, jobject thiz) {
     ALOGV("%s enter", __FUNCTION__);
+
+    if (sHiddIf == NULL) {
+        ALOGV("%s: HID Device interface not initialized", __FUNCTION__);
+        return JNI_FALSE;
+    }
 
     jboolean result = JNI_FALSE;
 
