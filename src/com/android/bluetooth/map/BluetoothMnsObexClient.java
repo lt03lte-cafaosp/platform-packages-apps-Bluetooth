@@ -89,6 +89,10 @@ public class BluetoothMnsObexClient {
         return mHandler;
     }
 
+    public boolean isTransportSrmCapable() {
+        return ((BluetoothMnsTransport)mTransport).isSrmCapable();
+    }
+
     public BluetoothMapContentObserver getContentObserver(int masInstanceId) {
         if(masInstanceId == 1)
            return mEmailObserver;
@@ -452,11 +456,16 @@ public class BluetoothMnsObexClient {
                         }
                     }
                 }
+            } catch (IOException e) {
+                Log.e(TAG, "Error while retreving response code" + e.getMessage());
+            }
+            try {
                 if (putOperation != null) {
+                    if(V) Log.v(TAG, "putOperation Close");
                     putOperation.close();
                 }
             } catch (IOException e) {
-                Log.e(TAG, "Error when closing stream after send " + e.getMessage());
+                Log.e(TAG, "Error when closing put operation after send " + e.getMessage());
             }
         }
         if(D) Log.d(TAG, "BluetoothMnsObexClient: Exiting sendEvent");
