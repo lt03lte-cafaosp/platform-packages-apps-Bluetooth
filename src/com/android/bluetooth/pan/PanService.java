@@ -17,6 +17,7 @@
 package com.android.bluetooth.pan;
 
 import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothPan;
 import android.bluetooth.BluetoothProfile;
@@ -80,6 +81,7 @@ public class PanService extends ProfileService {
     private static final String PAN_TETHER_SETTING = "TETHERSTATE";
 
     private BluetoothTetheringNetworkFactory mNetworkFactory;
+    private BluetoothAdapter mAdapter;
 
 
     static {
@@ -112,6 +114,7 @@ public class PanService extends ProfileService {
         // Set mTetherOn based on the last saved tethering preference while starting the Pan service
         SharedPreferences tetherSetting = getSharedPreferences(PAN_PREFERENCE_FILE, 0);
         mTetherOn = tetherSetting.getBoolean(PAN_TETHER_SETTING, false);
+        mAdapter = BluetoothAdapter.getDefaultAdapter();
 
         return true;
     }
@@ -269,6 +272,13 @@ public class PanService extends ProfileService {
             Log.e(TAG, "Pan Device not disconnected: " + device);
             return false;
         }
+
+        /* Cancel discovery while initiating PANU connection, if It's in progress */
+        if (mAdapter != null && mAdapter.isDiscovering()) {
+            Log.d(TAG,"Inquiry is going on, Cancelling inquiry while initiating PANU connection");
+            mAdapter.cancelDiscovery();
+        }
+
         Message msg = mHandler.obtainMessage(MESSAGE_CONNECT,device);
         mHandler.sendMessage(msg);
         return true;
