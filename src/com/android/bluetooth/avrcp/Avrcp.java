@@ -79,6 +79,7 @@ public final class Avrcp {
     private AvrcpMessageHandler mHandler;
     private RemoteController mRemoteController;
     private RemoteControllerWeak mRemoteControllerCb;
+    private AvrcpRemoteControllerWeak mAvrcpRemoteControllerCb;
     private Metadata mMetadata;
     private int mTransportControlFlags;
     private int mCurrentPlayState;
@@ -372,7 +373,9 @@ public final class Avrcp {
         }
         registerMediaPlayers();
         mRemoteControllerCb = new RemoteControllerWeak(mHandler);
-        mRemoteController = new RemoteController(mContext, mRemoteControllerCb);
+        mAvrcpRemoteControllerCb = new AvrcpRemoteControllerWeak(mHandler);
+        mRemoteController = new RemoteController(mContext, mRemoteControllerCb,
+                                                    null, mAvrcpRemoteControllerCb);
         mAudioManager.registerRemoteController(mRemoteController);
         mRemoteController.setSynchronizationMode(RemoteController.POSITION_SYNCHRONIZATION_CHECK);
     }
@@ -650,6 +653,15 @@ public final class Avrcp {
             if (handler != null) {
                 handler.obtainMessage(MSG_SET_METADATA, 0, 0, metadataEditor).sendToTarget();
             }
+        }
+    }
+
+    private static class AvrcpRemoteControllerWeak implements
+            RemoteController.OnClientAvrcpUpdateListener {
+        private final WeakReference<Handler> mLocalHandler;
+
+        public AvrcpRemoteControllerWeak(Handler handler) {
+            mLocalHandler = new WeakReference<Handler>(handler);
         }
 
         @Override
