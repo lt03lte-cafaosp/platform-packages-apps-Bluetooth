@@ -1007,8 +1007,11 @@ public class BluetoothMapService extends ProfileService {
                mBluetoothMnsObexClient.deinitObserver(mMasId);
             mConnectionManager.removeFromMapClientList(mMasId);
             closeConnectionSocket();
-
-            setState(BluetoothMap.STATE_DISCONNECTED);
+            if (mConnectionManager.MapClientList.get((mMasId^1)) == null) {
+                if (VERBOSE)
+                    Log.v(TAG,"setting state to disconnected");
+                setState(BluetoothMap.STATE_DISCONNECTED);
+            }
         }
 
         /**
