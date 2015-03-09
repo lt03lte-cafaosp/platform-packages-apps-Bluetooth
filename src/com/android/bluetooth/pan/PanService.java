@@ -269,7 +269,7 @@ public class PanService extends ProfileService {
         A2dpService a2dpService = A2dpService.getA2dpService();
         //do not allow new connections with active multicast
         if (a2dpService != null &&
-                a2dpService.isMulticastOngoing()) {
+                a2dpService.isMulticastOngoing(device)) {
             Log.i(TAG,"A2dp Multicast is Ongoing, ignore Connection Request");
             return false;
         }

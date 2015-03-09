@@ -780,7 +780,7 @@ public class AdapterService extends Service {
             //do not allow setmode when multicast is active
             A2dpService a2dpService = A2dpService.getA2dpService();
             if (a2dpService != null &&
-                    a2dpService.isMulticastOngoing()) {
+                    a2dpService.isMulticastOngoing(null)) {
                 Log.i(TAG,"A2dp Multicast is Ongoing, ignore setmode " + mode);
                 mScanmode = mode;
                 return false;
@@ -788,6 +788,9 @@ public class AdapterService extends Service {
 
             AdapterService service = getService();
             if (service == null) return false;
+            // when scan mode is not changed during multicast, reset it last to
+            // scan mode, as we will set mode to none for multicast
+            mScanmode = service.getScanMode();
             return service.setScanMode(mode,duration);
         }
 
@@ -1352,7 +1355,7 @@ public class AdapterService extends Service {
         //do not allow new connections with active multicast
         A2dpService a2dpService = A2dpService.getA2dpService();
         if (a2dpService != null &&
-                a2dpService.isMulticastOngoing()) {
+                a2dpService.isMulticastOngoing(null)) {
             Log.i(TAG,"A2dp Multicast is Ongoing, ignore discovery");
             return false;
         }
@@ -2090,8 +2093,10 @@ public class AdapterService extends Service {
         }
     }
 
-    public boolean resetScanMode() {
-        return setScanMode(mScanmode,getDiscoverableTimeout());
+    // do not use this API.It is called only from A2spstatemachine for
+    // restoring SCAN mode after multicast is stopped
+    public boolean restoreScanMode() {
+        return setScanMode(mScanmode, getDiscoverableTimeout());
     }
 
     private void debugLog(String msg) {

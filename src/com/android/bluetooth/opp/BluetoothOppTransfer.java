@@ -665,7 +665,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             //do not allow new connections with active multicast
             A2dpService a2dpService = A2dpService.getA2dpService();
             if (a2dpService != null &&
-                    a2dpService.isMulticastOngoing()) {
+                    a2dpService.isMulticastOngoing(device)) {
                 Log.i(TAG,"A2dp Multicast is Ongoing, ignore OPP send");
                 mSessionHandler.obtainMessage(TRANSPORT_ERROR).sendToTarget();
                 return ;
@@ -771,7 +771,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 //do not allow new connections with active multicast
                 A2dpService a2dpService = A2dpService.getA2dpService();
                 if (a2dpService != null &&
-                        a2dpService.isMulticastOngoing()) {
+                        a2dpService.isMulticastOngoing(device)) {
                     Log.i(TAG,"A2dp Multicast is Ongoing, ignore OPP send");
                     mSessionHandler.obtainMessage(TRANSPORT_ERROR).sendToTarget();
                     return ;

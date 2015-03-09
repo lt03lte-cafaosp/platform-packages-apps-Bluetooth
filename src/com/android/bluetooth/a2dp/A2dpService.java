@@ -251,12 +251,22 @@ public class A2dpService extends ProfileService {
     }
 
     // return status of multicast,needed for blocking outgoing connections
-    public boolean isMulticastOngoing() {
+    public boolean isMulticastOngoing(BluetoothDevice device) {
 
         Log.i(TAG,"audio isMusicActive is " + mAudioManager.isMusicActive());
-
-        if ((getA2dpPlayingDevice().size() == 2) &&
-                (mAudioManager.isMusicActive())) {
+        // we should never land is case where playing device size is bigger
+        // than 2 still have safe check.
+        if (device == null) {
+            if ((getA2dpPlayingDevice().size() >= 2) &&
+                    (mAudioManager.isMusicActive())) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        if ((getA2dpPlayingDevice().size() >= 2) &&
+                mAudioManager.isMusicActive() &&
+                !(getA2dpPlayingDevice().contains(device))) {
             return true;
         } else {
             return false;
