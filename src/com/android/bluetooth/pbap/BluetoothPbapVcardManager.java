@@ -810,12 +810,11 @@ public class BluetoothPbapVcardManager {
                         vcard = vcardfilter.applyFilter(vcard, vcardType21);
                         if (V) Log.v (TAG , "vCard on applying filter: " + vcard);
                     }
-                    vcard = StripTelephoneNumber(vcard);
+                    vcard = StripTelephoneNumber(vcard); 
                     if (V) {
                         Log.v(TAG, "Vcard Entry:");
                         Log.v(TAG,vcard);
                     }
-
                     if (!buffer.onEntryCreated(vcard)) {
                         // onEntryCreate() already emits error.
                         return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
@@ -1248,23 +1247,19 @@ public class BluetoothPbapVcardManager {
                     }
                 }
             }
-
-            if(vCard.toUpperCase().contains("SIP")) {
-                for (int i=0; i < attr.length; i++) {
-                    if(attr[i].toUpperCase().contains("SIP")){
-                        vCard = vCard.replace(attr[i] + "\n", "");
-                    }
-                }
-            }
-
-            Log.v(TAG, "Tokens after applying filter: ");
-
-            for (int i=0; i < attr.length; i++) {
-                if(!attr[i].equals("")){
-                    filteredVcard = filteredVcard.concat(attr[i] + "\n");
-                }
-            }
-
+           if(vCard.toUpperCase().contains("SIP")) {
+               for (int i=0; i < attr.length; i++) {
+                  if(attr[i].toUpperCase().contains("SIP")){
+                     vCard = vCard.replace(attr[i] + "\n", "");
+                   }
+               }
+           }
+ 
+          Log.v(TAG, "Tokens after applying filter: "); 
+              for (int i=0; i < attr.length; i++)
+                 if(!attr[i].equals("")){
+                     filteredVcard = filteredVcard.concat(attr[i] + "\n");
+                  }
             return filteredVcard;
         }
     }

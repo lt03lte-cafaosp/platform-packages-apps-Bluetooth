@@ -76,13 +76,16 @@ class HeadsetPhoneState {
 
     public void cleanup() {
         listenForPhoneState(false);
+
         mTelephonyManager = null;
         mStateMachine = null;
     }
 
     void listenForPhoneState(boolean start) {
+
         if (start) {
-            if (!mListening) {
+           if (!mListening) {
+
                 mTelephonyManager.listen(mPhoneStateListener,
                                          PhoneStateListener.LISTEN_SERVICE_STATE |
                                          PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
@@ -95,7 +98,7 @@ class HeadsetPhoneState {
             }
         }
     }
-
+ 
     int getService() {
         return mService;
     }
@@ -203,17 +206,17 @@ class HeadsetPhoneState {
         }
     }
 
-    private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
-        @Override
-        public void onServiceStateChanged(ServiceState serviceState) {
-            mServiceState = serviceState;
-            mService = (serviceState.getState() == ServiceState.STATE_IN_SERVICE) ?
-                HeadsetHalConstants.NETWORK_STATE_AVAILABLE :
-                HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE;
-            setRoam(serviceState.getRoaming() ? HeadsetHalConstants.SERVICE_TYPE_ROAMING
-                                              : HeadsetHalConstants.SERVICE_TYPE_HOME);
-            sendDeviceStateChanged();
-        }
+private PhoneStateListener mPhoneStateListener = new PhoneStateListener() { 
+    @Override
+public void onServiceStateChanged(ServiceState serviceState) {
+    mServiceState = serviceState;
+    mService = (serviceState.getState() == ServiceState.STATE_IN_SERVICE) ?
+        HeadsetHalConstants.NETWORK_STATE_AVAILABLE :
+        HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE;
+   setRoam(serviceState.getRoaming() ? HeadsetHalConstants.SERVICE_TYPE_ROAMING
+                                     : HeadsetHalConstants.SERVICE_TYPE_HOME);
+   sendDeviceStateChanged();
+   }
 
         @Override
         public void onSignalStrengthsChanged(SignalStrength signalStrength) {
@@ -228,7 +231,6 @@ class HeadsetPhoneState {
                 sendDeviceStateChanged();
         }
     };
-
 }
 
 class HeadsetDeviceState {
