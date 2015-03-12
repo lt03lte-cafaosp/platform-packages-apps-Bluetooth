@@ -539,6 +539,23 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
                         if (V) Log.v(TAG, "SRM status: Enabled");
                         ((ServerOperation)op).mSrmServerSession
                             .setLocalSrmStatus(ObexHelper.LOCAL_SRM_ENABLED);
+                        Byte srmp =
+                                (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+                        Log.v(TAG, "SRMP header (CONTINUE or OK): " + srmp);
+                        //SRMP enabled from remote
+                        if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                            Log.v(TAG, "SRMP status: WAIT");
+                            ((ServerOperation)op).mSrmServerSession
+                                .setLocalSrmpWait(true);
+                        } else {
+                            //SRMP enabled from local
+                            if( ((ServerOperation)op).mSrmServerSession
+                                    .getLocalSrmParamStatus() == false) {
+                                Log.v(TAG, "SRMP status: NONE");
+                                ((ServerOperation)op).mSrmServerSession
+                                        .setLocalSrmpWait(false);
+                            }
+                        }
                     } else {
                         if (V) Log.v(TAG, "SRM status: Disabled");
                         ((ServerOperation)op).mSrmServerSession
