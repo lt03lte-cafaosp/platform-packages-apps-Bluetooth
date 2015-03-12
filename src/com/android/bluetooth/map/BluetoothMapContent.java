@@ -733,6 +733,11 @@ public class BluetoothMapContent {
                    if(fd != null ) {
                        //Size in bytes
                        size = (Long.valueOf(fd.getStatSize()).intValue());
+                       //Add up to attachment_size
+                       int attachmentSize = e.getAttachmentSize();
+                       if(attachmentSize != -1) {
+                           size += attachmentSize;
+                       }
                        try {
                            fd.close();
                        } catch (IOException ex) {
@@ -896,15 +901,15 @@ public class BluetoothMapContent {
                              Log.v(TAG, " ::Sender Addressing split String 0:: " + senderAddrStr[0]
                                    + "::Sender Addressing split String 1:: " + senderAddrStr[1]);
                          }
-                         e.setEmailSenderAddressing(senderAddrStr[0].trim());
+                         e.setSenderAddressing(senderAddrStr[0].trim());
                       }
                    } else{
                          if(address.indexOf('<') != -1 && address.indexOf('>') != -1) {
                             if (D) Log.d(TAG, "setSenderAddressing: " + address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
-                            e.setEmailSenderAddressing(address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
+                            e.setSenderAddressing(address.substring(address.indexOf('<')+1, address.lastIndexOf('>')));
                          } else {
                             if (D) Log.d(TAG, "setSenderAddressing: " + address);
-                            e.setEmailSenderAddressing(address);
+                            e.setSenderAddressing(address);
                          }
                    }
                 }
@@ -1101,10 +1106,10 @@ public class BluetoothMapContent {
         setRecipientName(e, c, fi, ap);
         setRecipientAddressing(e, c, fi, ap);
         setType(e, c, fi, ap);
-        setSize(e, c, fi, ap);
         setReceptionStatus(e, c, fi, ap);
         setText(e, c, fi, ap);
         setAttachmentSize(e, c, fi, ap);
+        setSize(e, c, fi, ap);
         setPriority(e, c, fi, ap);
         setRead(e, c, fi, ap);
         setSent(e, c, fi, ap);
@@ -1743,6 +1748,9 @@ public class BluetoothMapContent {
             Log.v(TAG, "setEmailSubFolders: id = " + id
                     + "currentFolder: " + currentFolder.getName());
         }
+        String accountAddress =
+            BluetoothMapUtils.getEmailAccountAddress(mContext);
+        Log.v(TAG, " Account address: "+ accountAddress);
         String currentFolderName = currentFolder.getName();
         String where = setWhereFilterAccountKey(id);
         if (currentFolderName.equals("msg")) {
@@ -1789,6 +1797,12 @@ public class BluetoothMapContent {
                             if (V) Log.v(TAG, " Removing obsolete: "+ tmpFolder.getName());
                             currentFolder.subFolders.remove(tmpFolder);
                         }
+                    }
+                    if( accountAddress.contains("@hotmail.com") &&
+                            (newServerId.startsWith("1:") ||
+                                    newServerId.startsWith("2:"))) {
+                        if( V) Log.v(TAG, " Removing Extras [HOTMAIL]: "+ newDisplayName);
+                        continue;
                     }
                     currentFolder.addFolder(newDisplayName, newServerId, newParentServerId);
                 } while(cr.moveToNext());
