@@ -1479,23 +1479,6 @@ public final class Avrcp {
             Log.v(TAG,"index " + index + " status is"+
                     deviceFeatures[index].mPlayPosChangedNT);
         }
-        if (deviceFeatures[index].mTrackChangedNT ==
-                NOTIFICATION_TYPE_INTERIM) {
-            if (DEBUG)
-                Log.v(TAG, "send Track Changed reject to stack");
-            deviceFeatures[index].mTrackChangedNT =
-                    NOTIFICATION_TYPE_REJECT;
-            byte[] track = new byte[TRACK_ID_SIZE];
-            /* track is stored in big endian format */
-            for (int j = 0; j < TRACK_ID_SIZE; ++j) {
-                track[j] = (byte) (mTrackNumber >> (56 - 8 * j));
-            }
-            registerNotificationRspTrackChangeNative(deviceFeatures[index].mTrackChangedNT ,
-                    track ,getByteAddress(device));
-        } else {
-            Log.v(TAG,"index " + index + " status is"+
-                    deviceFeatures[index].mTrackChangedNT);
-        }
     }
 
     private void updatePlayPauseState(int state, long currentPosMs,
@@ -2123,9 +2106,7 @@ public final class Avrcp {
             Log.v(TAG,"new mMetadata, mTrackNumber update to " + mTrackNumber);
             for (int i = 0; i < maxAvrcpConnections; i++) {
                 if (deviceFeatures[i].mTrackChangedNT ==
-                        NOTIFICATION_TYPE_INTERIM &&
-                        deviceFeatures[i].mCurrentPlayState ==
-                        RemoteControlClient.PLAYSTATE_PLAYING) {
+                        NOTIFICATION_TYPE_INTERIM) {
                     deviceFeatures[i].mTrackChangedNT = NOTIFICATION_TYPE_CHANGED;
                     Log.v(TAG,"sending track change for device " + i);
                     sendTrackChangedRsp(deviceFeatures[i].mCurrentDevice);
@@ -4422,7 +4403,7 @@ public final class Avrcp {
      * returns true only when both playing devices support absolute volume
      */
     public boolean isAbsoluteVolumeSupported() {
-        List<BluetoothDevice> device = mA2dpService.getA2dpPlayingDevice();
+        List<BluetoothDevice> device = mA2dpService.getConnectedDevices();
         List<Byte> absVolumeSupported = new ArrayList<Byte>();
         int deviceIndex = INVALID_DEVICE_INDEX;
         if (device.size() == 0)
