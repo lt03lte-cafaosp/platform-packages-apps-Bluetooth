@@ -122,6 +122,31 @@ public class BluetoothMapUtils {
         return -1;
       }
     /**
+     * Get Account email Address for Default Email app
+     * @return the Account email address value
+     */
+    static public String getEmailAccountAddress(Context context) {
+        if (V) Log.v(TAG, "getEmailAccountEmailAddressList()");
+        String emailAddress = null;
+        ArrayList<Long> list = new ArrayList<Long>();
+        Context mContext = context;
+        mResolver = mContext.getContentResolver();
+        try {
+            Cursor cursor = mResolver.query(EMAIL_ACCOUNT_URI,
+                   ACCOUNT_ID_PROJECTION, null, null, null);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    emailAddress = cursor.getString(1);
+                    if (V) Log.v(TAG, "address = " + emailAddress);
+                }
+                cursor.close();
+            }
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
+        return emailAddress;
+    }
+    /**
      * Get Account id for Default Email app
      * @return the Account id value
      */

@@ -105,19 +105,8 @@ public class BluetoothMapMessageListingElement
     public String getSenderAddressing() {
         return senderAddressing;
     }
-
-    public void setEmailSenderAddressing(String senderAddressing) {
-       this.senderAddressing = senderAddressing;
-    }
-
     public void setSenderAddressing(String senderAddressing) {
-        /* TODO: This should depend on the type - for email, the addressing is an email address
-         * Consider removing this again - to allow strings.
-         */
-        this.senderAddressing = PhoneNumberUtils.extractNetworkPortion(senderAddressing);
-        if(this.senderAddressing == null || this.senderAddressing.length() < 2){
-            this.senderAddressing = ""; // Set empty value
-        }
+       this.senderAddressing = senderAddressing;
     }
 
     public String getReplyToAddressing() {
