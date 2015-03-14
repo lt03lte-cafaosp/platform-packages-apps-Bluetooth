@@ -134,7 +134,9 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
         RECORD_ID, EMAIL_ADDRESS, IS_DEFAULT, DISPLAY_NAME
     };
     public static final String[] EMAIL_MESSAGE_PROJECTION = new String[] {
-        RECORD_ID, MAILBOX_KEY, ACCOUNT_KEY
+        RECORD_ID, MAILBOX_KEY, ACCOUNT_KEY,
+        MessageColumns.FLAG_READ, MessageColumns.SUBJECT, MessageColumns.DISPLAY_NAME,
+        MessageColumns.TIMESTAMP
     };
     public static final String[] EMAIL_BOX_PROJECTION = new String[] {
         RECORD_ID, DISPLAY_NAME, ACCOUNT_KEY, EMAILTYPE
@@ -234,12 +236,15 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
          long mAccountKey;
          String mFolderName;
          int mType;
+         int mReadStatus;
 
-         public EmailMessage(long id, long accountKey, String folderName, int type) {
+         public EmailMessage(long id, long accountKey, String folderName, int type,
+                 int readStatus) {
                 mId = id;
                 mAccountKey = accountKey;
                 mFolderName = folderName;
                 mType = type;
+                mReadStatus = readStatus;
          }
 
          @Override
@@ -322,6 +327,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                         continue;
                     }
                     id = crEmail.getLong(MSG_COL_RECORD_ID);
+                    int read = crEmail.getInt(crEmail.getColumnIndex(MessageColumns.FLAG_READ));
                     final long mailboxKey = crEmail.getLong(MSG_COL_MAILBOX_KEY);
                     if (boxList.containsKey(mailboxKey)) {
                         final EmailBox box = boxList.get(mailboxKey);
@@ -331,7 +337,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                         folderName = isMapFolder(box.mType)
                                    ? EMAIL_TO_MAP[box.mType] : box.mDisplayName;
                         final EmailMessage msg = new EmailMessage(id, accountKey,
-                            folderName, box.mType);
+                            folderName, box.mType, read);
                         if (box.mType == TYPE_DELETED) {
                             if (init) {
                                 mDeletedList.put(id, msg);
@@ -348,8 +354,59 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                                         !mEmailAddedList.containsKey(id)) {
                                     Log.v(TAG,"Putting in added list");
                                     mEmailAddedList.put(id, msg);
+                                    if (msg.mFolderName.equalsIgnoreCase("inbox")) {
+                                        Event evt = new Event("NewMessage", id, msg.mFolderName,
+                                                null, TYPE.EMAIL);
+                                        if (mMnsClient.isTransportSrmCapable()) {
+                                            Log.v(TAG,"Added extend report 1.1 feilds for INBOX");
+                                            String timeStamp = crEmail.getString(crEmail
+                                                    .getColumnIndex(MessageColumns.TIMESTAMP));
+                                            evt.setDateTime(timeStamp);
+                                            //Email Message doesnot support any Priority Feild
+                                            evt.setPriority("no");
+                                            String subject = crEmail.getString(crEmail
+                                                    .getColumnIndex(MessageColumns.SUBJECT));
+                                            if (subject != null) {
+                                                evt.setSubject(subject);
+                                            } else {
+                                                evt.setSubject(" ");
+                                            }
+                                            String senderName = crEmail.getString(crEmail.
+                                                getColumnIndex(MessageColumns.DISPLAY_NAME));
+                                            if (senderName != null && senderName.contains("")) {
+                                            String[] senderStr = senderName.split("");
+                                              if (senderStr !=null && senderStr.length > 0) {
+                                                   if (V) {
+                                                       Log.v(TAG, " ::Sender name split String 0::"
+                                                           + senderStr[0] +
+                                                               "::Sender name split String 1:: "
+                                                               + senderStr[1]);
+                                                    }
+                                                    senderName = senderStr[1];
+                                               }
+                                            }
+                                            if (senderName != null) {
+                                                senderName =
+                                                        BluetoothMapContent
+                                                                .decodeEncodedWord(senderName);
+                                                senderName = senderName.trim();
+                                            }
+                                            if(senderName != null) {
+                                                evt.setSenderName(senderName);
+                                            } else {
+                                                evt.setSenderName(" ");
+                                            }
+                                            if (V) {
+                                                Log.d(TAG, "handleMsgListChangesEmail ****\n date:"
+                                                        + timeStamp + " subject: "+ subject+
+                                                                "senderName: "+ senderName+"\n");
+                                            }
+                                        }
+                                        sendEvent(evt);
+                                    }
                                 } else {
                                     if (oldEmailList.get(id) != null) {
+                                      int oldReadStatus = oldEmailList.get(id).mReadStatus;
                                         if(!(msg.mFolderName.equalsIgnoreCase(oldEmailList.
                                             get(id).mFolderName))) {
                                             Log.d(TAG,"sending Message Shift Event");
@@ -357,7 +414,16 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                                             evt = new Event("MessageShift", id, msg.mFolderName,
                                                       oldEmailList.get(id).mFolderName, TYPE.EMAIL);
                                             sendEvent(evt);
-                                        }
+                                        } else if(msg.mReadStatus != oldReadStatus &&
+                                                mMnsClient.isTransportSrmCapable()) {
+                                            Log.d(TAG, "new readStatus: " + msg.mReadStatus +
+                                                   " old readStatus: " + oldReadStatus);
+                                            Event evt;
+                                            evt = new Event("ReadStatusChanged", id,
+                                                    msg.mFolderName, null, TYPE.EMAIL);
+                                            oldEmailList.get(id).mReadStatus = msg.mReadStatus;
+                                            sendEvent(evt);
+                                         }
                                     }
                                 }
                         }
@@ -405,10 +471,7 @@ public class BluetoothMapContentEmailObserver extends BluetoothMapContentObserve
                                         "deleted", TYPE.EMAIL);
                         sendEvent(evt);
                     }  else if (email.mFolderName.equalsIgnoreCase("inbox")) {
-                        evt = new Event("NewMessage", email.mId, folderName,
-                                         null, TYPE.EMAIL);
-                        sendEvent(evt);
-
+                        if (V) Log.d(TAG,"sendEventNewMessage already handled for id" + email.mId);
                     }
                 }
               }

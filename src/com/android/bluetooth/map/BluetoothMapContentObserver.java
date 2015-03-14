@@ -52,6 +52,9 @@ import android.provider.Telephony.Mms;
 import android.provider.Telephony.MmsSms;
 import android.provider.Telephony.Sms;
 import android.provider.Telephony.Sms.Inbox;
+import android.provider.ContactsContract;
+import android.provider.ContactsContract.Contacts;
+import android.provider.ContactsContract.PhoneLookup;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SmsManager;
@@ -61,6 +64,8 @@ import android.util.Log;
 import android.util.Xml;
 import android.os.Looper;
 import android.os.Message;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import com.android.bluetooth.map.BluetoothMapUtils.TYPE;
 import com.android.bluetooth.map.BluetoothMapbMessageMmsEmail.MimePart;
@@ -95,6 +100,7 @@ public class BluetoothMapContentObserver {
         Sms.STATUS,
         Sms.LOCKED,
         Sms.ERROR_CODE,
+        Sms.PRIORITY,
     };
 
     static final String[] MMS_PROJECTION = new String[] {
@@ -111,6 +117,7 @@ public class BluetoothMapContentObserver {
         Mms.MESSAGE_BOX,
         Mms.MESSAGE_TYPE,
         Mms.STATUS,
+        Mms.PRIORITY,
     };
 
     public BluetoothMapContentObserver(final Context context) {
@@ -170,11 +177,17 @@ public class BluetoothMapContentObserver {
     };
 
     public class Event {
+        public final static float EXTENDED_EVENT_REPORT_1_1 = 1.1f;
+        public final static float MAP_EVENT_REPORT_1_0 = 1.0f;
         String eventType;
         long handle;
         String folder;
         String oldFolder;
         TYPE msgType;
+        String dateTime;
+        String subject;
+        String senderName;
+        String priority;
 
         public Event(String eventType, long handle, String folder,
             String oldFolder, TYPE msgType) {
@@ -192,9 +205,28 @@ public class BluetoothMapContentObserver {
                 this.oldFolder = null;
             }
             this.msgType = msgType;
+            this.dateTime = null;
+            this.subject = null;
+            this.senderName = null;
+            this.priority = null;
         }
-
+        public void setDateTime(String dateTime) {
+            this.dateTime = dateTime;
+        }
+        public void setSubject(String subject) {
+            this.subject = subject;
+        }
+        public void setSenderName(String senderName) {
+            this.senderName = senderName;
+        }
+        public void setPriority(String priority) {
+            this.priority = priority;
+        }
         public byte[] encode() throws UnsupportedEncodingException {
+            //BackwardCompatible API
+            return encode(MAP_EVENT_REPORT_1_0);
+        }
+        public byte[] encode(float version) throws UnsupportedEncodingException {
             StringWriter sw = new StringWriter();
             XmlSerializer xmlEvtReport = Xml.newSerializer();
             try {
@@ -202,7 +234,7 @@ public class BluetoothMapContentObserver {
                 xmlEvtReport.startDocument(null, null);
                 xmlEvtReport.text("\n");
                 xmlEvtReport.startTag("", "MAP-event-report");
-                xmlEvtReport.attribute("", "version", "1.0");
+                xmlEvtReport.attribute("", "version", Float.toString(version));
 
                 xmlEvtReport.startTag("", "event");
                 xmlEvtReport.attribute("", "type", eventType);
@@ -214,6 +246,20 @@ public class BluetoothMapContentObserver {
                     xmlEvtReport.attribute("", "old_folder", oldFolder);
                 }
                 xmlEvtReport.attribute("", "msg_type", msgType.name());
+                if(mMnsClient.isTransportSrmCapable()) {
+                    if (dateTime!= null) {
+                        xmlEvtReport.attribute("", "dateTime", dateTime);
+                    }
+                    if (subject != null) {
+                        xmlEvtReport.attribute("", "subject", subject);
+                    }
+                    if (senderName!= null) {
+                        xmlEvtReport.attribute("", "sender_name", senderName);
+                    }
+                    if (priority != null) {
+                        xmlEvtReport.attribute("", "priority", priority);
+                    }
+                }
                 xmlEvtReport.endTag("", "event");
 
                 xmlEvtReport.endTag("", "MAP-event-report");
@@ -235,10 +281,12 @@ public class BluetoothMapContentObserver {
     public class Msg {
         long id;
         int type;
+        int readStatus;
 
-        public Msg(long id, int type) {
+        public Msg(long id, int type, int readStatus) {
             this.id = id;
             this.type = type;
+            this.readStatus = readStatus;
         }
     }
 
@@ -347,7 +395,14 @@ public class BluetoothMapContentObserver {
         // 'SendingSuccess' is triggered only for MCE initiated case
         if(location == -1 || evt.eventType.equalsIgnoreCase("SendingSuccess")) {
             try {
-                mMnsClient.sendEvent(evt.encode(), mMasId);
+                //TODO: MAPExtendedReport1.1 to be supported ONLY if advertised from remote SDP.
+                if(mMnsClient.isTransportSrmCapable()) {
+                    mMnsClient.sendEvent(evt.encode(Event.EXTENDED_EVENT_REPORT_1_1), mMasId);
+                    Log.d(TAG, "sendEvent: " + evt.dateTime + " " + evt.subject + " "
+                   + evt.priority + " " + evt.senderName);
+                } else {
+                    mMnsClient.sendEvent(evt.encode(), mMasId);
+                }
             } catch (UnsupportedEncodingException ex) {
                 Log.w(TAG, ex);
             }
@@ -372,8 +427,9 @@ public class BluetoothMapContentObserver {
             do {
                 long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
                 int type = c.getInt(c.getColumnIndex(Sms.TYPE));
+                int readStatus = c.getInt(c.getColumnIndex(Sms.READ));
 
-                Msg msg = new Msg(id, type);
+                Msg msg = new Msg(id, type, readStatus);
                 msgListSms.put(id, msg);
             } while (c.moveToNext());
             c.close();
@@ -390,8 +446,9 @@ public class BluetoothMapContentObserver {
             do {
                 long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
                 int type = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX));
+                int readStatus = c.getInt(c.getColumnIndex(Mms.READ));
 
-                Msg msg = new Msg(id, type);
+                Msg msg = new Msg(id, type, readStatus);
                 msgListMms.put(id, msg);
             } while (c.moveToNext());
             c.close();
@@ -413,17 +470,49 @@ public class BluetoothMapContentObserver {
                 do {
                     long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
                     int type = c.getInt(c.getColumnIndex(Sms.TYPE));
+                    int readStatus = c.getInt(c.getColumnIndex(Sms.READ));
 
                     Msg msg = mMsgListSms.remove(id);
 
                     if (msg == null) {
                         /* New message */
-                        msg = new Msg(id, type);
+                        msg = new Msg(id, type, readStatus);
                         msgListSms.put(id, msg);
 
                         if (folderSms[type].equals("inbox")) {
                             Event evt = new Event("NewMessage", id, folderSms[type],
                                 null, mSmsType);
+                            if(mMnsClient.isTransportSrmCapable()) {
+                                long dateTime = c.getLong(c.getColumnIndex(Sms.DATE));
+                                SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'HHmmss");
+                                Date date = new Date(dateTime);
+                                // Format to YYYYMMDDTHHMMSS local time
+                                evt.setDateTime(format.format(date));
+                                String subject = c.getString(c.getColumnIndex(Sms.BODY));
+                                if(subject != null ) {
+                                    evt.setSubject(subject);
+                                } else {
+                                    evt.setSubject("");
+                                }
+                                String priority = "no";
+                                if (PduHeaders.PRIORITY_HIGH ==
+                                        c.getInt(c.getColumnIndex(Sms.PRIORITY))) {
+                                    priority = "yes";
+                                }
+                                evt.setPriority(priority);
+                                String phone = c.getString(c.getColumnIndex(Sms.ADDRESS));
+                                String senderName = getContactNameFromPhone(phone);
+                                if (senderName != null ) {
+                                    evt.setSenderName(senderName);
+                                } else {
+                                    evt.setSenderName("");
+                                }
+                                if (V) {
+                                    Log.d(TAG, "handleMsgListChangesSms ****\n date: "+ dateTime
+                                    + " subject: "+ subject+" prio: "+ priority +" senderName: "
+                                           + senderName+"\n");
+                                }
+                            }
                             sendEvent(evt);
                         }
                     } else {
@@ -434,6 +523,14 @@ public class BluetoothMapContentObserver {
                                 folderSms[msg.type], mSmsType);
                             sendEvent(evt);
                             msg.type = type;
+                        } else if(readStatus != msg.readStatus &&
+                                mMnsClient.isTransportSrmCapable()) {
+                            Log.d(TAG, "new readStatus: " + readStatus + " old readStatus: "
+                                    + msg.readStatus);
+                            Event evt = new Event("ReadStatusChanged", id, folderSms[type], null,
+                                    mSmsType);
+                            sendEvent(evt);
+                            msg.readStatus = readStatus;
                         }
                         msgListSms.put(id, msg);
                     }
@@ -465,6 +562,7 @@ public class BluetoothMapContentObserver {
                     long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
                     int type = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX));
                     int mtype = c.getInt(c.getColumnIndex(Mms.MESSAGE_TYPE));
+                    int readStatus = c.getInt(c.getColumnIndex(Mms.READ));
 
                     Msg msg = mMsgListMms.remove(id);
 
@@ -475,12 +573,44 @@ public class BluetoothMapContentObserver {
                                 continue;
                         }
 
-                        msg = new Msg(id, type);
+                        msg = new Msg(id, type, readStatus);
                         msgListMms.put(id, msg);
 
                         if (folderMms[type].equals("inbox")) {
                             Event evt = new Event("NewMessage", id, folderMms[type],
                                 null, TYPE.MMS);
+                            if (mMnsClient.isTransportSrmCapable()) {
+                                long dateTime = c.getLong(c.getColumnIndex(Mms.DATE));
+                                SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'HHmmss");
+                                Date date = new Date(dateTime);
+                                // Format to YYYYMMDDTHHMMSS local time
+                                evt.setDateTime(format.format(date));
+                                String subject = c.getString(c.getColumnIndex(Mms.SUBJECT));
+                                if (subject != null ) {
+                                    evt.setSubject(subject);
+                                } else {
+                                    evt.setSubject("");
+                                }
+                                String priority = "no";
+                                if (PduHeaders.PRIORITY_HIGH ==
+                                        c.getInt(c.getColumnIndex(Mms.PRIORITY))) {
+                                    priority="yes";
+                                }
+                                evt.setPriority(priority);
+                                String phone = BluetoothMapContent.getAddressMms(mResolver, id,
+                                        BluetoothMapContent.MMS_TO);
+                                String senderName = getContactNameFromPhone(phone);
+                                if (senderName != null ) {
+                                    evt.setSenderName(senderName);
+                                } else {
+                                    evt.setSenderName("");
+                                }
+                                if (V) {
+                                    Log.d(TAG, "handleMsgListChangesMms ****\n date: " + dateTime
+                                        + " subject: "+ subject + " prio: "+ priority +
+                                            " senderName: " + senderName);
+                                }
+                            }
                             sendEvent(evt);
                         }
                     } else {
@@ -500,6 +630,14 @@ public class BluetoothMapContentObserver {
                                 sendEvent(evt);
                                 removeMceInitiatedOperation(loc);
                             }
+                        } else if(readStatus != msg.readStatus &&
+                                mMnsClient.isTransportSrmCapable()) {
+                            Event evt = new Event("ReadStatusChanged", id, folderMms[type],
+                                null, TYPE.MMS);
+                            sendEvent(evt);
+                            msg.readStatus = readStatus;
+                            Log.d(TAG, "new readStatus: " + readStatus + " old readStatus: "
+                                + msg.readStatus);
                         }
                         msgListMms.put(id, msg);
                     }
@@ -515,6 +653,30 @@ public class BluetoothMapContentObserver {
 
             mMsgListMms = msgListMms;
         }
+    }
+    private String getContactNameFromPhone(String phone) {
+        String name = "";
+        if (TextUtils.isEmpty(phone)) {
+           return name;
+        }
+        Uri uri = Uri.withAppendedPath(PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(phone));
+
+        String[] projection = {Contacts._ID, Contacts.DISPLAY_NAME};
+        String selection = Contacts.IN_VISIBLE_GROUP + "=1";
+        String orderBy = Contacts.DISPLAY_NAME + " ASC";
+
+        Cursor c = mResolver.query(uri, projection, selection, null, orderBy);
+
+        if (c != null && c.getCount() >= 1) {
+            c.moveToFirst();
+            name = c.getString(c.getColumnIndex(Contacts.DISPLAY_NAME));
+        }
+
+        if (c != null) {
+            c.close();
+        }
+        return name;
     }
 
     private void handleMsgListChanges() {
