@@ -640,8 +640,14 @@ final class A2dpStateMachine extends StateMachine {
                     // we already broadcasted the intent, doing nothing here
                     log("Stack and target device are connecting");
                 }
-                else if (mIncomingDevice != null && mIncomingDevice.equals(device)) {
-                    loge("Another connecting event on the incoming device");
+                else if (mIncomingDevice != null) {
+                    if (mIncomingDevice.equals(device)) {
+                        loge("Connecting for same device");
+                    } else {
+                        log("Processing incoming " + mIncomingDevice +
+                                " Rejecting incoming " + device);
+                        disconnectA2dpNative(getByteAddress(device));
+                    }
                 } else {
                     // We get an incoming connecting request while Pending
                     // TODO(BT) is stack handing this case? let's ignore it for now
