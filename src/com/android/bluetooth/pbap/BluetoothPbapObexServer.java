@@ -710,7 +710,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
                     currentValue = currentValue.substring(0, currentValue.lastIndexOf(','));
 
                 if (searchValue != null) {
-                    if (searchValue.isEmpty() || ((currentValue.toLowerCase()).equals(compareValue.toLowerCase()))) {
+                    if (searchValue.isEmpty() || ((currentValue.toLowerCase()).startsWith(compareValue.toLowerCase()))) {
                         selectedNameList.add(currentValue);
                         savedPosList.add(pos);
                     }
