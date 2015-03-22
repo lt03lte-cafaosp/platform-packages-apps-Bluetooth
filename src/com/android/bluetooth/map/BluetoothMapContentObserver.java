@@ -407,7 +407,7 @@ public class BluetoothMapContentObserver {
                 Log.w(TAG, ex);
             }
         } else {
-            Log.d(TAG, "Not MCE initiated operation" +location);
+            Log.d(TAG, "Ignore MCE initiated operation" +location);
             return;
         }
     }
@@ -616,20 +616,23 @@ public class BluetoothMapContentObserver {
                     } else {
                         /* Existing message */
                         if (type != msg.type) {
-                            Log.d(TAG, "new type: " + type + " old type: " + msg.type);
+                            Log.d(TAG, "new type: " + type + " old type: " + msg.type
+                                + " folder: "+ folderMms[type]);
                             Event evt = new Event("MessageShift", id, folderMms[type],
                                 folderMms[msg.type], TYPE.MMS);
-                            sendEvent(evt);
                             msg.type = type;
-
-                            // Trigger 'SendingSuccess' for MMS ONLY when local initiated
-                            int loc = findLocationMceInitiatedOperation(Long.toString(id));
-                            if (folderMms[type].equals("sent")&& loc != -1) {
-                                evt = new Event("SendingSuccess", id,
-                                    folderMms[type], null, TYPE.MMS);
-                                sendEvent(evt);
-                                removeMceInitiatedOperation(loc);
+                            if (folderMms[type].equals("sent")) {
+                                // Trigger 'SendingSuccess' for MMS ONLY when local initiated
+                                int loc = findLocationMceInitiatedOperation(Long.toString(id));
+                                if(loc != -1) {
+                                    Log.d(TAG, "LOC: " + loc +"id: " + id);
+                                    Event sendEvt = new Event("SendingSuccess", id,
+                                        folderMms[type], null, TYPE.MMS);
+                                    sendEvent(sendEvt);
+                                    continue;
+                                }
                             }
+                            sendEvent(evt);
                         } else if(readStatus != msg.readStatus &&
                                 mMnsClient.isTransportSrmCapable()) {
                             Event evt = new Event("ReadStatusChanged", id, folderMms[type],
@@ -1131,7 +1134,7 @@ public class BluetoothMapContentObserver {
                               " to Uri: " + uri.toString());
                     }
                 }
-                addMceInitiatedOperation("+");
+                addMceInitiatedOperation(Long.toString(handle));
             }   catch (UnsupportedEncodingException e) {
                 Log.w(TAG, e);
             } catch (IOException e) {
