@@ -88,13 +88,26 @@ public final class Avrcp {
     private RemoteControllerWeak mRemoteControllerCb;
     private Metadata mMetadata;
     private int mTransportControlFlags;
+    private int mCurrentPlayState;
+    private int mPlayStatusChangedNT;
+    private int mTrackChangedNT;
+    private long mCurrentPosMs;
+    private long mPlayStartTimeMs;
     private long mTrackNumber;
     private long mSongLengthMs;
+    private long mPlaybackIntervalMs;
+    private int mPlayPosChangedNT;
     private long mNextPosMs;
     private long mPrevPosMs;
     private long mSkipStartTime;
+    private int mFeatures;
+    private int mAbsoluteVolume;
+    private int mLastSetVolume;
+    private int mLastDirection;
     private final int mVolumeStep;
     private final int mAudioStreamMax;
+    private boolean mVolCmdInProgress;
+    private int mAbsVolRetryTimes;
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
     private int mSkipAmount;
@@ -290,6 +303,7 @@ public final class Avrcp {
             mLastDirection = 0;
             mVolCmdInProgress = false;
             mAbsVolRetryTimes = 0;
+            mSkipAmount = 0;
             keyPressState = KEY_STATE_RELEASE; //Key release state
             mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
             mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
@@ -384,6 +398,8 @@ public final class Avrcp {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mMetadata = new Metadata();
         mTrackNumber = -1L;
+        mCurrentPosMs = -1L;
+        mPlayStartTimeMs = -1L;
         mSongLengthMs = 0L;
         mA2dpService = svc;
         mLastPlayingDevice.clear();
@@ -4213,6 +4229,10 @@ public final class Avrcp {
 
         TrackNumberRsp = mMetadata.tracknum ;
 
+        if(DEBUG) Log.v(TAG,"mCurrentPlayState" + mCurrentPlayState );
+
+            TrackNumberRsp = mMetadata.tracknum ;
+
         /* track is stored in big endian format */
         for (int i = 0; i < TRACK_ID_SIZE; ++i) {
             track[i] = (byte) (TrackNumberRsp >> (56 - 8 * i));
@@ -4403,7 +4423,7 @@ public final class Avrcp {
      * returns true only when both playing devices support absolute volume
      */
     public boolean isAbsoluteVolumeSupported() {
-        List<BluetoothDevice> device = mA2dpService.getConnectedDevices();
+        List<BluetoothDevice> device = mA2dpService.getA2dpPlayingDevice();
         List<Byte> absVolumeSupported = new ArrayList<Byte>();
         int deviceIndex = INVALID_DEVICE_INDEX;
         if (device.size() == 0)
@@ -4816,6 +4836,36 @@ public final class Avrcp {
 
     private byte[] getByteAddress(BluetoothDevice device) {
         return Utils.getBytesFromAddress(device.getAddress());
+    }
+
+    public void dump(StringBuilder sb) {
+        sb.append("AVRCP:\n");
+        for (int i = 0; i < maxAvrcpConnections; i++) {
+            Log.v(TAG,"for index " + i);
+            ProfileService.println(sb, "mMetadata: " + mMetadata);
+            ProfileService.println(sb, "mTransportControlFlags: " + mTransportControlFlags);
+            ProfileService.println(sb, "mCurrentPlayState: " + deviceFeatures[i].mCurrentPlayState);
+            ProfileService.println(sb, "mPlayStatusChangedNT: " + deviceFeatures[i].mPlayStatusChangedNT);
+            ProfileService.println(sb, "mTrackChangedNT: " + deviceFeatures[i].mTrackChangedNT);
+            ProfileService.println(sb, "mTrackNumber: " + mTrackNumber);
+            ProfileService.println(sb, "mCurrentPosMs: " + deviceFeatures[i].mCurrentPosMs);
+            ProfileService.println(sb, "mPlayStartTimeMs: " + deviceFeatures[i].mPlayStartTimeMs);
+            ProfileService.println(sb, "mSongLengthMs: " + mSongLengthMs);
+            ProfileService.println(sb, "mPlaybackIntervalMs: " + deviceFeatures[i].mPlaybackIntervalMs);
+            ProfileService.println(sb, "mPlayPosChangedNT: " + deviceFeatures[i].mPlayPosChangedNT);
+            ProfileService.println(sb, "mNextPosMs: " + mNextPosMs);
+            ProfileService.println(sb, "mPrevPosMs: " + mPrevPosMs);
+            ProfileService.println(sb, "mSkipStartTime: " + mSkipStartTime);
+            ProfileService.println(sb, "mFeatures: " + deviceFeatures[i].mFeatures);
+            ProfileService.println(sb, "mAbsoluteVolume: " + deviceFeatures[i].mAbsoluteVolume);
+            ProfileService.println(sb, "mLastSetVolume: " + deviceFeatures[i].mLastSetVolume);
+            ProfileService.println(sb, "mLastDirection: " + deviceFeatures[i].mLastDirection);
+            ProfileService.println(sb, "mVolumeStep: " + mVolumeStep);
+            ProfileService.println(sb, "mAudioStreamMax: " + mAudioStreamMax);
+            ProfileService.println(sb, "mVolCmdInProgress: " + deviceFeatures[i].mVolCmdInProgress);
+            ProfileService.println(sb, "mAbsVolRetryTimes: " + deviceFeatures[i].mAbsVolRetryTimes);
+            ProfileService.println(sb, "mSkipAmount: " + mSkipAmount);
+        }
     }
 
     // Do not modify without updating the HAL bt_rc.h files.

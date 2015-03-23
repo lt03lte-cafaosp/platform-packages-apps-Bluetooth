@@ -15,6 +15,7 @@
 package com.android.bluetooth.map;
 
 import java.io.ByteArrayInputStream;
+import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -88,6 +89,13 @@ public class BluetoothMapContentObserver {
     public static final int MESSAGE_TYPE_RETRIEVE_CONF = 0x84;
 
     private TYPE mSmsType;
+
+    private static void close(Closeable c) {
+        try {
+            if (c != null) c.close();
+        } catch (IOException e) {
+        }
+    }
 
     static final String[] SMS_PROJECTION = new String[] {
         BaseColumns._ID,
@@ -418,6 +426,7 @@ public class BluetoothMapContentObserver {
         mMsgListSms.clear();
         mMsgListMms.clear();
 
+
         HashMap<Long, Msg> msgListSms = new HashMap<Long, Msg>();
 
         Cursor c = mResolver.query(Sms.CONTENT_URI,
@@ -432,29 +441,31 @@ public class BluetoothMapContentObserver {
                 Msg msg = new Msg(id, type, readStatus);
                 msgListSms.put(id, msg);
             } while (c.moveToNext());
-            c.close();
+            close(c);
         }
-
-        mMsgListSms = msgListSms;
+        synchronized(mMsgListSms) {
+            mMsgListSms.clear();
+            mMsgListSms = msgListSms;
+        }
 
         HashMap<Long, Msg> msgListMms = new HashMap<Long, Msg>();
 
-        c = mResolver.query(Mms.CONTENT_URI,
-            MMS_PROJECTION, null, null, null);
-
-        if (c != null && c.moveToFirst()) {
-            do {
-                long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
+        try {
+            while (c != null && c.moveToNext()) {
+                long id = c.getLong(c.getColumnIndex(Mms._ID));
                 int type = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX));
                 int readStatus = c.getInt(c.getColumnIndex(Mms.READ));
 
                 Msg msg = new Msg(id, type, readStatus);
                 msgListMms.put(id, msg);
-            } while (c.moveToNext());
-            c.close();
+            }
+        } finally {
+            close(c);
         }
-
-        mMsgListMms = msgListMms;
+        synchronized(mMsgListMms) {
+            mMsgListMms.clear();
+            mMsgListMms = msgListMms;
+        }
     }
 
     private void handleMsgListChangesSms() {
@@ -701,7 +712,9 @@ public class BluetoothMapContentObserver {
                 mResolver.update(uri, contentValues, null, null);
             } else {
                 /* Delete from observer message list to avoid delete notifications */
-                mMsgListMms.remove(handle);
+				synchronized(mMsgListMms) {
+                    mMsgListMms.remove(handle);
+				}
                 /* Delete message */
                 mResolver.delete(uri, null, null);
             }
@@ -710,6 +723,7 @@ public class BluetoothMapContentObserver {
         if (c != null) {
             c.close();
         }
+
         return res;
     }
 
@@ -769,7 +783,9 @@ public class BluetoothMapContentObserver {
                 mResolver.update(uri, contentValues, null, null);
             } else {
                 /* Delete from observer message list to avoid delete notifications */
-                mMsgListSms.remove(handle);
+				synchronized(mMsgListSms) {
+                    mMsgListSms.remove(handle);
+			    }
                 /* Delete message */
                 mResolver.delete(uri, null, null);
             }
@@ -922,20 +938,45 @@ public class BluetoothMapContentObserver {
                     case SMS_CDMA:
                     {
                         /* Add the message to the database */
+
                         String phone = recipient.getFirstPhoneNumber();
+
                         String msgBody = ((BluetoothMapbMessageSms) msg).getSmsBody();
                         if (TextUtils.isEmpty(msgBody)) {
                             Log.d(TAG, "PushMsg: Empty msgBody ");
                             /* not allowed to push empty message */
                             throw new IllegalArgumentException("push EMPTY message: Invalid Body");
                         }
-                        Uri contentUri = Uri.parse("content://sms/" + folder);
-                        Uri uri = Sms.addMessageToUri(mResolver, contentUri, phone, msgBody,
-                            "", System.currentTimeMillis(), read, deliveryReport);
 
-                        if (uri == null) {
-                            Log.d(TAG, "pushMessage - failure on add to uri " + contentUri);
-                            return -1;
+                        /* We need to lock the SMS list while updating the database, to avoid sending
+                         * events on MCE initiated operation. */
+                        Uri contentUri = Uri.parse(Sms.CONTENT_URI+ "/" + folder);
+                        Uri uri;
+                        synchronized(mMsgListSms) {
+                            uri = Sms.addMessageToUri(mResolver, contentUri, phone, msgBody,
+                                "", System.currentTimeMillis(), read, deliveryReport);
+
+                            if(V) Log.v(TAG, "Sms.addMessageToUri() returned: " + uri);
+                            if (uri == null) {
+                                if (D) Log.d(TAG, "pushMessage - failure on add to uri " + contentUri);
+                                return -1;
+                            }
+                            Cursor c = mResolver.query(uri, SMS_PROJECTION, null, null, null);
+                            try {
+                                /* Extract the data for the inserted message, and store in local mirror, to
+                                * avoid sending a NewMessage Event. */
+                                if (c != null && c.moveToFirst()) {
+                                    long id = c.getLong(c.getColumnIndex(Sms._ID));
+                                    int type = c.getInt(c.getColumnIndex(Sms.TYPE));
+                                    int readStatus = c.getInt(c.getColumnIndex(Sms.READ));
+                                    Msg newMsg = new Msg(id, type, readStatus);
+                                    mMsgListSms.put(id, newMsg);
+                                } else {
+                                    return -1; // This can only happen, if the message is deleted just as it is added
+                                }
+                            } finally {
+                                close(c);
+                            }
                         }
 
                         handle = Long.parseLong(uri.getLastPathSegment());
@@ -1006,7 +1047,6 @@ public class BluetoothMapContentObserver {
 
     }
 
-
     private void moveDraftToOutbox(long handle) {
         ContentResolver contentResolver = mContext.getContentResolver();
         /*Move message by changing the msg_box value in the content provider database */
@@ -1014,7 +1054,8 @@ public class BluetoothMapContentObserver {
             String whereClause = " _id= " + handle;
             Uri uri = Uri.parse("content://mms");
             Cursor queryResult = contentResolver.query(uri, null, whereClause, null, null);
-            if (queryResult != null) {
+			try {
+               if (queryResult != null) {
                 if (queryResult.getCount() > 0) {
                     queryResult.moveToFirst();
                     ContentValues data = new ContentValues();
@@ -1023,10 +1064,14 @@ public class BluetoothMapContentObserver {
                     contentResolver.update(uri, data, whereClause, null);
                     Log.d(TAG, "moved draft MMS to outbox");
                 }
-                queryResult.close();
+                
                 addMceInitiatedOperation(Long.toString(handle));
-            }else {
+              } else {
                 Log.d(TAG, "Could not move draft to outbox ");
+
+              }
+            } finally {
+               queryResult.close();
             }
         }
     }
@@ -1064,26 +1109,52 @@ public class BluetoothMapContentObserver {
      // Get thread id
         Set<String> recipients = new HashSet<String>();
         recipients.addAll(Arrays.asList(to_address));
-        values.put("thread_id", Telephony.Threads.getOrCreateThreadId(mContext, recipients));
-        Uri uri = Uri.parse("content://mms");
+        values.put(Mms.THREAD_ID, Telephony.Threads.getOrCreateThreadId(mContext, recipients));
+		Uri uri = Mms.CONTENT_URI;
 
-        ContentResolver cr = mContext.getContentResolver();
-        uri = cr.insert(uri, values);
+        synchronized (mMsgListMms) {
+            uri = mResolver.insert(uri, values);
 
-        if (uri == null) {
-            // unable to insert MMS
-            Log.e(TAG, "Unabled to insert MMS " + values + "Uri: " + uri);
-            return -1;
-        }
+            if (uri == null) {
+                // unable to insert MMS
+                Log.e(TAG, "Unabled to insert MMS " + values + "Uri: " + uri);
+                return -1;
+            }
+            /* As we already have all the values we need, we could skip the query, but
+               doing the query ensures we get any changes made by the content provider
+               at insert. */
+            Cursor c = mResolver.query(uri, MMS_PROJECTION, null, null, null);
+            try {
+                if (c != null && c.moveToFirst()) {
+                    long id = c.getLong(c.getColumnIndex(Mms._ID));
+                    int type = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX));
+                    int readStatus = c.getInt(c.getColumnIndex(Mms.READ));
+                   
+
+                    /* We must filter out any actions made by the MCE. Add the new message to
+                     * the list of known messages. */
+
+                    Msg newMsg = new Msg(id, type, readStatus);
+                    mMsgListMms.put(id, newMsg);
+                }
+            } finally {
+                close(c);
+            }
+        } // Done adding changes, unlock access to mMsgListMms to allow sending MMS events again
 
         long handle = Long.parseLong(uri.getLastPathSegment());
-        ArrayList<MimePart> parts = msg.getMimeParts();
-        if (parts != null) {
-            Log.v(TAG, " NEW URI " + uri.toString());
-            try {
-                for(MimePart part : parts) {
-                    int count = 0;
-                    count++;
+        if (V) Log.v(TAG, " NEW URI " + uri.toString());
+
+        try {
+            if(msg.getMimeParts() == null) {
+                /* Perhaps this message have been deleted, and no longer have any content, but only headers */
+                Log.w(TAG, "No MMS parts present...");
+            } else {
+                if(V) Log.v(TAG, "Adding " + msg.getMimeParts().size() + " parts to the data base.");
+                int count = 0;
+                for(MimePart part : msg.getMimeParts()) {
+                    ++count;
+
                     values.clear();
                     if(part.contentType != null &&
                        part.contentType.toUpperCase().contains("TEXT")) {
@@ -1106,7 +1177,7 @@ public class BluetoothMapContentObserver {
                           values.put("cd", part.contentDisposition);
                        values.put("text", new String(part.data, "UTF-8"));
                        uri = Uri.parse("content://mms/" + handle + "/part");
-                       uri = cr.insert(uri, values);
+                       uri = mResolver.insert(uri, values);
                        if(V) Log.v(TAG, "Added TEXT part");
                     } else if (part.contentType != null &&
                                part.contentType.toUpperCase().contains("SMIL")) {
@@ -1123,7 +1194,7 @@ public class BluetoothMapContentObserver {
                       values.put("text", new String(part.data, "UTF-8"));
 
                       uri = Uri.parse("content://mms/" + handle + "/part");
-                      uri = cr.insert(uri, values);
+                      uri = mResolver.insert(uri, values);
                       if(V) Log.v(TAG, "Added SMIL part");
                     } else /*VIDEO/AUDIO/IMAGE*/ {
                       writeMmsDataPart(handle, part, count);
@@ -1135,11 +1206,11 @@ public class BluetoothMapContentObserver {
                     }
                 }
                 addMceInitiatedOperation(Long.toString(handle));
-            }   catch (UnsupportedEncodingException e) {
-                Log.w(TAG, e);
-            } catch (IOException e) {
-                Log.w(TAG, e);
             }
+        } catch (UnsupportedEncodingException e) {
+                Log.w(TAG, e);
+        } catch (IOException e) {
+                Log.w(TAG, e);
         }
         values.clear();
         values.put("contact_id", "null");
@@ -1148,7 +1219,7 @@ public class BluetoothMapContentObserver {
         values.put("charset", 106);
 
         uri = Uri.parse("content://mms/" + handle + "/addr");
-        uri = cr.insert(uri, values);
+        uri = mResolver.insert(uri, values);
         if (uri != null && V){
             Log.v(TAG, " NEW URI " + uri.toString());
         }
@@ -1160,7 +1231,7 @@ public class BluetoothMapContentObserver {
         values.put("charset", 106);
 
         uri = Uri.parse("content://mms/" + handle + "/addr");
-        uri = cr.insert(uri, values);
+        uri = mResolver.insert(uri, values);
         if (uri != null && V){
             Log.v(TAG, " NEW URI " + uri.toString());
         }
@@ -1407,30 +1478,34 @@ public class BluetoothMapContentObserver {
         String where = "type = " + Sms.MESSAGE_TYPE_OUTBOX;
         Cursor c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION, where, null,
             null);
+        if (c == null) return;
+        try {
+            while (c!= null && c.moveToNext()) {
+                long id = c.getLong(c.getColumnIndex(Sms._ID));
 
-        if (c != null && c.moveToFirst()) {
-            do {
-                long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
                 String msgBody = c.getString(c.getColumnIndex(Sms.BODY));
                 PushMsgInfo msgInfo = mPushMsgList.get(id);
                 if (msgInfo == null || msgInfo.resend == false) {
                     continue;
                 }
                 sendMessage(msgInfo, msgBody);
-            } while (c.moveToNext());
-            c.close();
+            }
+        } finally {
+            close(c);
         }
     }
 
     private void failPendingMessages() {
         /* Move pending messages from outbox to failed */
         String where = "type = " + Sms.MESSAGE_TYPE_OUTBOX;
-        Cursor c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION, where, null,
-            null);
+        Cursor c = mResolver.query(Sms.CONTENT_URI, SMS_PROJECTION, where, null, null);
+        if (c == null) return;
 
-        if (c != null && c.moveToFirst()) {
-            do {
-                long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
+
+        try {
+            while (c!= null && c.moveToNext()) {
+                long id = c.getLong(c.getColumnIndex(Sms._ID));
+
                 String msgBody = c.getString(c.getColumnIndex(Sms.BODY));
                 PushMsgInfo msgInfo = mPushMsgList.get(id);
                 if (msgInfo == null || msgInfo.resend == false) {
@@ -1438,9 +1513,10 @@ public class BluetoothMapContentObserver {
                 }
                 Sms.moveMessageToFolder(mContext, msgInfo.uri,
                     Sms.MESSAGE_TYPE_FAILED, 0);
-            } while (c.moveToNext());
+            }
+        } finally {
+            close(c);
         }
-        if (c != null) c.close();
     }
 
     private void removeDeletedMessages() {
@@ -1449,7 +1525,7 @@ public class BluetoothMapContentObserver {
                 "thread_id = " + DELETED_THREAD_ID, null);
     }
 
-    private PhoneStateListener mPhoneListener = new PhoneStateListener (Long.MAX_VALUE - 1,
+    private PhoneStateListener mPhoneListener = new PhoneStateListener (Integer.MAX_VALUE - 1,
                                                          Looper.getMainLooper())  {
         @Override
         public void onServiceStateChanged(ServiceState serviceState) {
