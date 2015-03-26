@@ -843,6 +843,7 @@ public class BluetoothOppService extends Service {
             && (newConfirm == BluetoothShare.USER_CONFIRMATION_CONFIRMED ||
                 newConfirm == BluetoothShare.USER_CONFIRMATION_AUTO_CONFIRMED ||
                 newConfirm == BluetoothShare.USER_CONFIRMATION_HANDOVER_CONFIRMED)) {
+           confirmUpdated = true;
         }
         info.mConfirm = newConfirm;
         int newStatus = cursor.getInt(statusColumn);
