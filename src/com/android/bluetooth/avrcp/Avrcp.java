@@ -327,7 +327,7 @@ public final class Avrcp {
         mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
         mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
         mTrackNumber = -1L;
-        mCurrentPosMs = 0L;
+        mCurrentPosMs = -1L;
         mPlayStartTimeMs = -1L;
         mSongLengthMs = 0L;
         mPlaybackIntervalMs = 0L;
@@ -676,8 +676,10 @@ public final class Avrcp {
                 }
                 mMediaUri = uri;
                 if (handler != null) {
+                     // Don't send the complete path to CK as few gets confused by that
+                    // Send only the name of the root folder
                     handler.obtainMessage(MSG_UPDATE_BROWSED_PLAYER_FOLDER, NUM_ROOT_ELEMENTS,
-                                                SplitPath.length, SplitPath).sendToTarget();
+                                                1, SplitPath).sendToTarget();
                 }
             } else {
                 handler.obtainMessage(MSG_UPDATE_BROWSED_PLAYER_FOLDER, 0, 0, null)
@@ -1404,7 +1406,7 @@ public final class Avrcp {
             trackTitle = null;
             albumTitle = null;
             genre = null;
-            tracknum = 0;
+            tracknum = -1L;
         }
 
         public String toString() {
@@ -3143,11 +3145,9 @@ public final class Avrcp {
         long TrackNumberRsp = -1L;
 
         if(DEBUG) Log.v(TAG,"mCurrentPlayState" + mCurrentPlayState );
-        /*As per spec 6.7.2 Register Notification
-          If no track is currently selected, then return
-         0xFFFFFFFFFFFFFFFF in the interim response */
-        if (mCurrentPlayState == RemoteControlClient.PLAYSTATE_PLAYING)
+
             TrackNumberRsp = mMetadata.tracknum ;
+
         /* track is stored in big endian format */
         for (int i = 0; i < TRACK_ID_SIZE; ++i) {
             track[i] = (byte) (TrackNumberRsp >> (56 - 8 * i));
@@ -3551,6 +3551,33 @@ public final class Avrcp {
     public void setA2dpAudioState(int state) {
         Message msg = mHandler.obtainMessage(MESSAGE_SET_A2DP_AUDIO_STATE, state, 0);
         mHandler.sendMessage(msg);
+    }
+
+    public void dump(StringBuilder sb) {
+        sb.append("AVRCP:\n");
+        ProfileService.println(sb, "mMetadata: " + mMetadata);
+        ProfileService.println(sb, "mTransportControlFlags: " + mTransportControlFlags);
+        ProfileService.println(sb, "mCurrentPlayState: " + mCurrentPlayState);
+        ProfileService.println(sb, "mPlayStatusChangedNT: " + mPlayStatusChangedNT);
+        ProfileService.println(sb, "mTrackChangedNT: " + mTrackChangedNT);
+        ProfileService.println(sb, "mTrackNumber: " + mTrackNumber);
+        ProfileService.println(sb, "mCurrentPosMs: " + mCurrentPosMs);
+        ProfileService.println(sb, "mPlayStartTimeMs: " + mPlayStartTimeMs);
+        ProfileService.println(sb, "mSongLengthMs: " + mSongLengthMs);
+        ProfileService.println(sb, "mPlaybackIntervalMs: " + mPlaybackIntervalMs);
+        ProfileService.println(sb, "mPlayPosChangedNT: " + mPlayPosChangedNT);
+        ProfileService.println(sb, "mNextPosMs: " + mNextPosMs);
+        ProfileService.println(sb, "mPrevPosMs: " + mPrevPosMs);
+        ProfileService.println(sb, "mSkipStartTime: " + mSkipStartTime);
+        ProfileService.println(sb, "mFeatures: " + mFeatures);
+        ProfileService.println(sb, "mAbsoluteVolume: " + mAbsoluteVolume);
+        ProfileService.println(sb, "mLastSetVolume: " + mLastSetVolume);
+        ProfileService.println(sb, "mLastDirection: " + mLastDirection);
+        ProfileService.println(sb, "mVolumeStep: " + mVolumeStep);
+        ProfileService.println(sb, "mAudioStreamMax: " + mAudioStreamMax);
+        ProfileService.println(sb, "mVolCmdInProgress: " + mVolCmdInProgress);
+        ProfileService.println(sb, "mAbsVolRetryTimes: " + mAbsVolRetryTimes);
+        ProfileService.println(sb, "mSkipAmount: " + mSkipAmount);
     }
 
     // Do not modify without updating the HAL bt_rc.h files.
