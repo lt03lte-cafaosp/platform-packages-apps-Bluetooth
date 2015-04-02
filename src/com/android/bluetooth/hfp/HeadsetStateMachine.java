@@ -420,6 +420,7 @@ final class HeadsetStateMachine extends StateMachine {
             mPhoneState.listenForPhoneState(false);
             mVoiceRecognitionStarted = false;
             mWaitingForVoiceRecognition = false;
+            mDialingOut = false;
         }
 
         @Override
@@ -1046,7 +1047,9 @@ final class HeadsetStateMachine extends StateMachine {
                 case DIALING_OUT_TIMEOUT:
                 {
                     BluetoothDevice device = (BluetoothDevice) message.obj;
+                    Log.d(TAG, "mDialingOut is " + mDialingOut);
                     if (mDialingOut) {
+                        Log.d(TAG, "Timeout waiting for call to be placed, resetting mDialingOut");
                         mDialingOut= false;
                         atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR,
                                                    0, getByteAddress(device));
@@ -1552,8 +1555,10 @@ final class HeadsetStateMachine extends StateMachine {
                     break;
                 case DIALING_OUT_TIMEOUT:
                 {
+                    Log.d(TAG, "mDialingOut is " + mDialingOut);
                     if (mDialingOut) {
                         BluetoothDevice device = (BluetoothDevice)message.obj;
+                        Log.d(TAG, "Timeout waiting for call to be placed, resetting mDialingOut");
                         mDialingOut= false;
                         atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR,
                                                0, getByteAddress(device));
@@ -1931,8 +1936,10 @@ final class HeadsetStateMachine extends StateMachine {
                     processIntentA2dpStateChanged((Intent) message.obj);
                     break;
                 case DIALING_OUT_TIMEOUT:
+                    Log.d(TAG, "mDialingOut is " + mDialingOut);
                     if (mDialingOut) {
                         device = (BluetoothDevice) message.obj;
+                        Log.d(TAG, "Timeout waiting for call to be placed, resetting mDialingOut");
                         mDialingOut= false;
                         atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR,
                                              0, getByteAddress(device));
@@ -3027,7 +3034,7 @@ final class HeadsetStateMachine extends StateMachine {
 
         String dialNumber;
         if (mDialingOut) {
-            log("processDialCall, already dialling");
+            Log.d(TAG, "processDialCall, already dialling");
             atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR, 0,
                                        getByteAddress(device));
             return;
@@ -3035,7 +3042,7 @@ final class HeadsetStateMachine extends StateMachine {
         if ((number == null) || (number.length() == 0)) {
             dialNumber = mPhonebook.getLastDialledNumber();
             if (dialNumber == null) {
-                log("processDialCall, last dial number null");
+                Log.d(TAG, "processDialCall, last dial number null");
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR, 0,
                                        getByteAddress(device));
                 return;
@@ -3044,6 +3051,7 @@ final class HeadsetStateMachine extends StateMachine {
             // Yuck - memory dialling requested.
             // Just dial last number for now
             if (number.startsWith(">9999")) {   // for PTS test
+                Log.d(TAG, "number starts with >9999");
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR, 0,
                                        getByteAddress(device));
                 return;
@@ -3051,7 +3059,7 @@ final class HeadsetStateMachine extends StateMachine {
             log("processDialCall, memory dial do last dial for now");
             dialNumber = mPhonebook.getLastDialledNumber();
             if (dialNumber == null) {
-                log("processDialCall, last dial number null");
+                Log.d(TAG, "processDialCall, last dial number null");
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR, 0,
                                        getByteAddress(device));
                 return;
@@ -3128,13 +3136,14 @@ final class HeadsetStateMachine extends StateMachine {
         if (mDialingOut && callState.mCallState ==
                 HeadsetHalConstants.CALL_STATE_DIALING) {
                 BluetoothDevice device = getDeviceForMessage(DIALING_OUT_TIMEOUT);
+                removeMessages(DIALING_OUT_TIMEOUT);
+                Log.d(TAG, "mDialingOut is " + mDialingOut + ", device " + device);
+                mDialingOut = false;
                 if (device == null) {
                     return;
                 }
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK,
                                                        0, getByteAddress(device));
-                removeMessages(DIALING_OUT_TIMEOUT);
-                mDialingOut = false;
         }
 
         /* Set ActiveScoDevice to null when call ends */
