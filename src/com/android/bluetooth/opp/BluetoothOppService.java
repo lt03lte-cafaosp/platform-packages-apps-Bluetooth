@@ -1090,15 +1090,13 @@ public class BluetoothOppService extends Service {
                     cursorToUpdate.moveToNext()) {
                 updateValues = new ContentValues();
                 updateValues.put(BluetoothShare.STATUS, BluetoothShare.STATUS_UNKNOWN_ERROR);
-                int outboundId = cursorToUpdate.getInt(cursorToUpdate.getColumnIndexOrThrow(
+                int mId = cursorToUpdate.getInt(cursorToUpdate.getColumnIndexOrThrow(
                                     BluetoothShare._ID));
-                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + outboundId);
+                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + mId);
                 contentResolver.update(contentUri, updateValues, null, null);
             }
-            if (V) {
-                Log.v(TAG, "Update interrupted outbound share status, number = "
+            if (V) Log.v(TAG, "Update interrupted outbound share status, number = "
                         + cursorToUpdate.getCount());
-            }
             cursorToUpdate.close();
             cursorToUpdate = null;
         }
@@ -1109,7 +1107,7 @@ public class BluetoothOppService extends Service {
                 + "=" + BluetoothShare.USER_CONFIRMATION_PENDING;
 
         cursorToUpdate = contentResolver.query(BluetoothShare.CONTENT_URI, null,
-                WHERE_CONFIRMATION_PENDING_INBOUND, null, null);
+                    WHERE_CONFIRMATION_PENDING_INBOUND, null, null);
 
         if (cursorToUpdate != null) {
             if (cursorToUpdate.moveToFirst()) {
@@ -1117,15 +1115,13 @@ public class BluetoothOppService extends Service {
                 updateValues.put(BluetoothShare.USER_CONFIRMATION,
                         BluetoothShare.USER_CONFIRMATION_DENIED);
                 updateValues.put(BluetoothShare.STATUS, BluetoothShare.STATUS_UNKNOWN_ERROR);
-                int inboundId = cursorToUpdate.getInt(cursorToUpdate.getColumnIndexOrThrow(
-                        BluetoothShare._ID));
-                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + inboundId);
+                int mId = cursorToUpdate.getInt(cursorToUpdate.getColumnIndexOrThrow(
+                                    BluetoothShare._ID));
+                Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + mId);
                 contentResolver.update(contentUri, updateValues, null, null);
             }
-            if (V) {
-                Log.v(TAG, "Update interrupted inbound share status, number = "
+            if (V) Log.v(TAG, "Update interrupted inbound share status, number = "
                         + cursorToUpdate.getCount());
-            }
             cursorToUpdate.close();
             cursorToUpdate = null;
         }
