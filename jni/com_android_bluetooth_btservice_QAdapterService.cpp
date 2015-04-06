@@ -204,6 +204,7 @@ bt_callbacks_t sQBluetoothCallbacks = {
     le_lpp_read_rssi_thresh_callbacks,
     le_lpp_enable_rssi_monitor_callbacks,
     le_lpp_rssi_threshold_evt_callbacks,
+    NULL
 };
 static void classInitNative(JNIEnv* env, jclass clazz) {
     int err;
