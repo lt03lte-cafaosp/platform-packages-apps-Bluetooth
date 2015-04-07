@@ -450,6 +450,8 @@ public class BluetoothMapContentObserver {
 
         HashMap<Long, Msg> msgListMms = new HashMap<Long, Msg>();
 
+        c = mResolver.query(Mms.CONTENT_URI,
+            MMS_PROJECTION, null, null, null);
         try {
             while (c != null && c.moveToNext()) {
                 long id = c.getLong(c.getColumnIndex(Mms._ID));
