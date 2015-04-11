@@ -505,6 +505,7 @@ static bt_callbacks_t sBluetoothCallbacks = {
     NULL,
     NULL,
     NULL,
+    NULL,
     NULL
 };
 
