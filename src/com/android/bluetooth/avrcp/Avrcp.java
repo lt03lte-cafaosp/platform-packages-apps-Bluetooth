@@ -1363,6 +1363,7 @@ public final class Avrcp {
                 if (msg.arg1 == BluetoothA2dp.STATE_PLAYING) {
                     mAudioManager.avrcpSupportsAbsoluteVolume(playStateChangeDevice.getAddress(),
                             isAbsoluteVolumeSupported());
+                    Log.v(TAG, "update Audiomanager to set AbsVol: " + isAbsoluteVolumeSupported());
                 }
                 if (isAbsoluteVolumeSupported() &&
                         deviceFeatures[deviceIndex].mAbsoluteVolume != -1) {
@@ -4449,8 +4450,10 @@ public final class Avrcp {
             // add 0 in byte list if absolute volume not supported
             if ((deviceFeatures[deviceIndex].mFeatures &
                     BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
+                Log.v(TAG, "isAbsoluteVolumeSupported: yes, for dev: " + i);
                 absVolumeSupported.add((byte)1);
             } else {
+                Log.v(TAG, "isAbsoluteVolumeSupported: no, for dev: " + i);
                 absVolumeSupported.add((byte)0);
             }
         }
