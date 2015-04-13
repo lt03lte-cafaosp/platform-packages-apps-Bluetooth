@@ -772,15 +772,20 @@ public final class Avrcp {
                         SendSetPlayerAppRspNative(INTERNAL_ERROR);
                     break;
                     case GET_ATTRIBUTE_TEXT:
-                    case GET_VALUE_TEXT:
                         String [] values = new String [mPlayerSettings.attrIds.length];
-                        String msgVal = (msg.what == GET_ATTRIBUTE_TEXT) ? UPDATE_ATTRIB_TEXT :
-                                                                                 UPDATE_VALUE_TEXT;
                         for (int i = 0; i < mPlayerSettings.attrIds.length; i++) {
                             values[i] = "";
                         }
                         sendSettingsTextRspNative(mPlayerSettings.attrIds.length ,
                                                     mPlayerSettings.attrIds, values.length,values);
+                    break;
+                    case GET_VALUE_TEXT:
+                        String [] valText= new String [mPlayerSettings.attrIds.length];
+                        for (int i = 0; i < mPlayerSettings.attrIds.length; i++) {
+                            valText[i] = "";
+                        }
+                        sendValueTextRspNative(mPlayerSettings.attrIds.length ,
+                                               mPlayerSettings.attrIds, valText.length, valText);
                     break;
                     default :
                     break;
@@ -2961,7 +2966,7 @@ public final class Avrcp {
                 while (rccIterator.hasNext()) {
                     final MediaPlayerInfo di = rccIterator.next();
                     if (di.GetPlayerFocus()) {
-                        if (!di.IsRemoteAddressable()) {
+                        if (!di.IsRemoteAddressable() || mCurrentPath.equals(PATH_INVALID)) {
                             getFolderItemsRspNative((byte)INTERNAL_ERROR, numItems, itemType,
                                 uid, type, playable, displayName, numAtt, attValues, attIds);
                             Log.e(TAG, "GetFolderItems fails: addressed player is not browsable");
@@ -3546,6 +3551,33 @@ public final class Avrcp {
     public void setA2dpAudioState(int state) {
         Message msg = mHandler.obtainMessage(MESSAGE_SET_A2DP_AUDIO_STATE, state, 0);
         mHandler.sendMessage(msg);
+    }
+
+    public void dump(StringBuilder sb) {
+        sb.append("AVRCP:\n");
+        ProfileService.println(sb, "mMetadata: " + mMetadata);
+        ProfileService.println(sb, "mTransportControlFlags: " + mTransportControlFlags);
+        ProfileService.println(sb, "mCurrentPlayState: " + mCurrentPlayState);
+        ProfileService.println(sb, "mPlayStatusChangedNT: " + mPlayStatusChangedNT);
+        ProfileService.println(sb, "mTrackChangedNT: " + mTrackChangedNT);
+        ProfileService.println(sb, "mTrackNumber: " + mTrackNumber);
+        ProfileService.println(sb, "mCurrentPosMs: " + mCurrentPosMs);
+        ProfileService.println(sb, "mPlayStartTimeMs: " + mPlayStartTimeMs);
+        ProfileService.println(sb, "mSongLengthMs: " + mSongLengthMs);
+        ProfileService.println(sb, "mPlaybackIntervalMs: " + mPlaybackIntervalMs);
+        ProfileService.println(sb, "mPlayPosChangedNT: " + mPlayPosChangedNT);
+        ProfileService.println(sb, "mNextPosMs: " + mNextPosMs);
+        ProfileService.println(sb, "mPrevPosMs: " + mPrevPosMs);
+        ProfileService.println(sb, "mSkipStartTime: " + mSkipStartTime);
+        ProfileService.println(sb, "mFeatures: " + mFeatures);
+        ProfileService.println(sb, "mAbsoluteVolume: " + mAbsoluteVolume);
+        ProfileService.println(sb, "mLastSetVolume: " + mLastSetVolume);
+        ProfileService.println(sb, "mLastDirection: " + mLastDirection);
+        ProfileService.println(sb, "mVolumeStep: " + mVolumeStep);
+        ProfileService.println(sb, "mAudioStreamMax: " + mAudioStreamMax);
+        ProfileService.println(sb, "mVolCmdInProgress: " + mVolCmdInProgress);
+        ProfileService.println(sb, "mAbsVolRetryTimes: " + mAbsVolRetryTimes);
+        ProfileService.println(sb, "mSkipAmount: " + mSkipAmount);
     }
 
     // Do not modify without updating the HAL bt_rc.h files.
