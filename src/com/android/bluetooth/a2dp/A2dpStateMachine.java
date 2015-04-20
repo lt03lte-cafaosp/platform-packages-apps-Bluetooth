@@ -1417,11 +1417,10 @@ final class A2dpStateMachine extends StateMachine {
                         mCurrentDevice);
                 return;
             }
-            log("processAudioStateEvent  MulticonnectionPending" + state + " device "
-                    + device);
+            log("processAudioStateEvent  MulticonnectionPending" + state + " device: "
+                    + device.getName());
             log("mPlayingA2dpDevice size is " + mPlayingA2dpDevice.size());
-            log("mConnectedDevicesList size is " +
-                    mConnectedDevicesList.contains(device));
+            log("mConnectedDevicesList size is " + mConnectedDevicesList.size());
             switch (state) {
                 case AUDIO_STATE_STARTED:
                     synchronized (A2dpStateMachine.this) {
