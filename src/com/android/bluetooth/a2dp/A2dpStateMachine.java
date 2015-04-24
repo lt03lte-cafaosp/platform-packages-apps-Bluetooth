@@ -77,6 +77,8 @@ final class A2dpStateMachine extends StateMachine {
     static final int DISCONNECT = 2;
     private static final int STACK_EVENT = 101;
     private static final int CONNECT_TIMEOUT = 201;
+    private static final int CONNECT_TIMEOUT_SEC = 35000;
+
 
     // Max number of A2dp connections at any time
     private int maxA2dpConnections = 1;
@@ -261,7 +263,7 @@ final class A2dpStateMachine extends StateMachine {
                     //          sends back events consistently
                     Message m = obtainMessage(CONNECT_TIMEOUT);
                     m.obj = device;
-                    sendMessageDelayed(m, 30000);
+                    sendMessageDelayed(m, CONNECT_TIMEOUT_SEC);
                     break;
                 case DISCONNECT:
                     // ignore
@@ -786,7 +788,7 @@ final class A2dpStateMachine extends StateMachine {
                     }
                     Message m = obtainMessage(CONNECT_TIMEOUT);
                     m.obj = device;
-                    sendMessageDelayed(m, 30000);
+                    sendMessageDelayed(m, CONNECT_TIMEOUT_SEC);
 
                 }
                     break;
@@ -925,7 +927,7 @@ final class A2dpStateMachine extends StateMachine {
                         transitionTo(mMultiConnectionPending);
                         Message m = obtainMessage(CONNECT_TIMEOUT);
                         m.obj = device;
-                        sendMessageDelayed(m, 30000);
+                        sendMessageDelayed(m, CONNECT_TIMEOUT_SEC);
                     } else {
                         disconnectA2dpNative(getByteAddress(device));
                         // the other profile connection should be initiated
