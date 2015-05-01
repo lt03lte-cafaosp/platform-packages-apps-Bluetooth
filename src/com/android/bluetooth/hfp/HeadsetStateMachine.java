@@ -128,6 +128,7 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CLCC_RSP_TIMEOUT = 104;
 
     private static final int CONNECT_TIMEOUT = 201;
+    private static final int CONNECT_TIMEOUT_SEC = 35000;
 
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
@@ -473,7 +474,7 @@ final class HeadsetStateMachine extends StateMachine {
                         // sends back events consistently
                         Message m = obtainMessage(CONNECT_TIMEOUT);
                         m.obj = device;
-                        sendMessageDelayed(m, 30000);
+                        sendMessageDelayed(m, CONNECT_TIMEOUT_SEC);
                     } else {
                         if (mRetryConnect.containsKey(device)) {
                             Log.d(TAG, "Removing device " + device +
@@ -971,7 +972,7 @@ final class HeadsetStateMachine extends StateMachine {
                         mRetryConnect.put(device, RetryConn);
                         Message m = obtainMessage(CONNECT_TIMEOUT);
                         m.obj = device;
-                        sendMessageDelayed(m, 30000);
+                        sendMessageDelayed(m, CONNECT_TIMEOUT_SEC);
                     } else {
                         if (mRetryConnect.containsKey(device)) {
                             Log.d(TAG, "Removing device " + device +
@@ -1441,7 +1442,7 @@ final class HeadsetStateMachine extends StateMachine {
                         mRetryConnect.put(device, RetryConn);
                         Message m = obtainMessage(CONNECT_TIMEOUT);
                         m.obj = device;
-                        sendMessageDelayed(m, 30000);
+                        sendMessageDelayed(m, CONNECT_TIMEOUT_SEC);
                     } else {
                         if (mRetryConnect.containsKey(device)) {
                             Log.d(TAG, "Removing device " + device +
