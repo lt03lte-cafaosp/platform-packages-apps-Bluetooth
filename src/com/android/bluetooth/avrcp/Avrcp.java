@@ -1035,6 +1035,10 @@ public final class Avrcp {
                     deviceFeatures[deviceIndex].isAbsoluteVolumeSupportingDevice =
                             ((deviceFeatures[deviceIndex].mFeatures &
                             BTRC_FEAT_ABSOLUTE_VOLUME) != 0);
+                    mAudioManager.avrcpSupportsAbsoluteVolume(device.getAddress(),
+                            isAbsoluteVolumeSupported());
+                    Log.v(TAG," update audio manager for abs vol state = "
+                            + isAbsoluteVolumeSupported());
                     break;
             }
             case MESSAGE_GET_PLAY_STATUS:
@@ -1150,16 +1154,13 @@ public final class Avrcp {
                     long pecentVolChanged = ((long)absVol * 100) / 0x7f;
                     if (DEBUG)
                         Log.v(TAG, "percent volume changed: " + pecentVolChanged + "%");
-                    List<BluetoothDevice> playingDevice = mA2dpService.getA2dpPlayingDevice();
-                    if (playingDevice.size() != 0 &&
-                            playingDevice.contains(deviceFeatures[deviceIndex].mCurrentDevice)) {
-                        if (isAbsoluteVolumeSupported() &&
-                                deviceFeatures[deviceIndex].mAbsoluteVolume != -1) {
-                            notifyVolumeChanged(deviceFeatures[deviceIndex].mAbsoluteVolume,
+                    if (isAbsoluteVolumeSupported() &&
+                            deviceFeatures[deviceIndex].mAbsoluteVolume != -1) {
+                        Log.v(TAG," update audio manager for abs vol  = "
+                                + deviceFeatures[deviceIndex].mAbsoluteVolume);
+                        notifyVolumeChanged(deviceFeatures[deviceIndex].mAbsoluteVolume,
                                     deviceFeatures[deviceIndex].mCurrentDevice);
-                        }
                     }
-                    playingDevice = null;
                 } else if (msg.arg2 == AVRC_RSP_REJ) {
                     if (DEBUG)
                         Log.v(TAG, "setAbsoluteVolume call rejected");
@@ -1359,16 +1360,6 @@ public final class Avrcp {
                 if (msg.arg1 == BluetoothA2dp.STATE_NOT_PLAYING) {
                     // update last playing device
                     mLastPlayingDevice.add(deviceFeatures[deviceIndex].mCurrentDevice);
-                }
-                if (msg.arg1 == BluetoothA2dp.STATE_PLAYING) {
-                    mAudioManager.avrcpSupportsAbsoluteVolume(playStateChangeDevice.getAddress(),
-                            isAbsoluteVolumeSupported());
-                    Log.v(TAG, "update Audiomanager to set AbsVol: " + isAbsoluteVolumeSupported());
-                }
-                if (isAbsoluteVolumeSupported() &&
-                        deviceFeatures[deviceIndex].mAbsoluteVolume != -1) {
-                    notifyVolumeChanged(deviceFeatures[deviceIndex].mAbsoluteVolume,
-                            deviceFeatures[deviceIndex].mCurrentDevice);
                 }
                 updateA2dpAudioState(msg.arg1, (BluetoothDevice)msg.obj);
                 break;
@@ -4456,7 +4447,7 @@ public final class Avrcp {
      * returns true only when both playing devices support absolute volume
      */
     public boolean isAbsoluteVolumeSupported() {
-        List<BluetoothDevice> device = mA2dpService.getA2dpPlayingDevice();
+        List<BluetoothDevice> device = mA2dpService.getConnectedDevices();
         List<Byte> absVolumeSupported = new ArrayList<Byte>();
         int deviceIndex = INVALID_DEVICE_INDEX;
         if (device.size() == 0)
@@ -4863,6 +4854,22 @@ public final class Avrcp {
                         mBrowserDevice.equals(device)) {
                     Log.i(TAG,"clearing mBrowserDevice on disconnect");
                     mBrowserDevice = null;
+                }
+                break;
+            }
+        }
+        mAudioManager.avrcpSupportsAbsoluteVolume(device.getAddress(),
+                isAbsoluteVolumeSupported());
+        Log.v(TAG," update audio manager for abs vol state = "
+                + isAbsoluteVolumeSupported());
+        for (int i = 0; i < maxAvrcpConnections; i++ ) {
+            if (deviceFeatures[i].mCurrentDevice != null) {
+                if (isAbsoluteVolumeSupported() &&
+                        deviceFeatures[i].mAbsoluteVolume != -1) {
+                    notifyVolumeChanged(deviceFeatures[i].mAbsoluteVolume,
+                            deviceFeatures[i].mCurrentDevice);
+                    Log.v(TAG," update audio manager for abs vol  = "
+                            + deviceFeatures[i].mAbsoluteVolume);
                 }
                 break;
             }
