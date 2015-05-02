@@ -309,6 +309,11 @@ public class A2dpService extends ProfileService {
         public boolean connect(BluetoothDevice device) {
             A2dpService service = getService();
             if (service == null) return false;
+            //do not allow new connections with active multicast
+            if (service.isMulticastOngoing(device)) {
+                Log.i(TAG,"A2dp Multicast is Ongoing, ignore Connection Request");
+                return false;
+            }
             return service.connect(device);
         }
 
