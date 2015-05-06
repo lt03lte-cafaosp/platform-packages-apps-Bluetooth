@@ -210,6 +210,7 @@ final class RemoteDevices {
                 if(alias == null) {
                    mAlias = null;
                 } else {
+                    mAlias = alias;
                     mAdapterService.setDevicePropertyNative(mAddress,
                         AbstractionLayer.BT_PROPERTY_REMOTE_FRIENDLY_NAME, alias.getBytes());
                 }
