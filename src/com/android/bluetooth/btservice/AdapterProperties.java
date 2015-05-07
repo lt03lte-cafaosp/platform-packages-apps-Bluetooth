@@ -722,7 +722,7 @@ class AdapterProperties {
         infoLog("Callback:discoveryStateChangeCallback with state:" + state + " disc: " + mDiscovering);
         synchronized (mObject) {
             Intent intent;
-            if (state == AbstractionLayer.BT_DISCOVERY_STOPPED) {
+            if ((state == AbstractionLayer.BT_DISCOVERY_STOPPED) && mDiscovering) {
                 mDiscovering = false;
                 intent = new Intent(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
                 mService.sendBroadcast(intent, mService.BLUETOOTH_PERM);
