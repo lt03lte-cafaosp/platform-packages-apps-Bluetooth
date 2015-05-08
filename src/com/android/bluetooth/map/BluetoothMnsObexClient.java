@@ -217,7 +217,10 @@ public class BluetoothMnsObexClient {
         if((mEmailObserverRegistered == false) && (mObserverRegistered == false) &&
            (notificationStatus == BluetoothMapAppParams.NOTIFICATION_STATUS_YES)) {
             Log.d(TAG, "handleRegistration: connect");
-            connect();
+            if (connect() == false) {
+                Log.d(TAG, "handleRegistration: connect failed");
+                return;
+            }
         }
 
         if(notificationStatus == BluetoothMapAppParams.NOTIFICATION_STATUS_NO) {
@@ -247,7 +250,7 @@ public class BluetoothMnsObexClient {
         }
     }
 
-    public void connect() {
+    public boolean connect() {
         Log.d(TAG, "handleRegistration: connect 2");
 
         BluetoothSocket btSocket = null;
@@ -267,7 +270,7 @@ public class BluetoothMnsObexClient {
                 btSocket.connect();
             } catch (IOException e1) {
                Log.e(TAG, "BtRFCOMMSocket Connect error " + e.getMessage(), e);
-               return;
+               return false;
             }
         }
 
@@ -307,6 +310,7 @@ public class BluetoothMnsObexClient {
         mClientSession.mSrmClient.setLocalSrmCapability(
                     ((BluetoothMnsTransport)(mTransport)).isSrmCapable());
         Log.d(TAG, "Exiting from connect");
+        return true;
     }
 
     public void  initObserver( Handler callback, int masInstanceId) {
