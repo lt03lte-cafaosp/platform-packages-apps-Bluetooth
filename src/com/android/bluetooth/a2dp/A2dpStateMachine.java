@@ -77,7 +77,8 @@ final class A2dpStateMachine extends StateMachine {
     static final int DISCONNECT = 2;
     private static final int STACK_EVENT = 101;
     private static final int CONNECT_TIMEOUT = 201;
-    private static final int CONNECT_TIMEOUT_SEC = 35000;
+    /* Allow time for possible LMP response timeout + Page timeout */
+    private static final int CONNECT_TIMEOUT_SEC = 38000;
 
 
     // Max number of A2dp connections at any time
@@ -1230,10 +1231,20 @@ final class A2dpStateMachine extends StateMachine {
                                 }
                             }
                         } else {
-                            /* HS disconnected, when other HS is connected */
+                            /* HS disconnected, when other HS is connected
+                             * If the device disconnected is currentDevice,
+                             * need to update the currentDevice.
+                             */
                             synchronized (A2dpStateMachine.this) {
                                 mConnectedDevicesList.remove(device);
                                 mService.setAvrcpDisconnectedDevice(device);
+
+                                if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
+                                    log( "currentDevice removed, update currentDevice");
+                                    int deviceSize = mConnectedDevicesList.size();
+                                    mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
+                                }
+
                                 log( "device " + device.getAddress() +
                                         " is removed in MultiConnectionPending state");
                             }

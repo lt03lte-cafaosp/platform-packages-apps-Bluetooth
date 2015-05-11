@@ -1516,7 +1516,7 @@ public final class Avrcp {
             Log.v(TAG,"updatePlayPauseState, state: " + state);
 
         for (int i = 0; i < maxAvrcpConnections; i++) {
-            Log.v(TAG,"Device: " + ((deviceFeatures[i].mCurrentDevice == null) ? "no name" : deviceFeatures[i].mCurrentDevice.getName() +
+            Log.v(TAG,"Device: " + ((deviceFeatures[i].mCurrentDevice == null) ? "no name: " : deviceFeatures[i].mCurrentDevice.getName() +
                 " : old state: ") + deviceFeatures[i].mCurrentPlayState);
         }
 
