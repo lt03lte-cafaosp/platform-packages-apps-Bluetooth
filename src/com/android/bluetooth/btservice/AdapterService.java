@@ -1441,6 +1441,13 @@ public class AdapterService extends Service {
         if (deviceProp != null && deviceProp.getBondState() != BluetoothDevice.BOND_NONE) {
             return false;
         }
+        // Multicast: Do not allow bonding while multcast
+        A2dpService a2dpService = A2dpService.getA2dpService();
+        if (a2dpService != null &&
+                a2dpService.isMulticastOngoing(null)) {
+            Log.i(TAG,"A2dp Multicast is ongoing, ignore bonding");
+            return false;
+        }
 
         // Pairing is unreliable while scanning, so cancel discovery
         // Note, remove this when native stack improves
