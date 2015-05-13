@@ -128,7 +128,8 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CLCC_RSP_TIMEOUT = 104;
 
     private static final int CONNECT_TIMEOUT = 201;
-    private static final int CONNECT_TIMEOUT_SEC = 35000;
+    /* Allow time for possible LMP response timeout + Page timeout */
+    private static final int CONNECT_TIMEOUT_SEC = 38000;
 
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
@@ -2123,6 +2124,12 @@ final class HeadsetStateMachine extends StateMachine {
                               mConnectedDevicesList.remove(device);
                               mHeadsetAudioParam.remove(device);
                               mHeadsetBrsf.remove(device);
+                              if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
+                                  log( "currentDevice removed, update currentDevice");
+                                  int deviceSize = mConnectedDevicesList.size();
+                                  mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
+                              }
+
                               Log.d(TAG, "device " + device.getAddress() +
                                            " is removed in MultiHFPending state");
                             }
