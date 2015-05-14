@@ -822,7 +822,8 @@ public class AdapterService extends Service {
             // when scan mode is not changed during multicast, reset it last to
             // scan mode, as we will set mode to none for multicast
             mScanmode = service.getScanMode();
-            return service.setScanMode(mode,duration);
+            Log.i(TAG,"setScanMode: prev mode: " + mScanmode + " new mode: " + mode);
+            return service.setScanMode(mode, duration);
         }
 
         public int getDiscoverableTimeout() {
@@ -2170,6 +2171,7 @@ public class AdapterService extends Service {
     // do not use this API.It is called only from A2spstatemachine for
     // restoring SCAN mode after multicast is stopped
     public boolean restoreScanMode() {
+        Log.i(TAG, "restoreScanMode: " + mScanmode);
         return setScanMode(mScanmode, getDiscoverableTimeout());
     }
 

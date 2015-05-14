@@ -308,7 +308,8 @@ final class A2dpStateMachine extends StateMachine {
                 }
                 logw("Ignore A2DP DISCONNECTED event, device: " + device);
                 // Reset scan mode if it set due to multicast
-                Log.i(TAG,"getScanMode " + mAdapter.getScanMode());
+                Log.i(TAG,"getScanMode " + mAdapter.getScanMode() +
+                    " isScanDisabled: " + isScanDisabled);
                 if (mPlayingA2dpDevice.size() <= 1 &&
                         (mAdapter.getScanMode() ==
                         BluetoothAdapter.SCAN_MODE_NONE) &&
@@ -459,7 +460,8 @@ final class A2dpStateMachine extends StateMachine {
                         mPlayingA2dpDevice.remove(device);
                     }
                     // Reset scan mode if it set due to multicast
-                    Log.i(TAG,"getScanMode " + mAdapter.getScanMode());
+                    Log.i(TAG,"getScanMode " + mAdapter.getScanMode() +
+                        " isScanDisabled: " + isScanDisabled);
                     if (mPlayingA2dpDevice.size() <= 1 &&
                             (mAdapter.getScanMode() ==
                             BluetoothAdapter.SCAN_MODE_NONE) &&
@@ -856,7 +858,8 @@ final class A2dpStateMachine extends StateMachine {
                             mPlayingA2dpDevice.remove(device);
                         }
                         // Reset scan mode if it set due to multicast
-                        Log.i(TAG,"getScanMode " + mAdapter.getScanMode());
+                        Log.i(TAG,"getScanMode: " + mAdapter.getScanMode() +
+                            " isScanDisabled: " + isScanDisabled);
                         if (mPlayingA2dpDevice.size() <= 1 &&
                                 (mAdapter.getScanMode() ==
                                 BluetoothAdapter.SCAN_MODE_NONE) &&
@@ -1025,7 +1028,7 @@ final class A2dpStateMachine extends StateMachine {
                         mCurrentDevice);
                 return;
             }
-            log("processAudioStateEvent  connected" + state + " device "
+            log("connectedState: processAudioStateEvent state: " + state + " device "
                     + device);
             log("mPlayingA2dpDevice size is " + mPlayingA2dpDevice.size());
             log("mConnectedDevicesList size is " +
@@ -1070,14 +1073,13 @@ final class A2dpStateMachine extends StateMachine {
                                      BluetoothA2dp.STATE_PLAYING);
                         }
                         // Reset scan mode if it set due to multicast
-                        Log.i(TAG,"getScanMode " + mAdapter.getScanMode());
+                        Log.i(TAG,"getScanMode: " + mAdapter.getScanMode() +
+                            " isScanDisabled: " + isScanDisabled);
                         if (mPlayingA2dpDevice.size() <= 1 &&
-                                (mAdapter.getScanMode() ==
-                                BluetoothAdapter.SCAN_MODE_NONE) &&
+                                (mAdapter.getScanMode() == BluetoothAdapter.SCAN_MODE_NONE) &&
                                 isScanDisabled) {
                             isScanDisabled = false;
-                            AdapterService adapterService =
-                                    AdapterService.getAdapterService();
+                            AdapterService adapterService = AdapterService.getAdapterService();
                             if (adapterService != null) {
                                 adapterService.restoreScanMode();
                             }
@@ -1178,7 +1180,8 @@ final class A2dpStateMachine extends StateMachine {
                             mPlayingA2dpDevice.remove(device);
                         }
                         // Reset scan mode if it set due to multicast
-                        Log.i(TAG,"getScanMode " + mAdapter.getScanMode());
+                        Log.i(TAG,"getScanMode: " + mAdapter.getScanMode() +
+                            " isScanDisabled: " + isScanDisabled);
                         if (mPlayingA2dpDevice.size() <= 1 &&
                                 (mAdapter.getScanMode() ==
                                 BluetoothAdapter.SCAN_MODE_NONE) &&
@@ -1430,7 +1433,7 @@ final class A2dpStateMachine extends StateMachine {
                         mCurrentDevice);
                 return;
             }
-            log("processAudioStateEvent  MulticonnectionPending" + state + " device: "
+            log("MultiPendingState: processAudioStateEvent state: " + state + " device "
                     + device.getName());
             log("mPlayingA2dpDevice size is " + mPlayingA2dpDevice.size());
             log("mConnectedDevicesList size is " + mConnectedDevicesList.size());
@@ -1474,14 +1477,13 @@ final class A2dpStateMachine extends StateMachine {
                                     BluetoothA2dp.STATE_PLAYING);
                      }
                         // Reset scan mode if it set due to multicast
-                        Log.i(TAG,"getScanMode " + mAdapter.getScanMode());
+                        Log.i(TAG,"getScanMode: " + mAdapter.getScanMode() +
+                            " isScanDisabled: " + isScanDisabled);
                         if (mPlayingA2dpDevice.size() <= 1 &&
-                                (mAdapter.getScanMode() ==
-                                BluetoothAdapter.SCAN_MODE_NONE) &&
+                                (mAdapter.getScanMode() == BluetoothAdapter.SCAN_MODE_NONE) &&
                                 isScanDisabled) {
                             isScanDisabled = false;
-                            AdapterService adapterService =
-                                    AdapterService.getAdapterService();
+                            AdapterService adapterService = AdapterService.getAdapterService();
                             if (adapterService != null) {
                                 adapterService.restoreScanMode();
                             }
