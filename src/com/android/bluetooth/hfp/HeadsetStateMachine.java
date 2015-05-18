@@ -2124,11 +2124,6 @@ final class HeadsetStateMachine extends StateMachine {
                               mConnectedDevicesList.remove(device);
                               mHeadsetAudioParam.remove(device);
                               mHeadsetBrsf.remove(device);
-                              if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
-                                  log( "currentDevice removed, update currentDevice");
-                                  int deviceSize = mConnectedDevicesList.size();
-                                  mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
-                              }
 
                               Log.d(TAG, "device " + device.getAddress() +
                                            " is removed in MultiHFPending state");

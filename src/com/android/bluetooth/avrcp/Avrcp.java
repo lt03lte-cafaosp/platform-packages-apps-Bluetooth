@@ -257,6 +257,7 @@ public final class Avrcp {
     private static final int TRACK_CHANGE_NOTIFICATION = 103;
     private static final int NOW_PALYING_CONTENT_CHANGED_NOTIFICATION = 104;
 
+    private static final int INVALID_ADDRESSED_PLAYER_ID = -1;
     // Device dependent registered Notification & Variables
     private class DeviceDependentFeature {
         private BluetoothDevice mCurrentDevice;
@@ -308,7 +309,7 @@ public final class Avrcp {
             mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
             mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
             mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
-            mAddressedPlayerId = 0; //  0 signifies bad entry
+            mAddressedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
             mRequestedAddressedPlayerPackageName = null;
             mCurrentPath = PATH_INVALID;
             mCurrentPathUid = null;
@@ -677,6 +678,9 @@ public final class Avrcp {
         }
         mAudioManager.unregisterRemoteController(mRemoteController);
         clearDeviceDependentFeature();
+        for (int i = 0; i < maxAvrcpConnections; i++) {
+            cleanupDeviceFeaturesIndex(i);
+        }
         try {
             mContext.unregisterReceiver(mIntentReceiver);
         }catch (Exception e) {
@@ -990,12 +994,6 @@ public final class Avrcp {
                 BluetoothDevice device = mAdapter.getRemoteDevice(address);
                 deviceIndex = getIndexForDevice(device);
                 if (deviceIndex == INVALID_DEVICE_INDEX) {
-                    Log.e(TAG, "device index is not valid");
-                    Log.v(TAG,"adding device " + device);
-                    setA2dpConnectedDevice(device);
-                    deviceIndex = getIndexForDevice(device);
-                }
-                if (deviceIndex == INVALID_DEVICE_INDEX) {
                     Log.v(TAG,"device entry not present, bailing out");
                     return;
                 }
@@ -1013,8 +1011,6 @@ public final class Avrcp {
             {
                 BluetoothDevice device;
                 int playState, position;
-                List<BluetoothDevice> playingDevice = mA2dpService.getA2dpPlayingDevice();
-
                 if (DEBUG)
                     Log.v(TAG, "MESSAGE_GET_PLAY_STATUS");
                 Log.v(TAG, "Event for device address " + (String)msg.obj);
@@ -1106,8 +1102,6 @@ public final class Avrcp {
                     Log.e(TAG,"invalid index for device");
                     break;
                 }
-                if (DEBUG)
-                    Log.v(TAG,"abslute vol is " + deviceFeatures[deviceIndex].mAbsoluteVolume);
                 if (msg.arg2 == AVRC_RSP_ACCEPT || msg.arg2 == AVRC_RSP_REJ) {
                     if (deviceFeatures[deviceIndex].mVolCmdInProgress == false) {
                         Log.e(TAG, "Unsolicited response, ignored");
@@ -1124,11 +1118,11 @@ public final class Avrcp {
                     byte absVol = (byte)((byte)msg.arg1 & 0x7f); // discard MSB as it is RFD
                     deviceFeatures[deviceIndex].mAbsoluteVolume = absVol;
                     long pecentVolChanged = ((long)absVol * 100) / 0x7f;
-                    if (DEBUG)
-                        Log.v(TAG, "percent volume changed: " + pecentVolChanged + "%");
+                    Log.v(TAG, "Absolute Volume change received as: " + absVol);
+                    Log.v(TAG, "Percent volume changed: " + pecentVolChanged + "%");
                     if (isAbsoluteVolumeSupported() &&
                             deviceFeatures[deviceIndex].mAbsoluteVolume != -1) {
-                        Log.v(TAG," update audio manager for abs vol  = "
+                        Log.v(TAG," update audio manager for absolute volume = "
                                 + deviceFeatures[deviceIndex].mAbsoluteVolume);
                         notifyVolumeChanged(deviceFeatures[deviceIndex].mAbsoluteVolume,
                                     deviceFeatures[deviceIndex].mCurrentDevice);
@@ -1142,7 +1136,6 @@ public final class Avrcp {
             case MESSAGE_ADJUST_VOLUME:
             {
                 List<BluetoothDevice> playingDevice = mA2dpService.getA2dpPlayingDevice();
-
                 if (DEBUG)
                     Log.d(TAG, "MESSAGE_ADJUST_VOLUME: direction=" + msg.arg1);
                 for (int i = 0; i < playingDevice.size(); i++) {
@@ -1441,7 +1434,7 @@ public final class Avrcp {
                     return;
                 }
                 /* do not update play start time now, as music app is still in
-                 * same sate as before */
+                 * same state as before */
                 updatePlayPauseState(isPlaying ? RemoteControlClient.PLAYSTATE_PLAYING :
                         RemoteControlClient.PLAYSTATE_PAUSED,
                         RemoteControlClient.PLAYBACK_POSITION_INVALID,
@@ -1525,8 +1518,19 @@ public final class Avrcp {
                 Log.v(TAG, "old state = " +
                         deviceFeatures[deviceIndex].mCurrentPlayState
                         + " new state : PLAYSTATE_PAUSED");
-                deviceFeatures[deviceIndex].mCurrentPlayState = state;
-                deviceFeatures[deviceIndex].mCurrentPosMs = currentPosMs;
+                if (deviceFeatures[deviceIndex].mCurrentPlayState != state) {
+                    deviceFeatures[deviceIndex].mCurrentPlayState = state;
+                    deviceFeatures[deviceIndex].mCurrentPosMs = currentPosMs;
+                    if (deviceFeatures[deviceIndex].mPlayStatusChangedNT
+                                            == NOTIFICATION_TYPE_INTERIM) {
+                        deviceFeatures[deviceIndex].mPlayStatusChangedNT =
+                                                    NOTIFICATION_TYPE_CHANGED;
+                        registerNotificationRspPlayStatusNative(
+                                deviceFeatures[deviceIndex].mPlayStatusChangedNT,
+                                state,
+                                getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
+                    }
+                }
             }
         }
 
@@ -1679,7 +1683,7 @@ public final class Avrcp {
                         deviceFeatures[i].mAddressedPlayerChangedNT,
                         deviceFeatures[i].mAddressedPlayerId ,
                         getByteAddress(deviceFeatures[i].mCurrentDevice));
-                if (previousAddressedPlayerId != 0) {
+                if (previousAddressedPlayerId != INVALID_ADDRESSED_PLAYER_ID) {
                     resetAndSendPlayerStatusReject();
                 }
             } else {
@@ -2109,15 +2113,6 @@ public final class Avrcp {
         byte retError = INVALID_PLAYER_ID;
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
         int deviceIndex = getIndexForDevice(device);
-        if (deviceIndex == INVALID_DEVICE_INDEX && deviceAddress == null) {
-            Log.e(TAG,"device index is not valid");
-            return;
-        }
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
@@ -2224,15 +2219,6 @@ public final class Avrcp {
         int status = OPERATION_SUCCESSFUL;
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
         int deviceIndex = getIndexForDevice(device);
-        if (deviceIndex == INVALID_DEVICE_INDEX && deviceAddress == null) {
-            Log.e(TAG,"invalid device index");
-            return;
-        }
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
@@ -2594,16 +2580,6 @@ public final class Avrcp {
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
         mBrowserDevice = device;
         int deviceIndex = getIndexForDevice(device);
-        if (deviceIndex == INVALID_DEVICE_INDEX && deviceAddress == null) {
-            Log.e(TAG,"Device index is not valid");
-            return;
-        }
-
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
@@ -2822,16 +2798,6 @@ public final class Avrcp {
         String[] textArray;
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
         int deviceIndex = getIndexForDevice(device);
-        if (deviceIndex == INVALID_DEVICE_INDEX && deviceAddress == null) {
-            Log.e(TAG,"invalid device index");
-            return;
-        }
-
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
@@ -2913,16 +2879,6 @@ public final class Avrcp {
         String packageName = null;
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
         int deviceIndex = getIndexForDevice(device);
-        if (deviceIndex == INVALID_DEVICE_INDEX && deviceAddress == null) {
-            Log.e(TAG,"device index is not valid and device is null");
-            return;
-        }
-
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
@@ -3077,15 +3033,6 @@ public final class Avrcp {
         mBrowserDevice = device;
 
         int deviceIndex = getIndexForDevice(device);
-        if (deviceIndex == INVALID_DEVICE_INDEX && deviceAddress == null) {
-            Log.e(TAG,"device index is not valid & device is null" );
-            return;
-        }
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
@@ -4003,11 +3950,6 @@ public final class Avrcp {
         int deviceIndex = getIndexForDevice(device);
         Log.v(TAG,"processRegisterNotification: eventId" + eventId);
         if (deviceIndex == INVALID_DEVICE_INDEX) {
-            Log.v(TAG,"adding device " + device);
-            setA2dpConnectedDevice(device);
-            deviceIndex = getIndexForDevice(device);
-        }
-        if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
             return;
         }
@@ -4335,25 +4277,19 @@ public final class Avrcp {
      * returns true only when both playing devices support absolute volume
      */
     public boolean isAbsoluteVolumeSupported() {
-        List<BluetoothDevice> device = mA2dpService.getConnectedDevices();
         List<Byte> absVolumeSupported = new ArrayList<Byte>();
-        int deviceIndex = INVALID_DEVICE_INDEX;
-        if (device.size() == 0)
-            return false;
-        for (int i = 0 ; i < device.size(); i++) {
-            deviceIndex = getIndexForDevice(device.get(i));
-            if (deviceIndex == INVALID_DEVICE_INDEX) {
-                continue;
-            }
-            // add 1 in byte list if absolute volume is supported
-            // add 0 in byte list if absolute volume not supported
-            if ((deviceFeatures[deviceIndex].mFeatures &
-                    BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
-                Log.v(TAG, "isAbsoluteVolumeSupported: yes, for dev: " + i);
-                absVolumeSupported.add((byte)1);
-            } else {
-                Log.v(TAG, "isAbsoluteVolumeSupported: no, for dev: " + i);
-                absVolumeSupported.add((byte)0);
+        for (int i = 0; i < maxAvrcpConnections; i++ ) {
+            if (deviceFeatures[i].mCurrentDevice != null) {
+                // add 1 in byte list if absolute volume is supported
+                // add 0 in byte list if absolute volume not supported
+                if ((deviceFeatures[i].mFeatures &
+                        BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
+                    Log.v(TAG, "isAbsoluteVolumeSupported: yes, for dev: " + i);
+                    absVolumeSupported.add((byte)1);
+                } else {
+                    Log.v(TAG, "isAbsoluteVolumeSupported: no, for dev: " + i);
+                    absVolumeSupported.add((byte)0);
+                }
             }
         }
         return !absVolumeSupported.contains((byte)0);
@@ -4484,7 +4420,7 @@ public final class Avrcp {
                 GET_ATTRIBUTE_IDS,0 ,
                 Utils.getAddressStringFromByte(address));
         mPendingCmds.add(new Integer(msg.arg1));
-        mHandler.sendMessageDelayed(msg, 130);
+        mHandler.sendMessageDelayed(msg, 500);
     }
 
     //PDU ID 0x12
@@ -4512,7 +4448,7 @@ public final class Avrcp {
         msg.arg2 = 0;
         msg.obj = Utils.getAddressStringFromByte(address);
         mPendingCmds.add(new Integer(msg.arg1));
-        mHandler.sendMessageDelayed(msg, 130);
+        mHandler.sendMessageDelayed(msg, 500);
     }
 
 
@@ -4549,7 +4485,7 @@ public final class Avrcp {
         msg.arg2 = 0;
         msg.obj = Utils.getAddressStringFromByte(address);
         mPendingCmds.add(new Integer(msg.arg1));
-        mHandler.sendMessageDelayed(msg, 130);
+        mHandler.sendMessageDelayed(msg, 500);
     }
 
     //PDU 0x14
@@ -4617,7 +4553,7 @@ public final class Avrcp {
         msg.arg2 = 0;
         msg.obj = Utils.getAddressStringFromByte(address);
         mPendingCmds.add(new Integer(msg.arg1));
-        mHandler.sendMessageDelayed(msg, 130);
+        mHandler.sendMessageDelayed(msg, 500);
    }
 
     //PDU 0x15
@@ -4650,7 +4586,7 @@ public final class Avrcp {
         msg.arg2 = 0;
         msg.obj = Utils.getAddressStringFromByte(address);
         mPendingCmds.add(new Integer(msg.arg1));
-        mHandler.sendMessageDelayed(msg, 130);
+        mHandler.sendMessageDelayed(msg, 500);
     }
 
     /**
@@ -4665,7 +4601,7 @@ public final class Avrcp {
     /**
      * This is called from A2dpStateMachine to set A2dp Connected device.
      */
-    public void setA2dpConnectedDevice(BluetoothDevice device) {
+    public void setAvrcpConnectedDevice(BluetoothDevice device) {
         Log.i(TAG,"Device added is " + device);
         for (int i = 0; i < maxAvrcpConnections; i++) {
             if (deviceFeatures[i].mCurrentDevice != null &&
@@ -4677,7 +4613,7 @@ public final class Avrcp {
         for (int i = 0; i < maxAvrcpConnections; i++ ) {
             if (deviceFeatures[i].mCurrentDevice == null) {
                 deviceFeatures[i].mCurrentDevice = device;
-                Log.i(TAG,"added at " + i);
+                Log.i(TAG,"device added at " + i);
                 break;
             }
         }
@@ -4694,8 +4630,9 @@ public final class Avrcp {
         Log.e(TAG, "returning invalid index");
         return INVALID_DEVICE_INDEX;
     }
-    public void cleanupDeviceFeaturesIndex (int index) {
 
+    public void cleanupDeviceFeaturesIndex (int index) {
+        Log.i(TAG,"cleanupDeviceFeaturesIndex index:" + index);
         deviceFeatures[index].mCurrentDevice = null;
         deviceFeatures[index].mCurrentPlayState = RemoteControlClient.PLAYSTATE_NONE;
         deviceFeatures[index].mPlayStatusChangedNT = NOTIFICATION_TYPE_CHANGED;
@@ -4715,7 +4652,7 @@ public final class Avrcp {
         deviceFeatures[index].mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
         deviceFeatures[index].mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
         deviceFeatures[index].mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
-        deviceFeatures[index].mAddressedPlayerId = 0; //  0 signifies bad entry
+        deviceFeatures[index].mAddressedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
         deviceFeatures[index].mRequestedAddressedPlayerPackageName = null;
         deviceFeatures[index].mCurrentPath = PATH_INVALID;
         deviceFeatures[index].mCurrentPathUid = null;
@@ -4727,7 +4664,7 @@ public final class Avrcp {
     /**
      * This is called from A2dpStateMachine to set A2dp Connected device to null on disconnect.
      */
-    public void setA2dpDisconnectedDevice(BluetoothDevice device) {
+    public void setAvrcpDisconnectedDevice(BluetoothDevice device) {
         for (int i = 0; i < maxAvrcpConnections; i++ ) {
             if (deviceFeatures[i].mCurrentDevice !=null &&
                     deviceFeatures[i].mCurrentDevice.equals(device)) {
@@ -4766,6 +4703,17 @@ public final class Avrcp {
 
     private byte[] getByteAddress(BluetoothDevice device) {
         return Utils.getBytesFromAddress(device.getAddress());
+    }
+
+    private void onConnectionStateChanged(boolean connected, byte[] address) {
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+            (Utils.getAddressStringFromByte(address));
+        Log.d(TAG, "onConnectionStateChanged state: " + connected + " Addr: " + device);
+        if (connected) {
+            setAvrcpConnectedDevice(device);
+        } else {
+            setAvrcpDisconnectedDevice(device);
+        }
     }
 
     public void dump(StringBuilder sb) {

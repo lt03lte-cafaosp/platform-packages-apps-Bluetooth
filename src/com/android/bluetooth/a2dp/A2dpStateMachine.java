@@ -226,6 +226,7 @@ final class A2dpStateMachine extends StateMachine {
             log("mConnectedDevicesList size: " + mConnectedDevicesList.size());
             // Remove Timeout msg when moved to stable state
             removeMessages(CONNECT_TIMEOUT);
+            mCurrentDevice = null;
         }
 
         @Override
@@ -297,30 +298,7 @@ final class A2dpStateMachine extends StateMachine {
                     ", device = " + device);
             switch (state) {
             case CONNECTION_STATE_DISCONNECTED:
-                // remove this device from playing device list
-                if (mPlayingA2dpDevice.size() != 0 &&
-                        mPlayingA2dpDevice.contains(device)) {
-                    log ("Playing A2dp Device is disconnected, setting it to null");
-                    broadcastAudioState(device,
-                            BluetoothA2dp.STATE_NOT_PLAYING,
-                            BluetoothA2dp.STATE_PLAYING);
-                    mPlayingA2dpDevice.remove(device);
-                }
                 logw("Ignore A2DP DISCONNECTED event, device: " + device);
-                // Reset scan mode if it set due to multicast
-                Log.i(TAG,"getScanMode " + mAdapter.getScanMode() +
-                    " isScanDisabled: " + isScanDisabled);
-                if (mPlayingA2dpDevice.size() <= 1 &&
-                        (mAdapter.getScanMode() ==
-                        BluetoothAdapter.SCAN_MODE_NONE) &&
-                        isScanDisabled) {
-                    isScanDisabled = false;
-                    AdapterService adapterService =
-                            AdapterService.getAdapterService();
-                    if (adapterService != null) {
-                        adapterService.restoreScanMode();
-                    }
-                }
                 break;
             case CONNECTION_STATE_CONNECTING:
                 if (okToConnect(device)) {
@@ -350,7 +328,6 @@ final class A2dpStateMachine extends StateMachine {
                     synchronized (A2dpStateMachine.this) {
                         if (!mConnectedDevicesList.contains(device)) {
                             mConnectedDevicesList.add(device);
-                            mService.setAvrcpConnectedDevice(device);
                             log( "device " + device.getAddress() +
                                     " is adding in Disconnected state");
                         }
@@ -476,7 +453,6 @@ final class A2dpStateMachine extends StateMachine {
                     if (mConnectedDevicesList.contains(device)) {
                         synchronized (A2dpStateMachine.this) {
                             mConnectedDevicesList.remove(device);
-                            mService.setAvrcpDisconnectedDevice(device);
                             log( "device " + device.getAddress() +
                                     " is removed in Pending state");
                         }
@@ -569,7 +545,6 @@ final class A2dpStateMachine extends StateMachine {
                     synchronized (A2dpStateMachine.this) {
                         mCurrentDevice = mTargetDevice;
                         mConnectedDevicesList.add(mTargetDevice);
-                        mService.setAvrcpConnectedDevice(mTargetDevice);
                         mTargetDevice = null;
                         log( "device " + device.getAddress() +
                                 " is added in Pending state");
@@ -586,7 +561,6 @@ final class A2dpStateMachine extends StateMachine {
                         synchronized (A2dpStateMachine.this) {
                             mCurrentDevice = mIncomingDevice;
                             mConnectedDevicesList.add(mIncomingDevice);
-                            mService.setAvrcpConnectedDevice(mIncomingDevice);
                             mIncomingDevice = null;
                             if (mTargetDevice == null)
                                 transitionTo(mConnected);
@@ -612,7 +586,6 @@ final class A2dpStateMachine extends StateMachine {
                     if (okToConnect(device)) {
                         synchronized (A2dpStateMachine.this) {
                             mConnectedDevicesList.add(device);
-                            mService.setAvrcpConnectedDevice(device);
                             if (mTargetDevice != null) {
                                 log("Waiting for Connected event for mTargetDevice");
                             } else if (mIncomingDevice != null) {
@@ -875,7 +848,6 @@ final class A2dpStateMachine extends StateMachine {
                              BluetoothProfile.STATE_CONNECTED);
                         synchronized (A2dpStateMachine.this) {
                             mConnectedDevicesList.remove(device);
-                            mService.setAvrcpDisconnectedDevice(device);
                             log( "device " + device.getAddress() +
                                     " is removed in Connected state");
                             if (mConnectedDevicesList.size() == 0) {
@@ -964,7 +936,6 @@ final class A2dpStateMachine extends StateMachine {
                         synchronized (A2dpStateMachine.this) {
                             mCurrentDevice = mTargetDevice;
                             mConnectedDevicesList.add(mTargetDevice);
-                            mService.setAvrcpConnectedDevice(mTargetDevice);
                             mTargetDevice = null;
                             log( "device " + device.getAddress() +
                                     " is added in Connected state");
@@ -979,7 +950,6 @@ final class A2dpStateMachine extends StateMachine {
                         synchronized (A2dpStateMachine.this) {
                             mCurrentDevice = device;
                             mConnectedDevicesList.add(device);
-                            mService.setAvrcpConnectedDevice(device);
                             mIncomingDevice= null;
                             log( "device " + device.getAddress() +
                                     " is added in Connected state");
@@ -1198,7 +1168,6 @@ final class A2dpStateMachine extends StateMachine {
                             mMultiDisconnectDevice = null;
                             synchronized (A2dpStateMachine.this) {
                                 mConnectedDevicesList.remove(device);
-                                mService.setAvrcpDisconnectedDevice(device);
                                 log( "device " + device.getAddress() +
                                         " is removed in MultiConnectionPending state");
                             }
@@ -1234,19 +1203,9 @@ final class A2dpStateMachine extends StateMachine {
                                 }
                             }
                         } else {
-                            /* HS disconnected, when other HS is connected
-                             * If the device disconnected is currentDevice,
-                             * need to update the currentDevice.
-                             */
+                            /* HS disconnected, when other HS is connected */
                             synchronized (A2dpStateMachine.this) {
                                 mConnectedDevicesList.remove(device);
-                                mService.setAvrcpDisconnectedDevice(device);
-
-                                if (mCurrentDevice != null && mCurrentDevice.equals(device)) {
-                                    log( "currentDevice removed, update currentDevice");
-                                    int deviceSize = mConnectedDevicesList.size();
-                                    mCurrentDevice = mConnectedDevicesList.get(deviceSize-1);
-                                }
 
                                 log( "device " + device.getAddress() +
                                         " is removed in MultiConnectionPending state");
@@ -1368,7 +1327,6 @@ final class A2dpStateMachine extends StateMachine {
                         synchronized (A2dpStateMachine.this) {
                             mCurrentDevice = device;
                             mConnectedDevicesList.add(device);
-                            mService.setAvrcpConnectedDevice(device);
                             log( "device " + device.getAddress() +
                                     " is added in MultiConnectionPending state");
                             mTargetDevice = null;
@@ -1380,7 +1338,6 @@ final class A2dpStateMachine extends StateMachine {
                         synchronized (A2dpStateMachine.this) {
                             mCurrentDevice = device;
                             mConnectedDevicesList.add(device);
-                            mService.setAvrcpConnectedDevice(device);
                             log( "device " + device.getAddress() +
                                     " is added in MultiConnectionPending state");
                             mIncomingDevice = null;
@@ -1395,7 +1352,6 @@ final class A2dpStateMachine extends StateMachine {
                                 (mConnectedDevicesList.size() < maxA2dpConnections)) {
                             mCurrentDevice = device;
                             mConnectedDevicesList.add(device);
-                            mService.setAvrcpConnectedDevice(device);
                             log( "device " + device.getAddress() +
                                     " is added in MultiConnectionPending state");
                             broadcastConnectionState(device, BluetoothProfile.STATE_CONNECTED,
