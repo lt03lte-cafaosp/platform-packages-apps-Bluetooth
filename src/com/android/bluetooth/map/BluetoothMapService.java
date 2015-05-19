@@ -417,6 +417,12 @@ public class BluetoothMapService extends ProfileService {
     @Override
     protected boolean start() {
         if (DEBUG) Log.d(TAG, "start()");
+
+        if (!Utils.checkCaller()) {
+            Log.w(TAG, "start received for non-active user, ignoring");
+            return false;
+        }
+
         VERBOSE = Log.isLoggable(LOG_TAG, Log.VERBOSE) ? true : false;
         if (VERBOSE) Log.v(TAG, "verbose logging is enabled");
         IntentFilter filter = new IntentFilter();
