@@ -1029,6 +1029,10 @@ public final class Avrcp {
                 position = (int)getPlayPosition(device);
                 Log.v(TAG, "Play Status for : " + device.getName() +
                     " state: " + playState + " position: " + position);
+                if (position == -1) {
+                    Log.v(TAG, "Force play postion to 0, for getPlayStatus Rsp");
+                    position = 0;
+                }
 
                 getPlayStatusRspNative(playState, (int)mSongLengthMs, position,
                         getByteAddress(device));
@@ -2013,8 +2017,8 @@ public final class Avrcp {
         mMetadata.trackTitle = data.getString(MediaMetadataRetriever.METADATA_KEY_TITLE, null);
         mMetadata.albumTitle = data.getString(MediaMetadataRetriever.METADATA_KEY_ALBUM, null);
         mMetadata.genre = data.getString(MediaMetadataRetriever.METADATA_KEY_GENRE, null);
-        mTrackNumber = data.getLong(MediaMetadataRetriever.METADATA_KEY_NUM_TRACKS, -1L);
-        mMetadata.tracknum = data.getLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, -1L);
+        mTrackNumber = data.getLong(MediaMetadataRetriever.METADATA_KEY_NUM_TRACKS, 0L);
+        mMetadata.tracknum = data.getLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, 0L);
 
         Log.v(TAG,"old Metadata = " + oldMetadata);
         Log.v(TAG,"new MetaData " + mMetadata.toString());
