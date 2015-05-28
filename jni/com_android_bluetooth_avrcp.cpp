@@ -862,7 +862,7 @@ static jboolean getListPlayerappAttrRspNative(JNIEnv *env ,jobject object , jbyt
     //Call Stack Method
     if ((status = sBluetoothMultiAvrcpInterface->list_player_app_attr_rsp(numAttr, pAttrs,
                                             (bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed getelementattrrsp, status: %d", status);
+        ALOGE("Failed list_player_app_attr_rsp, status: %d", status);
     }
     delete[] pAttrs;
     env->ReleaseByteArrayElements(attrIds, attr, 0);
@@ -914,7 +914,7 @@ static jboolean getPlayerAppValueRspNative(JNIEnv *env ,jobject object , jbyte n
     }
     if ((status = sBluetoothMultiAvrcpInterface->list_player_app_value_rsp(numvalue, pAttrs,
                                             (bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed get_element_attr_rsp, status: %d", status);
+        ALOGE("Failed list_player_app_value_rsp, status: %d", status);
     }
     delete[] pAttrs;
     env->ReleaseByteArrayElements(value, attr, 0);
@@ -960,7 +960,7 @@ static jboolean SendCurrentPlayerValueRspNative(JNIEnv *env, jobject object ,
     }
     if ((status = sBluetoothMultiAvrcpInterface->get_player_app_value_rsp(pAttrs,
                                             (bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed get_element_attr_rsp, status: %d", status);
+        ALOGE("Failed get_player_app_value_rsp, status: %d", status);
     }
     delete pAttrs;
     env->ReleaseByteArrayElements(value, attr, 0);
@@ -986,7 +986,7 @@ static jboolean SendSetPlayerAppRspNative(JNIEnv *env, jobject object,
     }
     if ((status = sBluetoothMultiAvrcpInterface->set_player_app_value_rsp(player_rsp,
                                             (bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed get_element_attr_rsp, status: %d", status);
+        ALOGE("Failed set_player_app_value_rsp, status: %d", status);
     }
     env->ReleaseByteArrayElements(address, addr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
@@ -1050,7 +1050,7 @@ static jboolean sendSettingsTextRspNative(JNIEnv *env, jobject object, jint num_
     //Call Stack Methos to Respond PDU 0x16
     if ((status = sBluetoothMultiAvrcpInterface->get_player_app_attr_text_rsp(num_attr, pAttrs,
                                             (bt_bdaddr_t *)addr)) !=  BT_STATUS_SUCCESS) {
-        ALOGE("Failed get_element_attr_rsp, status: %d", status);
+        ALOGE("Failed get_player_app_attr_text_rsp, status: %d", status);
     }
     delete[] pAttrs;
     env->ReleaseByteArrayElements(attr, arr, 0);
@@ -1115,7 +1115,7 @@ static jboolean sendValueTextRspNative(JNIEnv *env, jobject object, jint num_att
     //Call Stack Method to Respond to PDU 0x16
     if ((status = sBluetoothMultiAvrcpInterface->get_player_app_value_text_rsp(num_attr, pAttrs,
                                             (bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed get_element_attr_rsp, status: %d", status);
+        ALOGE("Failed get_player_app_value_text_rsp, status: %d", status);
     }
     delete[] pAttrs;
     env->ReleaseByteArrayElements(attr, arr, 0);
@@ -1241,7 +1241,7 @@ static jboolean registerNotificationPlayerAppRspNative(JNIEnv *env, jobject obje
                 BTRC_EVT_APP_SETTINGS_CHANGED,
                 (btrc_notification_type_t)type,param,
                 (bt_bdaddr_t *)addr)) != BT_STATUS_SUCCESS) {
-        ALOGE("Failed get_element_attr_rsp, status: %d", status);
+        ALOGE("Failed register_notification_rsp, status: %d", status);
     }
     delete param;
     env->ReleaseByteArrayElements(value, attr, 0);
