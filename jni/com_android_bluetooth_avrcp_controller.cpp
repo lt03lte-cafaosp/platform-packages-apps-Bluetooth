@@ -199,16 +199,16 @@ static void btavrcp_list_player_app_setting_value_rsp_callback(bt_bdaddr_t *bd_a
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
-    sCallbackEnv->SetByteArrayRegion(supported_val, 0, (num_supported), (jbyte*)(supported_values));
+    sCallbackEnv->SetByteArrayRegion(supported_val, 0,(num_supported), (jbyte*)(supported_values));
     sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleListPlayerApplicationSettingValue,
-                                         addr, supported_val,(jbyte)num_supported, (jbyte)rsp_type);
+                                        addr, supported_val,(jbyte)num_supported, (jbyte)rsp_type);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
     sCallbackEnv->DeleteLocalRef(supported_val);
 }
 
-static void btavrcp_current_player_app_setting_rsp_callback(bt_bdaddr_t *bd_addr, uint8_t* supported_ids,
-                                     uint8_t* supported_values, uint8_t num_attrib, uint8_t rsp_type) {
+static void btavrcp_current_player_app_setting_rsp_callback(bt_bdaddr_t *bd_addr,
+      uint8_t* supported_ids,uint8_t* supported_values, uint8_t num_attrib, uint8_t rsp_type) {
     jbyteArray addr;
     jbyteArray supported_attrib_ids;
     jbyteArray supported_val;
@@ -233,8 +233,9 @@ static void btavrcp_current_player_app_setting_rsp_callback(bt_bdaddr_t *bd_addr
     sCallbackEnv->SetByteArrayRegion(supported_val, 0, (num_attrib), (jbyte*)(supported_values));
     sCallbackEnv->SetByteArrayRegion(supported_attrib_ids, 0, (num_attrib),
                                                        (jbyte*)(supported_ids));
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleCurrentPlayerApplicationSettingsResponse,
-             addr,supported_attrib_ids, supported_val, (jbyte)num_attrib, (jbyte)rsp_type);
+    sCallbackEnv->CallVoidMethod(mCallbacksObj,
+           method_handleCurrentPlayerApplicationSettingsResponse,addr,supported_attrib_ids,
+                                               supported_val, (jbyte)num_attrib, (jbyte)rsp_type);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
     sCallbackEnv->DeleteLocalRef(supported_val);
@@ -323,8 +324,8 @@ static void btavrcp_get_element_attrib_rsp_callback(bt_bdaddr_t *bd_addr, uint8_
     sCallbackEnv->DeleteLocalRef(supported_val);
 }
 
-static void btavrcp_get_playstatus_rsp_callback(bt_bdaddr_t *bd_addr, int param_len, uint8_t* play_status_rsp
-                                                           ,uint8_t rsp_type) {
+static void btavrcp_get_playstatus_rsp_callback(bt_bdaddr_t *bd_addr, int param_len,
+                                                 uint8_t* play_status_rsp,uint8_t rsp_type) {
     jbyteArray addr;
     jbyteArray supported_val;
 

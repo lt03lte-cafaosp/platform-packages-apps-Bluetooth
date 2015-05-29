@@ -43,7 +43,6 @@ import com.android.bluetooth.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Currency;
 import java.util.List;
 import java.util.HashMap;
 import android.util.Log;
@@ -291,8 +290,7 @@ public class AvrcpControllerService extends ProfileService {
         public Metadata() {
             resetMetaData();
         }
-       public void resetMetaData()
-       {
+       public void resetMetaData() {
            artist = BluetoothAvrcpInfo.ARTIST_NAME_INVALID;
            trackTitle = BluetoothAvrcpInfo.TITLE_INVALID;
            albumTitle = BluetoothAvrcpInfo.ALBUM_NAME_INVALID;
@@ -368,8 +366,7 @@ public class AvrcpControllerService extends ProfileService {
         unregisterReceiver(mBroadcastReceiver);
          try {
              deinitDatabase();
-             if (mRemoteData != null)
-             {
+             if (mRemoteData != null) {
                  mRemoteData.mCompanyIDSupported.clear();
                  mRemoteData.mEventsSupported.clear();
                  mRemoteData.mMetadata.resetMetaData();
@@ -382,7 +379,7 @@ public class AvrcpControllerService extends ProfileService {
                  mRemoteData = null;
              }
          } catch (Exception e) {
-             Log.w(TAG, "Unable to unregister broadcast receiver", e);
+             Log.e(TAG, "Cleanup failed", e);
          }
         return true;
     }
@@ -402,8 +399,7 @@ public class AvrcpControllerService extends ProfileService {
                             ||((mRemoteData.mRemoteFeatures & BTRC_FEAT_ABSOLUTE_VOLUME) == 0)
                             ||(mConnectedDevices.isEmpty()))
                             return;
-                        if(mRemoteData.absVolNotificationState == NOTIFY_RSP_INTERIM_SENT)
-                        {
+                        if(mRemoteData.absVolNotificationState == NOTIFY_RSP_INTERIM_SENT) {
                             int maxVol = mAudioManager.
                                                   getStreamMaxVolume(AudioManager.STREAM_MUSIC);
                             int currIndex = mAudioManager.
@@ -414,8 +410,7 @@ public class AvrcpControllerService extends ProfileService {
                             mRemoteData.absVolNotificationState = NOTIFY_NOT_REGISTERED;
                             sendRegisterAbsVolRspNative(rspType,percentageVol);
                         }
-                        else if (mRemoteData.absVolNotificationState == NOTIFY_RSP_ABS_VOL_DEFERRED)
-                        {
+                        else if (mRemoteData.absVolNotificationState == NOTIFY_RSP_ABS_VOL_DEFERRED) {
                             Log.d(TAG," Don't Complete Notification Rsp. ");
                             mRemoteData.absVolNotificationState = NOTIFY_RSP_INTERIM_SENT;
                         }
@@ -425,16 +420,15 @@ public class AvrcpControllerService extends ProfileService {
         }
     };
     protected boolean cleanup() {
-        mHandler.removeCallbacksAndMessages(null);
-        Looper looper = mHandler.getLooper();
-        if (looper != null) {
-            looper.quit();
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+            Looper looper = mHandler.getLooper();
+            if (looper != null) {
+                looper.quit();
+            }
         }
-
         clearAvrcpControllerService();
-
         cleanupNative();
-
         return true;
     }
 
@@ -553,7 +547,7 @@ public class AvrcpControllerService extends ProfileService {
     public void getMetaData(int[] attributeIds) {
         Log.d(TAG, "num getMetaData = "+ attributeIds.length);
         if (mRemoteData == null) {
-            throw new NullPointerException("remote not connected");
+            return;
         }
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         /*
@@ -563,12 +557,11 @@ public class AvrcpControllerService extends ProfileService {
          */
         if ((mRemoteData.mMetadata.attributesFetchedId != -1) &&
            (requestedElementAttribs != null)&&
-           (requestedElementAttribs.length < 7))
-        {
+           (requestedElementAttribs.length < 7)) {
+
             int currAttributeId =
                       requestedElementAttribs[mRemoteData.mMetadata.attributesFetchedId];
-            if (mHandler.hasMessages(GET_ELEMENT_ATTR_TIMEOUT_BASE + currAttributeId))
-            {
+            if (mHandler.hasMessages(GET_ELEMENT_ATTR_TIMEOUT_BASE + currAttributeId)) {
                 mHandler.removeMessages(GET_ELEMENT_ATTR_TIMEOUT_BASE + currAttributeId);
                 Log.d(TAG," Timeout CMD dequeued ID " + currAttributeId);
             }
@@ -576,13 +569,11 @@ public class AvrcpControllerService extends ProfileService {
             requestedElementAttribs = Arrays.copyOf(attributeIds, attributeIds.length);
             return;
         }
-        else if ((attributeIds.length >= 0)&&(attributeIds[0] != MEDIA_ATTRIBUTE_ALL))
-        {
+        else if ((attributeIds.length >= 0)&&(attributeIds[0] != MEDIA_ATTRIBUTE_ALL)) {
             /* Subset sent by App, use them */
             requestedElementAttribs = Arrays.copyOf(attributeIds, attributeIds.length);
         }
-        else
-        {
+        else {
             /* Use SuperSet */
             requestedElementAttribs = new int [7];
             for (int xx = 0; xx < 7; xx++)
@@ -590,10 +581,8 @@ public class AvrcpControllerService extends ProfileService {
         }
         Arrays.sort(requestedElementAttribs);
         boolean mMetaDataPresent = true;
-        for (int attributeId: requestedElementAttribs)
-        {
-            if (!isMetaDataPresent(attributeId))
-            {
+        for (int attributeId: requestedElementAttribs) {
+            if (!isMetaDataPresent(attributeId)) {
                 mMetaDataPresent = false;
                 break;
             }
@@ -607,17 +596,15 @@ public class AvrcpControllerService extends ProfileService {
     public void getPlayStatus(int[] playStatusIds) {
         if (DBG) Log.d(TAG, "num getPlayStatus ID = "+ playStatusIds.length);
         if (mRemoteData == null) {
-            throw new NullPointerException("remote not connected");
+            return;
         }
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         int[] getApRequestedPlayStatusAttrib;
-        if ((playStatusIds.length >= 0)&&(playStatusIds[0] != MEDIA_PLAYSTATUS_ALL))
-        {
+        if ((playStatusIds.length >= 0)&&(playStatusIds[0] != MEDIA_PLAYSTATUS_ALL)) {
             /* Subset sent by App, use them */
             getApRequestedPlayStatusAttrib = Arrays.copyOf(playStatusIds, playStatusIds.length);
         }
-        else
-        {
+        else {
             /* Use SuperSet */
             getApRequestedPlayStatusAttrib = new int [3];
             for (int xx = 0; xx < 3; xx++)
@@ -625,18 +612,15 @@ public class AvrcpControllerService extends ProfileService {
         }
         Arrays.sort(getApRequestedPlayStatusAttrib);
         boolean mMetaDataPresent = true;
-        for (int attributeId: getApRequestedPlayStatusAttrib)
-        {
-            if (!isMetaDataPresent(attributeId))
-            {
+        for (int attributeId: getApRequestedPlayStatusAttrib) {
+            if (!isMetaDataPresent(attributeId)) {
                 mMetaDataPresent = false;
                 break;
             }
         }
         if(mMetaDataPresent)
             triggerNotification();
-        else
-        {
+        else {
             Log.d(TAG," Metadata not present");
             mHandler.sendEmptyMessage(MESSAGE_GET_PLAY_STATUS);
         }
@@ -644,22 +628,20 @@ public class AvrcpControllerService extends ProfileService {
     public void getPlayerApplicationSetting() {
         if (DBG) Log.d(TAG, "getPlayerApplicationSetting ");
         if (mRemoteData == null) {
-            throw new NullPointerException("remote not connected");
+            return;
         }
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        if(isMetaDataPresent(MEDIA_PLAYER_APPLICAITON_SETTING))
-        {
+        if(isMetaDataPresent(MEDIA_PLAYER_APPLICAITON_SETTING)) {
             triggerNotification();
         }
-        else
-        {
+        else {
             Log.d(TAG," Metadata not present, fetch it");
             mHandler.sendEmptyMessage(MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIB);
         }
     }
     public void setPlayerApplicationSetting(int attributeId, int attributeVal) {
         if (mRemoteData == null) {
-            throw new NullPointerException("remote not connected");
+            return;
         }
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         Message msg = mHandler.obtainMessage(MESSAGE_SET_CURRENT_PLAYER_APPLICATION_SETTINGS,
@@ -702,13 +684,11 @@ public class AvrcpControllerService extends ProfileService {
         Log.d(TAG," getSupportedFeatures returning " + mRemoteData.mRemoteFeatures);
         return mRemoteData.mRemoteFeatures;
     }
-    private void triggerNotification()
-    {
+    private void triggerNotification() {
         Uri avrcpDataUri = BluetoothAvrcpInfo.CONTENT_URI;
         sAvrcpControllerService.getContentResolver().notifyChange(avrcpDataUri, null);
     }
-    private boolean isMetaDataPresent(int attributeId)
-    {
+    private boolean isMetaDataPresent(int attributeId) {
         Uri avrcpDataUri = BluetoothAvrcpInfo.CONTENT_URI;
         Cursor cursor = sAvrcpControllerService.getContentResolver().query(avrcpDataUri,
                                                null, null, null,BluetoothAvrcpInfo._ID);
@@ -821,8 +801,7 @@ public class AvrcpControllerService extends ProfileService {
             break;
         case MEDIA_PLAYER_APPLICAITON_SETTING:
             boolean plSettingSupported = true;
-            for (PlayerSettings plSetting: mRemoteData.mSupportedApplicationSettingsAttribute)
-            {
+            for (PlayerSettings plSetting: mRemoteData.mSupportedApplicationSettingsAttribute) {
                 switch(plSetting.attr_Id)
                 {
                 case ATTRIB_REPEAT_STATUS:
@@ -1330,7 +1309,7 @@ public class AvrcpControllerService extends ProfileService {
     }
     private void handleCmdTimeout(int cmd)
     {
-        Log.d(TAG," CMD " + cmd + "Timeout Happened");
+        Log.d(TAG," CMD " + cmd + " Timeout Happened");
         switch(cmd)
         {
         case MESSAGE_GET_SUPPORTED_COMPANY_ID:
@@ -1486,13 +1465,11 @@ public class AvrcpControllerService extends ProfileService {
                 continue;
             oldState = notifyEvent.notify_state;
             if ((oldState == NOTIFY_INTERIM_EXPECTED) &&
-                (notificationType == NOTIFICATION_RSP_TYPE_INTERIM))
-            {
+                (notificationType == NOTIFICATION_RSP_TYPE_INTERIM)) {
                 notifyEvent.notify_state = NOTIFY_CHANGED_EXPECTED;
             }
             else if ((oldState == NOTIFY_CHANGED_EXPECTED) &&
-                    (notificationType == NOTIFICATION_RSP_TYPE_CHANGED))
-            {
+                    (notificationType == NOTIFICATION_RSP_TYPE_CHANGED)) {
                  notifyEvent.notify_state = NOTIFY_NOT_NOTIFIED;
             }
             break;
@@ -1500,7 +1477,22 @@ public class AvrcpControllerService extends ProfileService {
             switch(notificationId)
             {
             case EVENT_PLAYBACK_STATUS_CHANGED:
+                byte oldPlayStatus = mRemoteData.mMetadata.playStatus;
                 mRemoteData.mMetadata.playStatus = notificationRsp.get(1);
+                /*
+                 * Check if there is a transition from Stopped/Paused to Playing
+                 * and Remote does not support EVENT_PLAYBACK_POS
+                 * We need to Que GetPlayBackStatus command.
+                 */
+                if (((oldPlayStatus == PLAY_STATUS_STOPPED)||
+                   (oldPlayStatus == PLAY_STATUS_PAUSED))&&
+                   (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PLAYING)) {
+                    if (!(mRemoteData.mEventsSupported.contains(EVENT_PLAYBACK_POS_CHANGED))||
+                        !(mRemoteData.mEventsSupported.contains(EVENT_PLAYBACK_STATUS_CHANGED))) {
+                        Log.d(TAG," State Transition Triggered, Que GetPlayStatus ");
+                        mHandler.sendEmptyMessage(MESSAGE_GET_PLAY_STATUS);
+                    }
+                }
                 updatePlayStatus();
                 break;
             case EVENT_PLAYBACK_POS_CHANGED:
