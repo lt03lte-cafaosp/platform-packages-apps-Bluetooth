@@ -238,14 +238,6 @@ public class A2dpService extends ProfileService {
         mAvrcp.setA2dpAudioState(state, device);
     }
 
-    public void setAvrcpDisconnectedDevice(BluetoothDevice device) {
-        mAvrcp.setA2dpDisconnectedDevice(device);
-    }
-
-    public void setAvrcpConnectedDevice(BluetoothDevice device) {
-        mAvrcp.setA2dpConnectedDevice(device);
-    }
-
     public List<BluetoothDevice> getA2dpPlayingDevice() {
         return mStateMachine.getPlayingDevice();
     }

@@ -640,6 +640,37 @@ static void btavrcp_get_item_attr_callback(uint8_t scope, uint64_t uid,
     sCallbackEnv->DeleteLocalRef(attrs);
     sCallbackEnv->DeleteLocalRef(addr);
 }
+
+static void btavrcp_connection_state_callback(bool state, bt_bdaddr_t* bd_addr) {
+    jbyteArray addr;
+
+    ALOGI("%s", __FUNCTION__);
+    ALOGI("conn state: %d", state);
+
+    if (!checkCallbackThread()) {
+        ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
+        return;
+    }
+
+    addr = sCallbackEnv->NewByteArray(sizeof(bt_bdaddr_t));
+    if (!addr) {
+        ALOGE("Fail to new jbyteArray bd addr for connection state");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        return;
+    }
+
+    sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
+    if (mCallbacksObj) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onConnectionStateChanged,
+                                            (jboolean) state, addr);
+    } else {
+        ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
+    }
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(addr);
+}
+
+
 static btrc_callbacks_t sBluetoothAvrcpCallbacks = {
     sizeof(sBluetoothAvrcpCallbacks),
     btavrcp_remote_features_callback,
@@ -659,7 +690,8 @@ static btrc_callbacks_t sBluetoothAvrcpCallbacks = {
     btavrcp_set_browsed_player_callback,
     btavrcp_change_path_callback,
     btavrcp_play_item_callback,
-    btavrcp_get_item_attr_callback
+    btavrcp_get_item_attr_callback,
+    btavrcp_connection_state_callback
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
@@ -701,6 +733,8 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
         env->GetMethodID(clazz, "playItem", "(BJ[B)V");
     method_getItemAttr =
         env->GetMethodID(clazz, "getItemAttr", "(BJB[I[B)V");
+    method_onConnectionStateChanged =
+        env->GetMethodID(clazz, "onConnectionStateChanged", "(Z[B)V");
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 
