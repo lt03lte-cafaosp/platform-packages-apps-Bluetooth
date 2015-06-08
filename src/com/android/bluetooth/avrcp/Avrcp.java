@@ -556,12 +556,13 @@ public final class Avrcp {
                                     if (checkPlayerAttributeResponse(data)) {
                                         SendSetPlayerAppRspNative(OPERATION_SUCCESSFUL,
                                                 getByteAddress(deviceFeatures[i].mCurrentDevice));
-                                       } else {
+                                    } else {
                                         SendSetPlayerAppRspNative(INTERNAL_ERROR,
                                                 getByteAddress(deviceFeatures[i].mCurrentDevice));
                                     }
                                 }
                             }
+                            mPendingSetAttributes.clear();
                         }
                         for (int i = 0; i < maxAvrcpConnections; i++) {
                             if (deviceFeatures[i].mPlayerStatusChangeNT ==
@@ -600,7 +601,6 @@ public final class Avrcp {
                                 mPlayerSettings.attrIds,
                                 text.length, text,
                                 getByteAddress(device));
-
                     break;
                 }
             }
@@ -850,44 +850,40 @@ public final class Avrcp {
             int deviceIndex  = INVALID_DEVICE_INDEX;
             switch (msg.what) {
                 case MESSAGE_PLAYERSETTINGS_TIMEOUT:
-                    if (DEBUG)
-                        Log.v(TAG, "**MESSAGE_PLAYSTATUS_TIMEOUT");
+                    Log.e(TAG, "**MESSAGE_PLAYSTATUS_TIMEOUT: Addr: " +
+                                (String)msg.obj + " Msg: " + msg.arg1);
                     synchronized (mPendingCmds) {
-                    Integer val = new Integer(msg.arg1);
-                    if (!mPendingCmds.contains(val)) {
-                        break;
+                        Integer val = new Integer(msg.arg1);
+                        if (!mPendingCmds.contains(val)) {
+                            break;
+                        }
+                        mPendingCmds.remove(val);
                     }
-                    mPendingCmds.remove(val);
-                }
-                switch (msg.arg1) {
+                    switch (msg.arg1) {
                     case GET_ATTRIBUTE_IDS:
-                        // add pending flag for connected device and check it
-                        Log.v(TAG, "event for device address " + (String)msg.obj);
                         getListPlayerappAttrRspNative((byte)def_attrib.length ,
-                                def_attrib ,
-                                getByteAddress(mAdapter.getRemoteDevice((String) msg.obj)));
+                                def_attrib, getByteAddress(
+                                mAdapter.getRemoteDevice((String) msg.obj)));
                     break;
                     case GET_VALUE_IDS:
-                        if (DEBUG)
-                            Log.v(TAG, "GET_VALUE_IDS");
                         switch (mPlayerSettings.attr) {
                             case ATTRIBUTE_REPEATMODE:
-                                Log.v(TAG, "event for device address " + (String)msg.obj);
                                 getPlayerAppValueRspNative((byte)value_repmode.length,
                                         value_repmode,
-                                        getByteAddress(mAdapter.getRemoteDevice((String) msg.obj)));
+                                        getByteAddress(mAdapter.getRemoteDevice(
+                                        (String) msg.obj)));
                             break;
                             case ATTRIBUTE_SHUFFLEMODE:
-                                Log.v(TAG, "event for device address " + (String)msg.obj);
                                 getPlayerAppValueRspNative((byte)value_shufmode.length,
                                         value_shufmode,
-                                        getByteAddress(mAdapter.getRemoteDevice((String) msg.obj)));
+                                        getByteAddress(mAdapter.getRemoteDevice(
+                                        (String) msg.obj)));
                             break;
                             default:
-                                Log.v(TAG, "event for device address " + (String)msg.obj);
                                 getPlayerAppValueRspNative((byte)value_default.length,
                                         value_default,
-                                        getByteAddress(mAdapter.getRemoteDevice((String) msg.obj)));
+                                        getByteAddress(mAdapter.getRemoteDevice(
+                                        (String) msg.obj)));
                             break;
                         }
                     break;
@@ -904,28 +900,32 @@ public final class Avrcp {
                                 retVal[j++] = 0x0;
                              }
                         }
-                        Log.v(TAG, "event for device address " + (String)msg.obj);
                         SendCurrentPlayerValueRspNative((byte)retVal.length ,
-                                retVal ,
-                                getByteAddress(mAdapter.getRemoteDevice((String) msg.obj)));
+                                retVal, getByteAddress(mAdapter.getRemoteDevice(
+                                (String) msg.obj)));
                     break;
                     case SET_ATTRIBUTE_VALUES :
-                        Log.v(TAG, "event for device address " + (String)msg.obj);
                         SendSetPlayerAppRspNative(INTERNAL_ERROR, getByteAddress(
                                 mAdapter.getRemoteDevice((String) msg.obj)));
                     break;
                     case GET_ATTRIBUTE_TEXT:
-                    case GET_VALUE_TEXT:
-                        String [] values = new String [mPlayerSettings.attrIds.length];
-                        String msgVal = (msg.what == GET_ATTRIBUTE_TEXT) ? UPDATE_ATTRIB_TEXT :
-                                                                                 UPDATE_VALUE_TEXT;
+                        String [] attribText = new String [mPlayerSettings.attrIds.length];
                         for (int i = 0; i < mPlayerSettings.attrIds.length; i++) {
-                            values[i] = "";
+                            attribText[i] = "";
                         }
-                        Log.v(TAG, "event for device address " + (String)msg.obj);
                         sendSettingsTextRspNative(mPlayerSettings.attrIds.length ,
-                                mPlayerSettings.attrIds , values.length,
-                                values, getByteAddress(mAdapter.getRemoteDevice(
+                                mPlayerSettings.attrIds, attribText.length,
+                                attribText, getByteAddress(mAdapter.getRemoteDevice(
+                                (String) msg.obj)));
+                    break;
+                    case GET_VALUE_TEXT:
+                        String [] valueText = new String [mPlayerSettings.attrIds.length];
+                        for (int i = 0; i < mPlayerSettings.attrIds.length; i++) {
+                            valueText[i] = "";
+                        }
+                        sendValueTextRspNative(mPlayerSettings.attrIds.length ,
+                                mPlayerSettings.attrIds, valueText.length,
+                                valueText,getByteAddress(mAdapter.getRemoteDevice(
                                 (String) msg.obj)));
                     break;
                     default :
@@ -942,7 +942,7 @@ public final class Avrcp {
                 break;
 
             case MSG_SET_METADATA:
-                    updateMetadata((MetadataEditor) msg.obj);
+                updateMetadata((MetadataEditor) msg.obj);
                 break;
 
             case MSG_UPDATE_AVAILABLE_PLAYERS:
@@ -976,7 +976,7 @@ public final class Avrcp {
                 break;
 
             case MSG_SET_TRANSPORT_CONTROLS:
-                    updateTransportControls(msg.arg2);
+                updateTransportControls(msg.arg2);
                 break;
 
             case MSG_SET_GENERATION_ID:
@@ -4369,6 +4369,7 @@ public final class Avrcp {
             switch (data[i]) {
                 case ATTRIBUTE_EQUALIZER:
                     if (mPendingSetAttributes.contains(new Integer(ATTRIBUTE_EQUALIZER))) {
+                        Log.v(TAG, "Pending SetAttribute contains Equalizer");
                         if(data[i+1] == ATTRIBUTE_NOTSUPPORTED) {
                             ret = false;
                         } else {
@@ -4378,6 +4379,7 @@ public final class Avrcp {
                 break;
                 case ATTRIBUTE_REPEATMODE:
                     if (mPendingSetAttributes.contains(new Integer(ATTRIBUTE_REPEATMODE))) {
+                        Log.v(TAG, "Pending SetAttribute contains Repeat");
                         if(data[i+1] == ATTRIBUTE_NOTSUPPORTED) {
                             ret = false;
                         } else {
@@ -4387,6 +4389,7 @@ public final class Avrcp {
                 break;
                 case ATTRIBUTE_SHUFFLEMODE:
                     if (mPendingSetAttributes.contains(new Integer(ATTRIBUTE_SHUFFLEMODE))) {
+                        Log.v(TAG, "Pending SetAttribute contains Shuffle");
                         if(data[i+1] == ATTRIBUTE_NOTSUPPORTED) {
                             ret = false;
                         } else {
@@ -4396,7 +4399,6 @@ public final class Avrcp {
                 break;
             }
         }
-        mPendingSetAttributes.clear();
         return ret;
     }
 
@@ -4457,7 +4459,7 @@ public final class Avrcp {
             byte[] address)
     {
         if (DEBUG)
-            Log.v(TAG, "onGetPlayerAttributeValues" + attr );
+            Log.v(TAG, "onGetPlayerAttributeValues: num of attrib " + attr );
         int i ;
         byte[] barray = new byte[attr];
         for(i =0 ; i<attr ; ++i)
@@ -4493,7 +4495,7 @@ public final class Avrcp {
             byte[] address)
     {
         if (DEBUG)
-            Log.v(TAG, "setPlayerAppSetting" + num );
+            Log.v(TAG, "setPlayerAppSetting: number of attributes" + num );
         byte[] array = new byte[num*2];
         for ( int i = 0; i < num; i++)
         {
@@ -4528,7 +4530,8 @@ public final class Avrcp {
     private void getplayerattribute_text(byte attr , byte [] attrIds,
             byte[] address)
     {
-        if(DEBUG) Log.d(TAG, "getplayerattribute_text" + attr +"attrIDsNum" + attrIds.length);
+        if(DEBUG) Log.d(TAG, "getplayerattribute_text " + attr +" attrIDsNum "
+                                                        + attrIds.length);
         Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
         Message msg = mHandler.obtainMessage();
         intent.putExtra(COMMAND, CMDGET);
@@ -4560,8 +4563,8 @@ public final class Avrcp {
     private void getplayervalue_text(byte attr_id , byte num_value , byte [] value,
             byte[] address)
     {
-        if(DEBUG) Log.d(TAG, "getplayervalue_text id" + attr_id +"num_value" + num_value
-                                                           +"value.lenght" + value.length);
+        if(DEBUG) Log.d(TAG, "getplayervalue_text id " + attr_id +" num_value " + num_value
+                                                           +" length " + value.length);
         Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
         Message msg = mHandler.obtainMessage();
         intent.putExtra(COMMAND, CMDGET);
