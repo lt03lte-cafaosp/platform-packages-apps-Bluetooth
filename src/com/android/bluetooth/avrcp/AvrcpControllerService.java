@@ -945,8 +945,12 @@ public class AvrcpControllerService extends ProfileService {
     private void getCurrentPlayerApplicationSettingsValues()
     {
         int count = 0;
-        if (mRemoteData == null)
+        if ((mRemoteData == null)||
+            (mRemoteData.mSupportedApplicationSettingsAttribute == null)||
+            (mRemoteData.mSupportedApplicationSettingsAttribute.size() == 0)) {
+            Log.w(TAG," PlayerAppSettings not supporterd, returning");
             return;
+        }
         byte[] supported_attrib =
             new byte[mRemoteData.mSupportedApplicationSettingsAttribute.size()];
         byte numAttrib = Byte.valueOf((Integer.valueOf
@@ -1360,14 +1364,35 @@ public class AvrcpControllerService extends ProfileService {
     }
     private int asciiToInt(int len, byte[] array)
     {
-        double radix = len -1;
-        double val = 0;
-        for(int count = 0; count < len; count ++)
-        {
-            val = val + (Math.pow(10, radix)*(array[count] - 48));
-            radix --;
+        return Integer.parseInt(utf8ToString(array));
+    }
+    private void resetElementAttribute(int attributeId, int asciiStringLen) {
+        if(asciiStringLen == 0) {
+            switch(attributeId)
+            {
+            case MEDIA_ATTRIBUTE_TITLE:
+                mRemoteData.mMetadata.trackTitle = BluetoothAvrcpInfo.TITLE_INVALID;
+                break;
+            case MEDIA_ATTRIBUTE_ARTIST_NAME:
+                mRemoteData.mMetadata.artist = BluetoothAvrcpInfo.ARTIST_NAME_INVALID;
+                break;
+            case MEDIA_ATTRIBUTE_ALBUM_NAME:
+                mRemoteData.mMetadata.albumTitle = BluetoothAvrcpInfo.ALBUM_NAME_INVALID;
+                break;
+            case MEDIA_ATTRIBUTE_GENRE:
+                mRemoteData.mMetadata.genre = BluetoothAvrcpInfo.GENRE_INVALID;
+                break;
+            case MEDIA_ATTRIBUTE_TRACK_NUMBER:
+                mRemoteData.mMetadata.trackNum = BluetoothAvrcpInfo.TRACK_NUM_INVALID;
+                break;
+            case MEDIA_ATTRIBUTE_TOTAL_TRACK_NUMBER:
+                mRemoteData.mMetadata.totalTrackNum = BluetoothAvrcpInfo.TOTAL_TRACKS_INVALID;
+                break;
+            case MEDIA_ATTRIBUTE_PLAYING_TIME:
+                mRemoteData.mMetadata.totalTrackLen = BluetoothAvrcpInfo.TOTAL_TRACK_TIME_INVALID;
+                break;
+            }
         }
-        return (int)val;
     }
     private int parseElementAttributes(int currentIndex, int attributeId, ByteBuffer attribBuffer)
     {
@@ -1379,6 +1404,7 @@ public class AvrcpControllerService extends ProfileService {
         if((asciiStringLen <= 0) || ((currentIndex + asciiStringLen) > attribBuffer.capacity()))
         {
             Log.d(TAG," parseElementAttribute wrong buffer");
+            resetElementAttribute(attributeId, asciiStringLen);
             return currentIndex;
         }
         byte[] asciiString = new byte[asciiStringLen];
@@ -1526,8 +1552,9 @@ public class AvrcpControllerService extends ProfileService {
                 if ((oldState == NOTIFY_CHANGED_EXPECTED) &&
                     (notificationType == NOTIFICATION_RSP_TYPE_CHANGED))
                 {
-                    Log.d(TAG," Track change Happened, que GetElement ");
+                    Log.d(TAG," Track change Happened, que GetElement, PlayerSetting ");
                     mHandler.sendEmptyMessage(MESSAGE_GET_ELEMENT_ATTRIBUTE);
+                    mHandler.sendEmptyMessage(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS);
                 }
                 break;
             }
