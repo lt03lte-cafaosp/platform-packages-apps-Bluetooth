@@ -192,6 +192,7 @@ final class AdapterState extends StateMachine {
             switch(msg.what) {
                case USER_TURN_ON:
                    notifyAdapterStateChange(BluetoothAdapter.STATE_TURNING_ON);
+                   adapterProperties.clearDisableFlag();
                    mPendingCommandState.setTurningOn(true);
                    transitionTo(mPendingCommandState);
                    sendMessageDelayed(BREDR_START_TIMEOUT, BREDR_START_TIMEOUT_DELAY);
@@ -387,7 +388,8 @@ final class AdapterState extends StateMachine {
                     break;
 
                 case SET_SCAN_MODE_TIMEOUT:
-                     warningLog("Timeout while setting scan mode. Continuing with disable...");
+                     adapterProperties.clearDisableFlag();
+                     Log.w(TAG,"Timeout while setting scan mode.Continuing with disable...");
                      //Fall through
                 case BEGIN_DISABLE:
                     removeMessages(SET_SCAN_MODE_TIMEOUT);
