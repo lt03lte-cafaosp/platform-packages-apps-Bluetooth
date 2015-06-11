@@ -694,7 +694,7 @@ class AdapterProperties {
 
     private boolean mBluetoothDisabling=false;
 
-    void onBluetoothEnable()  {
+    void clearDisableFlag()  {
          mBluetoothDisabling=false;
     }
     void onBluetoothDisable() {

@@ -133,7 +133,7 @@ final class AdapterState extends StateMachine {
                    mPendingCommandState.setTurningOn(true);
                    transitionTo(mPendingCommandState);
                    sendMessageDelayed(START_TIMEOUT, START_TIMEOUT_DELAY);
-                   adapterProperties.onBluetoothEnable();
+                   adapterProperties.clearDisableFlag();
                    adapterService.processStart();
                    break;
                case USER_TURN_OFF:
@@ -281,6 +281,7 @@ final class AdapterState extends StateMachine {
                     break;
 
                 case SET_SCAN_MODE_TIMEOUT:
+                     adapterProperties.clearDisableFlag();
                      Log.w(TAG,"Timeout will setting scan mode..Continuing with disable...");
                      //Fall through
                 case BEGIN_DISABLE: {
