@@ -2277,12 +2277,13 @@ public class BluetoothMapContent {
     }
 
     public BluetoothMapMessageListing msgListingEmail(String folder, BluetoothMapAppParams ap) {
-        Log.d(TAG, "msgListing: folder = " + folder);
         String urlEmail = "content://com.android.email.provider/message";
         Uri uriEmail = Uri.parse(urlEmail);
         BluetoothMapMessageListing bmList = new BluetoothMapMessageListing();
         BluetoothMapMessageListingElement e = null;
 
+        if (V)Log.d(TAG, "msgListing: folder = " + folder +
+            " maxListCount: " + ap.getMaxListCount());
         /* Cache some info used throughout filtering */
         FilterInfo fi = new FilterInfo();
         setFilterInfo(fi);
@@ -2294,10 +2295,10 @@ public class BluetoothMapContent {
             Log.d(TAG, "where clause is = " + where);
             try {
                 Cursor c = mResolver.query(uriEmail,
-                EMAIL_PROJECTION, where + " AND " + Message.FLAG_LOADED_SELECTION, null, "timeStamp desc");
+                EMAIL_PROJECTION, where, null, null);
                 if(c == null) {
                    Log.e(TAG, "Cursor is null. Returning from here");
-        }
+                }
 
                 if (c != null) {
                     while (c.moveToNext()) {
