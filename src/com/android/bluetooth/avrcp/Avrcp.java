@@ -119,6 +119,7 @@ public final class Avrcp {
     private static long currentTrackPos;
     private static boolean updatePlayTime;
     private static boolean updateValues;
+    private int mAddressedPlayerId;
 
     /* BTRC features */
     public static final int BTRC_FEAT_METADATA = 0x01;
@@ -279,7 +280,6 @@ public final class Avrcp {
         private int mAddressedPlayerChangedNT;
         private int mAvailablePlayersChangedNT;
         private int mNowPlayingContentChangedNT;
-        private int mAddressedPlayerId;
         private String mRequestedAddressedPlayerPackageName;
         private String mCurrentPath;
         private String mCurrentPathUid;
@@ -309,7 +309,6 @@ public final class Avrcp {
             mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
             mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
             mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
-            mAddressedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
             mRequestedAddressedPlayerPackageName = null;
             mCurrentPath = PATH_INVALID;
             mCurrentPathUid = null;
@@ -406,6 +405,7 @@ public final class Avrcp {
         mLastPlayingDevice.clear();
         maxAvrcpConnections = maxConnections;
         deviceFeatures = new DeviceDependentFeature[maxAvrcpConnections];
+        mAddressedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
         for(int i = 0; i < maxAvrcpConnections; i++) {
             deviceFeatures[i] = new DeviceDependentFeature();
         }
@@ -1667,31 +1667,31 @@ public final class Avrcp {
         }
     }
     private void updateAddressedMediaPlayer(int playerId) {
-        if (DEBUG)
-            Log.v(TAG, "updateAddressedMediaPlayer");
+        Log.v(TAG, "updateAddressedMediaPlayer");
+        Log.v(TAG, "current Player: " + mAddressedPlayerId);
+        Log.v(TAG, "Requested Player: " + playerId);
+
         int previousAddressedPlayerId;
         for (int i = 0; i < maxAvrcpConnections; i++) {
             if ((deviceFeatures[i].mAddressedPlayerChangedNT ==
                     NOTIFICATION_TYPE_INTERIM) &&
-                    (deviceFeatures[i].mAddressedPlayerId != playerId)) {
+                    (mAddressedPlayerId != playerId)) {
                 if (DEBUG)
                     Log.v(TAG, "send AddressedMediaPlayer to stack: playerId" + playerId);
-                previousAddressedPlayerId = deviceFeatures[i].mAddressedPlayerId;
-                deviceFeatures[i].mAddressedPlayerId = playerId;
+                previousAddressedPlayerId = mAddressedPlayerId;
                 deviceFeatures[i].mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
                 registerNotificationRspAddressedPlayerChangedNative(
                         deviceFeatures[i].mAddressedPlayerChangedNT,
-                        deviceFeatures[i].mAddressedPlayerId ,
-                        getByteAddress(deviceFeatures[i].mCurrentDevice));
+                        playerId, getByteAddress(deviceFeatures[i].mCurrentDevice));
                 if (previousAddressedPlayerId != INVALID_ADDRESSED_PLAYER_ID) {
                     resetAndSendPlayerStatusReject();
                 }
             } else {
                 if (DEBUG)
                     Log.v(TAG, "Do not reset notifications, ADDR_PLAYR_CHNGD not registered");
-                deviceFeatures[i].mAddressedPlayerId = playerId;
             }
         }
+        mAddressedPlayerId = playerId;
     }
 
     public void updateResetNotification(int notificationType) {
@@ -2901,7 +2901,7 @@ public final class Avrcp {
             }
         }
         if(packageName != null) {
-            if (playerId == deviceFeatures[deviceIndex].mAddressedPlayerId) {
+            if (playerId == mAddressedPlayerId) {
                 if (DEBUG)
                     Log.v(TAG, "setAddressedPlayer: Already addressed, sending success");
                 setAdressedPlayerRspNative((byte)OPERATION_SUCCESSFUL,
@@ -3900,7 +3900,8 @@ public final class Avrcp {
                         if(focussed) {
                             if (mHandler != null) {
                                 if (DEBUG)
-                                    Log.v(TAG, "Send MSG_UPDATE_ADDRESSED_PLAYER");
+                                    Log.v(TAG, "Send MSG_UPDATE_ADDRESSED_PLAYER: " +
+                                    di.RetrievePlayerId());
                                 mHandler.obtainMessage(MSG_UPDATE_ADDRESSED_PLAYER,
                                         di.RetrievePlayerId(), 0, 0).sendToTarget();
                             }
@@ -3935,7 +3936,7 @@ public final class Avrcp {
                 if (deviceFeatures[i].mCurrentDevice != null) {
                     if (mHandler != null) {
                         if (DEBUG)
-                            Log.v(TAG, "Send MSG_UPDATE_ADDRESSED_PLAYER");
+                            Log.v(TAG, "Send MSG_UPDATE_ADDRESSED_PLAYER: 0");
                         mHandler.obtainMessage(MSG_UPDATE_ADDRESSED_PLAYER,
                                 0, 0, 0).sendToTarget();
                     }
@@ -4021,11 +4022,11 @@ public final class Avrcp {
             case EVT_ADDRESSED_PLAYER_CHANGED:
                 if (DEBUG)
                     Log.v(TAG, "Process EVT_ADDRESSED_PLAYER_CHANGED Interim: Player ID: "
-                            + deviceFeatures[deviceIndex].mAddressedPlayerId);
+                            + mAddressedPlayerId);
                 deviceFeatures[deviceIndex].mAddressedPlayerChangedNT = NOTIFICATION_TYPE_INTERIM;
                 registerNotificationRspAddressedPlayerChangedNative(
                         deviceFeatures[deviceIndex].mAddressedPlayerChangedNT ,
-                        deviceFeatures[deviceIndex].mAddressedPlayerId ,
+                        mAddressedPlayerId ,
                         getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
                 break;
 
@@ -4655,7 +4656,6 @@ public final class Avrcp {
         deviceFeatures[index].mAddressedPlayerChangedNT = NOTIFICATION_TYPE_CHANGED;
         deviceFeatures[index].mAvailablePlayersChangedNT = NOTIFICATION_TYPE_CHANGED;
         deviceFeatures[index].mNowPlayingContentChangedNT = NOTIFICATION_TYPE_CHANGED;
-        deviceFeatures[index].mAddressedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
         deviceFeatures[index].mRequestedAddressedPlayerPackageName = null;
         deviceFeatures[index].mCurrentPath = PATH_INVALID;
         deviceFeatures[index].mCurrentPathUid = null;
