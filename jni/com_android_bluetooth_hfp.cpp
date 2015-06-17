@@ -948,6 +948,20 @@ static jboolean bindStringResponseNative(JNIEnv *env, jobject object, jstring re
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
 
+static jboolean voipNetworkWifiInfoNative(JNIEnv *env, jobject object,
+                                         jboolean isVoipStarted, jboolean isNetworkWifi) {
+    bt_status_t status;
+    if (!sBluetoothHfpInterface) return JNI_FALSE;
+
+    if ( (status = sBluetoothHfpInterface->voip_network_type_wifi(isVoipStarted ?
+            BTHF_VOIP_STATE_STARTED : BTHF_VOIP_STATE_STOPPED, isNetworkWifi ?
+            BTHF_VOIP_CALL_NETWORK_TYPE_WIFI : BTHF_VOIP_CALL_NETWORK_TYPE_MOBILE))
+            != BT_STATUS_SUCCESS) {
+        ALOGE("Failed sending VOIP network type, status: %d", status);
+    }
+    return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+}
+
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
     {"initializeNative", "(I)V", (void *) initializeNative},
@@ -970,7 +984,8 @@ static JNINativeMethod sMethods[] = {
     {"configureWBSNative", "([BI)Z", (void *) configureWBSNative},
     {"getRemoteFeaturesNative", "([B)I", (void *) getRemoteFeaturesNative},
     {"bindResponseNative", "(IZ[B)Z", (void *)bindResponseNative},
-    {"bindStringResponseNative", "(Ljava/lang/String;[B)Z", (void *)bindStringResponseNative}
+    {"bindStringResponseNative", "(Ljava/lang/String;[B)Z", (void *)bindStringResponseNative},
+    {"voipNetworkWifiInfoNative", "(ZZ)Z", (void *)voipNetworkWifiInfoNative}
 };
 
 int register_com_android_bluetooth_hfp(JNIEnv* env)
