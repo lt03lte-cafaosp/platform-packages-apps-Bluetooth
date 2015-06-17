@@ -1977,6 +1977,28 @@ static jboolean playItemRspNative(JNIEnv *env, jobject object, jint errStatus,
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
 
+static jboolean isDeviceActiveInHandOffNative(JNIEnv *env, jobject object, jbyteArray address) {
+    bt_status_t status = BT_STATUS_SUCCESS;
+    jbyte *addr;
+
+    if (!sBluetoothMultiAvrcpInterface) return JNI_FALSE;
+
+    addr = env->GetByteArrayElements(address, NULL);
+    if (!addr) {
+        jniThrowIOException(env, EINVAL);
+        return JNI_FALSE;
+    }
+    ALOGI("%s: sBluetoothMultiAvrcpInterface: %p", __FUNCTION__, sBluetoothMultiAvrcpInterface);
+
+    status = sBluetoothMultiAvrcpInterface->is_device_active_in_handoff((bt_bdaddr_t *)addr);
+
+    ALOGI("isDeviceActiveInHandOffNative: status: %d", status);
+
+    env->ReleaseByteArrayElements(address, addr, 0);
+    return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+}
+
+
 
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
@@ -2021,6 +2043,7 @@ static JNINativeMethod sMethods[] = {
     {"getItemAttrRspNative", "(B[I[Ljava/lang/String;[B)Z", (void *) getItemAttrRspNative},
     {"getFolderItemsRspNative", "(BJ[I[J[I[B[Ljava/lang/String;[B[Ljava/lang/String;[I[B)Z",
                                                             (void *) getFolderItemsRspNative},
+    {"isDeviceActiveInHandOffNative", "([B)Z", (void *) isDeviceActiveInHandOffNative},
 };
 
 int register_com_android_bluetooth_avrcp(JNIEnv* env)
