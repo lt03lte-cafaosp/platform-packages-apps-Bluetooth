@@ -807,6 +807,28 @@ final class A2dpStateMachine extends StateMachine {
                             break;
                     }
                     break;
+                case CONNECT_TIMEOUT:
+                    BluetoothDevice timedOutDevice = getDeviceForMessage(CONNECT_TIMEOUT);
+                    if ((mTargetDevice == null) || (timedOutDevice == null)) {
+                        loge("CONNECT_TIMEOUT received : targetDevice : " +
+                            mTargetDevice + " : timedout device : " + timedOutDevice);
+                    } else if(mTargetDevice.equals(timedOutDevice)) {
+                        loge("CONNECT_TIMEOUT received : connected devices : " +
+                            mConnectedDevicesList.size() +
+                            " : timedout device : " + timedOutDevice);
+                        broadcastConnectionState(mTargetDevice,
+                                BluetoothProfile.STATE_DISCONNECTED,
+                                BluetoothProfile.STATE_CONNECTING);
+                        mTargetDevice = null;
+                    } else {
+                        /* Should not hit this
+                         */
+                        loge("CONNECT_TIMEOUT received : connected devices : " +
+                            mConnectedDevicesList.size() +
+                            " : targetDevice : " + mTargetDevice +
+                            " : timedout device : " + timedOutDevice);
+                    }
+                    break;
                 default:
                     return NOT_HANDLED;
             }
