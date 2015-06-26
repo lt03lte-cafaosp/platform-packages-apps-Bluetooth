@@ -59,6 +59,10 @@ import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.ProfileService;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Hashtable;
@@ -2370,7 +2374,7 @@ final class HeadsetClientStateMachine extends StateMachine {
         intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, prevState);
         intent.putExtra(BluetoothProfile.EXTRA_STATE, newState);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-
+        connectionKpiMarker(newState, prevState);
         // add feature extras when connected
         if (newState == BluetoothProfile.STATE_CONNECTED) {
             if ((mPeerFeatures & HeadsetClientHalConstants.PEER_FEAT_3WAY) ==
@@ -2418,6 +2422,30 @@ final class HeadsetClientStateMachine extends StateMachine {
         }
 
         mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+    }
+
+    private void connectionKpiMarker (int newState, int prevState) {
+        try {
+            File f = new File("/proc/bootkpi/marker_entry");
+            if (!f.exists())
+                return;
+            FileOutputStream fos = new FileOutputStream(f);
+            if (prevState == BluetoothProfile.STATE_DISCONNECTED) {
+                log("HFP Start");
+                fos.write("HFP Start".getBytes());
+            } else if (newState == BluetoothProfile.STATE_CONNECTED) {
+                log("HFP End");
+                fos.write("HFP End".getBytes());
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED &&
+                    prevState == BluetoothProfile.STATE_CONNECTING ) {
+                log("HFP fail");
+                fos.write("HFP fail".getBytes());
+            }
+            fos.flush();
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     boolean isConnected() {

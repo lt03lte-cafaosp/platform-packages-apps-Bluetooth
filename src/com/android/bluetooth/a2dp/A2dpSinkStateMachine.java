@@ -58,6 +58,9 @@ import com.android.bluetooth.avrcp.AvrcpControllerService;
 import com.android.internal.util.IState;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
@@ -761,7 +764,7 @@ final class A2dpSinkStateMachine extends StateMachine {
 
         //int delay = mAudioManager.setBluetoothA2dpDeviceConnectionState(device, newState,
           //      BluetoothProfile.A2DP_SINK);
-
+        connectionKpiMarker(newState, prevState);
         mWakeLock.acquire();
         mIntentBroadcastHandler.sendMessageDelayed(mIntentBroadcastHandler.obtainMessage(
                                                         MSG_CONNECTION_STATE_CHANGED,
@@ -769,6 +772,30 @@ final class A2dpSinkStateMachine extends StateMachine {
                                                         newState,
                                                         device),
                                                         0);
+    }
+
+    private void connectionKpiMarker (int newState, int prevState) {
+        try {
+            File f = new File("/proc/bootkpi/marker_entry");
+            if (!f.exists())
+                return;
+            FileOutputStream fos = new FileOutputStream(f);
+            if (prevState == BluetoothProfile.STATE_DISCONNECTED) {
+                log("A2DP Start");
+                fos.write("A2DP Start".getBytes());
+            } else if (newState == BluetoothProfile.STATE_CONNECTED) {
+                log("A2DP End");
+                fos.write("A2DP End".getBytes());
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED &&
+                    prevState == BluetoothProfile.STATE_CONNECTING) {
+                log("A2DP fail");
+                fos.write("A2DP fail".getBytes());
+            }
+            fos.flush();
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void broadcastAudioState(BluetoothDevice device, int state, int prevState) {
