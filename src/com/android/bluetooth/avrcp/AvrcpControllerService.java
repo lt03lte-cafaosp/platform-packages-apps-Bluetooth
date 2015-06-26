@@ -357,13 +357,10 @@ public class AvrcpControllerService extends ProfileService {
         setAvrcpControllerService(this);
         mAudioManager = (AudioManager)sAvrcpControllerService.
                                   getSystemService(Context.AUDIO_SERVICE);
-        IntentFilter filter = new IntentFilter(AudioManager.VOLUME_CHANGED_ACTION);
-        registerReceiver(mBroadcastReceiver, filter);
         return true;
     }
 
     protected boolean stop() {
-        unregisterReceiver(mBroadcastReceiver);
          try {
              deinitDatabase();
              if (mRemoteData != null) {
@@ -383,42 +380,7 @@ public class AvrcpControllerService extends ProfileService {
          }
         return true;
     }
-    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action.equals(AudioManager.VOLUME_CHANGED_ACTION)) {
-                int streamType = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1);
-                if (streamType == AudioManager.STREAM_MUSIC) {
-                    int streamValue = intent
-                            .getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_VALUE, -1);
-                    int streamPrevValue = intent.getIntExtra(
-                            AudioManager.EXTRA_PREV_VOLUME_STREAM_VALUE, -1);
-                    if (streamValue != -1 && streamValue != streamPrevValue) {
-                        if ((mRemoteData == null)
-                            ||((mRemoteData.mRemoteFeatures & BTRC_FEAT_ABSOLUTE_VOLUME) == 0)
-                            ||(mConnectedDevices.isEmpty()))
-                            return;
-                        if(mRemoteData.absVolNotificationState == NOTIFY_RSP_INTERIM_SENT) {
-                            int maxVol = mAudioManager.
-                                                  getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-                            int currIndex = mAudioManager.
-                                                  getStreamVolume(AudioManager.STREAM_MUSIC);
-                            int percentageVol = ((currIndex*ABS_VOL_BASE)/maxVol);
-                            byte rspType = NOTIFICATION_RSP_TYPE_CHANGED;
-                            Log.d(TAG," Abs Vol Notify Rsp Changed val = "+ percentageVol);
-                            mRemoteData.absVolNotificationState = NOTIFY_NOT_REGISTERED;
-                            sendRegisterAbsVolRspNative(rspType,percentageVol);
-                        }
-                        else if (mRemoteData.absVolNotificationState == NOTIFY_RSP_ABS_VOL_DEFERRED) {
-                            Log.d(TAG," Don't Complete Notification Rsp. ");
-                            mRemoteData.absVolNotificationState = NOTIFY_RSP_INTERIM_SENT;
-                        }
-                    }
-                }
-            }
-        }
-    };
+
     protected boolean cleanup() {
         if (mHandler != null) {
             mHandler.removeCallbacksAndMessages(null);
@@ -489,7 +451,27 @@ public class AvrcpControllerService extends ProfileService {
         return (mConnectedDevices.contains(device) ? BluetoothProfile.STATE_CONNECTED
                                                 : BluetoothProfile.STATE_DISCONNECTED);
     }
-
+    public void volChanged(int streamVal, int streamPrevVal, int maxVol) {
+        log("volChanged prev = " + streamPrevVal + " new = " + streamVal);
+        if ((mRemoteData == null)
+            ||((mRemoteData.mRemoteFeatures & BTRC_FEAT_ABSOLUTE_VOLUME) == 0)
+            ||(mConnectedDevices.isEmpty())) {
+             return;
+        }
+        if(mRemoteData.absVolNotificationState == NOTIFY_RSP_INTERIM_SENT) {
+            if (streamVal != -1 && streamVal != streamPrevVal) {
+                streamVal = (streamVal == 1)?0:streamVal;
+                int percentageVol = ((streamVal*ABS_VOL_BASE)/maxVol);
+                byte rspType = NOTIFICATION_RSP_TYPE_CHANGED;
+                Log.d(TAG," Abs Vol Notify Rsp Changed val = "+ percentageVol);
+                mRemoteData.absVolNotificationState = NOTIFY_NOT_REGISTERED;
+                sendRegisterAbsVolRspNative(rspType,percentageVol);
+            }
+        } else if (mRemoteData.absVolNotificationState == NOTIFY_RSP_ABS_VOL_DEFERRED) {
+            Log.d(TAG," Don't Complete Notification Rsp. ");
+            mRemoteData.absVolNotificationState = NOTIFY_RSP_INTERIM_SENT;
+        }
+    }
     public void sendPassThroughCmd(BluetoothDevice device, int keyCode, int keyState) {
         if (DBG) Log.d(TAG, "sendPassThroughCmd");
         Log.v(TAG, "keyCode: " + keyCode + " keyState: " + keyState);
@@ -515,9 +497,16 @@ public class AvrcpControllerService extends ProfileService {
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PAUSED);
                 break;
             case AVRC_ID_PAUSE:
+            /*
+             * allowing pause command in pause state to handle A2DP Sink Concurrency
+             * If call is ongoing and Start is initiated from remote, we will send pause again
+             * If acquireFocus fails, we will send Pause again
+             * To Stop sending multiple Pause, check in BT-TestApp
+             */
                 sendCommand  = (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PLAYING)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_FWD_SEEK)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_STOPPED)||
+                               (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PAUSED)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_REV_SEEK);
                 break;
             case AVRC_ID_STOP:
@@ -1582,20 +1571,23 @@ public class AvrcpControllerService extends ProfileService {
     }
     private void setAbsVolume(int absVol)
     {
-        int maxVolume = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        int currIndex = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        int newIndex = (maxVolume*absVol)/ABS_VOL_BASE;
-        Log.d(TAG," setAbsVolume ="+absVol + " maxVol = " + maxVolume + " cur = " + currIndex +
+        A2dpSinkService a2dpSinkService = A2dpSinkService.getA2dpSinkService();
+        if(a2dpSinkService != null) {
+            int maxVolume = a2dpSinkService.getMaxVolume();
+            int currIndex = a2dpSinkService.getCurVolume();
+            int newIndex = (maxVolume*absVol)/ABS_VOL_BASE;
+            Log.d(TAG," setAbsVolume ="+absVol + " maxVol = " + maxVolume + " cur = " + currIndex +
                                               " new = "+newIndex);
-        /*
-         * In some cases change in percentage is not sufficient enough to warrant
-         * change in index values which are in range of 0-15. For such cases
-         * no action is required
-         */
-        if (newIndex != currIndex) {
-            if (mRemoteData.absVolNotificationState == NOTIFY_RSP_INTERIM_SENT)
-                mRemoteData.absVolNotificationState = NOTIFY_RSP_ABS_VOL_DEFERRED;
-            mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newIndex, 0);
+            /*
+             * In some cases change in percentage is not sufficient enough to warrant
+             * change in index values which are in range of 0-7. For such cases
+             * no action is required
+             */
+            if (newIndex != currIndex) {
+                if (mRemoteData.absVolNotificationState == NOTIFY_RSP_INTERIM_SENT)
+                    mRemoteData.absVolNotificationState = NOTIFY_RSP_ABS_VOL_DEFERRED;
+                a2dpSinkService.setRenderingVol(absVol, true, ABS_VOL_BASE);
+            }
         }
         sendAbsVolRspNative(absVol);
     }
@@ -1606,11 +1598,16 @@ public class AvrcpControllerService extends ProfileService {
             return;
         if(mRemoteData.absVolNotificationState == NOTIFY_NOT_REGISTERED)
         {
-            int maxVol = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int currIndex = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-            int percentageVol = ((currIndex*ABS_VOL_BASE)/maxVol);
-            Log.d(TAG," maxVol ="+maxVol+" currentIndex ="+currIndex+
+            int percentageVol = 0;
+            A2dpSinkService a2dpSinkService = A2dpSinkService.getA2dpSinkService();
+            if (a2dpSinkService != null) {
+                int maxVol = a2dpSinkService.getMaxVolume();
+                int currIndex = a2dpSinkService.getCurVolume();
+                currIndex = (currIndex == 1)?0:currIndex;
+                percentageVol = ((currIndex*ABS_VOL_BASE)/maxVol);
+                Log.d(TAG," maxVol ="+maxVol+" currentIndex ="+currIndex+
                                                    " percentageVol ="+percentageVol);
+            }
             byte rspType = NOTIFICATION_RSP_TYPE_INTERIM;
             mRemoteData.absVolNotificationState = NOTIFY_RSP_INTERIM_SENT;
             sendRegisterAbsVolRspNative(rspType,percentageVol);

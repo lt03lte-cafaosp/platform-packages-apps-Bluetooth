@@ -121,8 +121,7 @@ static btav_callbacks_t sBluetoothA2dpCallbacks = {
     bta2dp_connection_state_callback,
     bta2dp_audio_state_callback,
     NULL,
-    bta2dp_connection_priority_callback,
-    NULL
+    bta2dp_connection_priority_callback
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {

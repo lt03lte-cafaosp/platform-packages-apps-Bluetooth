@@ -163,6 +163,18 @@ public class A2dpSinkService extends ProfileService {
         return priority;
     }
 
+    public void setRenderingVol(int newVolIndex, boolean updateStreamVol, int maxPossibleIndex) {
+        enforceCallingOrSelfPermission(BLUETOOTH_PERM,
+                "Need BLUETOOTH permission");
+        mStateMachine.setStreamingVol(newVolIndex, updateStreamVol, maxPossibleIndex);
+    }
+
+    public int getMaxVolume() {
+        return mStateMachine.getMaxVolume();
+    }
+    public int getCurVolume() {
+        return mStateMachine.getCurVolume();
+    }
     synchronized boolean isA2dpPlaying(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM,
                                        "Need BLUETOOTH permission");

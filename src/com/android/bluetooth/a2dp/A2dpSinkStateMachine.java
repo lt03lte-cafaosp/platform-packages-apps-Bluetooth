@@ -37,9 +37,17 @@ import android.bluetooth.BluetoothUuid;
 import android.bluetooth.IBluetooth;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioManager.OnAudioFocusChangeListener;
+import android.media.AudioDevicePort;
+import android.media.AudioPatch;
+import android.media.AudioSystem;
+import android.media.AudioPortConfig;
+import android.media.AudioPort;
+
 import android.os.Handler;
 import android.os.Message;
 import android.os.ParcelUuid;
@@ -71,6 +79,8 @@ final class A2dpSinkStateMachine extends StateMachine {
 
     static final int CONNECT = 1;
     static final int DISCONNECT = 2;
+    final private static int SET_RENDERING_VOL = 3;
+    final private static int EVENT_TYPE_REQUEST_AUDIO_FOCUS = 4;
     private static final int STACK_EVENT = 101;
     private static final int CONNECT_TIMEOUT = 201;
 
@@ -99,6 +109,24 @@ final class A2dpSinkStateMachine extends StateMachine {
     private static final int AUDIO_FOCUS_LOSS_TRANSIENT = 2;
     private static final int AUDIO_FOCUS_LOSS_CAN_DUCK = 3;
     private int mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
+
+    private static final int maxA2dpSinkConnections = 1;
+
+    private final Object mLockForVolUpdate = new Object();
+    private static int mCurVolGain = 1;
+    private static int MAX_VOL = 40;
+    private static int mCurrentStreamType = AudioManager.STREAM_RING;
+
+    private final Object mLockForPatch = new Object();
+    private AudioDevicePort mInPortA2dpSink;
+    private AudioDevicePort mOutPortSpeaker;
+    private AudioPatch mA2dpSinkAudioPatch;
+    private String volSetParamString = "ext_hw_plugin_msg_type=3;" + "ext_hw_plugin_usecase=0;" +
+                                        "ext_hw_plugin_channel_mask=1;" + "ext_hw_plugin_gain=";
+    private String volSetMuteParamString = "ext_hw_plugin_msg_type=4;" + "ext_hw_plugin_usecase=0;"
+                                  +"ext_hw_plugin_channel_mask=1;" + "ext_hw_plugin_mute_flag=1";
+    private String volSetUnMuteParamString = "ext_hw_plugin_msg_type=4;" +
+        "ext_hw_plugin_usecase=0;" +"ext_hw_plugin_channel_mask=1;" + "ext_hw_plugin_mute_flag=0";
 
     // mCurrentDevice is the device connected before the state changes
     // mTargetDevice is the device to be connected
@@ -156,9 +184,104 @@ final class A2dpSinkStateMachine extends StateMachine {
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BluetoothA2dpSinkService");
 
         mIntentBroadcastHandler = new IntentBroadcastHandler();
-
+        IntentFilter filter = new IntentFilter("com.android.music.musicservicecommand");
+        filter.addAction(AudioManager.VOLUME_CHANGED_ACTION);
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        mContext.registerReceiver(mA2dpReceiver, filter);
+        mAudioManager.registerAudioPortUpdateListener(mAudioPortListener);
+        mCurVolGain = mAudioManager.getStreamVolume(mCurrentStreamType) * getGainMultiplier();
+        mCurVolGain = (mCurVolGain > MAX_VOL) ? MAX_VOL:mCurVolGain;
+        mCurVolGain = (mCurVolGain < 1)? 1:mCurVolGain;
     }
+    private int getGainMultiplier() {
+        return (MAX_VOL/mAudioManager.getStreamMaxVolume(mCurrentStreamType));
+    }
+    private void releasePatch() {
+        synchronized (mLockForPatch) {
+            log("releaseAudioPatch AudioPatch = " + mA2dpSinkAudioPatch);
+            if(mA2dpSinkAudioPatch != null) {
+                mAudioManager.releaseAudioPatch(mA2dpSinkAudioPatch);
+                mA2dpSinkAudioPatch = null;
+            }
+        }
+    }
+    private void patchPorts() {
+        synchronized (mLockForPatch) {
+            log("patchPorts : mA2dpSinkAudioPatch: " + mA2dpSinkAudioPatch +
+                " mPlayingDevice " + mPlayingDevice + " mOutPortSpeaker " + mOutPortSpeaker);
+            if((mA2dpSinkAudioPatch == null) && (mPlayingDevice != null) &&
+               (mOutPortSpeaker != null) && (mInPortA2dpSink != null)) {
+                int sampleRate = getAudioConfig(mPlayingDevice).getSampleRate();
+                int channelMask = getAudioConfig(mPlayingDevice).getChannelConfig();
+                int format = getAudioConfig(mPlayingDevice).getAudioFormat();
+
+                AudioPortConfig sourcePortArray[] =
+                    {mInPortA2dpSink.buildConfig(sampleRate, channelMask, format, null)};
+                AudioPortConfig sinkPortArray[] =
+                    {mOutPortSpeaker.buildConfig(sampleRate, channelMask, format, null)};
+                AudioPatch patchPortArray[] = {null};
+                /*  broadCast Audio State */
+                broadcastAudioState(mPlayingDevice, BluetoothA2dpSink.STATE_PLAYING,
+                                                 BluetoothA2dpSink.STATE_NOT_PLAYING);
+
+                int ret = mAudioManager.createAudioPatch(patchPortArray, sourcePortArray,
+                                                                               sinkPortArray);
+                if (ret == 0) {
+                    mA2dpSinkAudioPatch = patchPortArray[0];
+                    log("PatchCreated success: " + ret + " mA2dpSinkAudioPatch: "
+                                                                         + mA2dpSinkAudioPatch);
+                    setRenderingVolAfterStart();
+                } else {
+                    log("PatchCreated failed returned: " + ret);
+                }
+            }
+        }
+    }
+
+    private final AudioManager.OnAudioPortUpdateListener mAudioPortListener =
+                                                new AudioManager.OnAudioPortUpdateListener(){
+        public void onAudioPortListUpdate(AudioPort[] portList) {
+            synchronized (mLockForPatch){
+                log("onAudioPortListUpdate");
+                mOutPortSpeaker = null;
+                mInPortA2dpSink = null;
+
+                for (int i = 0; i < portList.length; i++) {
+                    AudioPort port = portList[i];
+                    if(port instanceof AudioDevicePort) {
+                        AudioDevicePort devicePort = (AudioDevicePort)port;
+                        if(devicePort.type() == AudioSystem.DEVICE_OUT_SPEAKER) {
+                            log("Updating Speaker Port");
+                            mOutPortSpeaker = devicePort;
+                        } else if(devicePort.type() == AudioSystem.DEVICE_IN_BLUETOOTH_A2DP) {
+                            log("Updating In Port A2DP Sink");
+                            mInPortA2dpSink = devicePort;
+                            /* Check if we still have focus */
+                            if ((mAudioFocusAcquired == AUDIO_FOCUS_GAIN) &&
+                                (mInPortA2dpSink != null) && (mA2dpSinkAudioPatch == null)) {
+                                /* This is the case of Port available
+                                 * later than focus acquired. Try patching ports now
+                                 */
+                                 log(" Sink Port updated, but patch not made");
+                                 patchPorts();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public void onAudioPatchListUpdate(AudioPatch[] patchList){
+            log("onAudioPatchListUpdate");
+            for(int i = 0; i < patchList.length; i++) {
+                log("Patch List " + i +" : "+ patchList[i]);
+            }
+        }
+
+        public void onServiceDied() {
+            log(" Service Died");
+        }
+    };
 
     static A2dpSinkStateMachine make(A2dpSinkService svc, Context context) {
         Log.d("A2dpSinkStateMachine", "make");
@@ -173,7 +296,10 @@ final class A2dpSinkStateMachine extends StateMachine {
 
     public void cleanup() {
         cleanupNative();
+        if (mContext != null)
+           mContext.unregisterReceiver(mA2dpReceiver);
         mAudioConfigs.clear();
+        mAudioManager.unregisterAudioPortUpdateListener(mAudioPortListener);
     }
 
     public void dump(StringBuilder sb) {
@@ -543,16 +669,23 @@ final class A2dpSinkStateMachine extends StateMachine {
                                        BluetoothProfile.STATE_DISCONNECTED);
                         break;
                     }
+
                     if (mAudioFocusAcquired != AUDIO_FOCUS_LOSS) {
                         int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                         if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                             mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
-                            informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                         }
+                        releasePatch();
                     }
                     mPlayingDevice = null;
                     transitionTo(mPending);
                 }
+                    break;
+                case SET_RENDERING_VOL:
+                    setStreamingVol(mCurVolGain, true, MAX_VOL);
+                    break;
+                case EVENT_TYPE_REQUEST_AUDIO_FOCUS:
+                    processAudioFocusRequestEvent(1, (BluetoothDevice) message.obj);
                     break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
@@ -565,9 +698,6 @@ final class A2dpSinkStateMachine extends StateMachine {
                             break;
                         case EVENT_TYPE_AUDIO_CONFIG_CHANGED:
                             processAudioConfigEvent(event.audioConfig, event.device);
-                            break;
-                        case EVENT_TYPE_REQUEST_AUDIO_FOCUS:
-                            processAudioFocusRequestEvent(event.valueInt, event.device);
                             break;
                         default:
                             loge("Unexpected stack event: " + event.type);
@@ -598,8 +728,11 @@ final class A2dpSinkStateMachine extends StateMachine {
                         int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                         if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                              mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
-                             informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
+                        /* Check if we need to release patch here
+                         * Would we ever get disconnect directly without
+                         * Suspend or Stoppped being called before */
                         }
+                        releasePatch();
                     } else {
                         loge("Disconnected from unknown device: " + device);
                     }
@@ -621,14 +754,19 @@ final class A2dpSinkStateMachine extends StateMachine {
                     if (mPlayingDevice == null) {
                         mPlayingDevice = device;
                     }
-                    broadcastAudioState(device, BluetoothA2dpSink.STATE_PLAYING,
-                                        BluetoothA2dpSink.STATE_NOT_PLAYING);
+                    requestAudioFocus(true, device);
                     break;
                 case AUDIO_STATE_REMOTE_SUSPEND:
                 case AUDIO_STATE_STOPPED:
                     mPlayingDevice = null;
+                    releasePatch();
                     broadcastAudioState(device, BluetoothA2dpSink.STATE_NOT_PLAYING,
                                         BluetoothA2dpSink.STATE_PLAYING);
+
+                    if (mAudioFocusAcquired == AUDIO_FOCUS_LOSS) {
+                       /* Audio Focus was already lost, no need to do it again */
+                       return;
+                    }
                     if ((mAudioFocusAcquired == AUDIO_FOCUS_LOSS_TRANSIENT) &&
                                      (state == AUDIO_STATE_REMOTE_SUSPEND)) {
                         log(" Dont't Loose audiofocus in case of suspend ");
@@ -637,8 +775,8 @@ final class A2dpSinkStateMachine extends StateMachine {
                     int status = mAudioManager.abandonAudioFocus(mAudioFocusListener);
                     if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                         mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
-                        informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                     }
+
                     break;
                 default:
                   loge("Audio State Device: " + device + " bad state: " + state);
@@ -649,24 +787,33 @@ final class A2dpSinkStateMachine extends StateMachine {
         private void processAudioFocusRequestEvent(int enable, BluetoothDevice device) {
             if ((mCurrentDevice != null) && (mCurrentDevice.equals(device))
                     && (1 == enable)) {
-                if (mAudioFocusAcquired == AUDIO_FOCUS_GAIN) {
-                    informAudioFocusStateNative(AUDIO_FOCUS_GAIN);
+
+                if (mAudioFocusAcquired == AUDIO_FOCUS_LOSS_TRANSIENT) {
+                    log(" Transient Loss Still, Don't acquire focus, Send PAUSE");
+                    SendPassThruPause(device);
+                    return;
+                }
+                else if (mAudioFocusAcquired == AUDIO_FOCUS_GAIN) {
+                    patchPorts();
                     return; /* if we already have focus, don't request again */
                 }
                 int status = mAudioManager.requestAudioFocus(mAudioFocusListener,
                                   AudioManager.STREAM_MUSIC,AudioManager.AUDIOFOCUS_GAIN);
                 log(" Audio Focus Request returned " + status);
                 if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                    informAudioFocusStateNative(AUDIO_FOCUS_GAIN);
                     mAudioFocusAcquired = AUDIO_FOCUS_GAIN;
+                    patchPorts();
                 }
-                else
-                    informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
+                else {
+                    log(" Can't acquire Focus, Send Pause to Remote ");
+                    SendPassThruPause(device);
+                }
             }
         }
     }
 
     private void processAudioConfigEvent(BluetoothAudioConfig audioConfig, BluetoothDevice device) {
+        log("processAudioConfigEvent: " + device);
         mAudioConfigs.put(device, audioConfig);
         broadcastAudioConfig(device, audioConfig);
     }
@@ -762,9 +909,10 @@ final class A2dpSinkStateMachine extends StateMachine {
     // This method does not check for error conditon (newState == prevState)
     private void broadcastConnectionState(BluetoothDevice device, int newState, int prevState) {
 
-        //int delay = mAudioManager.setBluetoothA2dpDeviceConnectionState(device, newState,
-          //      BluetoothProfile.A2DP_SINK);
+        int delay = mAudioManager.setBluetoothA2dpDeviceConnectionState(device, newState,
+                BluetoothProfile.A2DP_SINK);
         connectionKpiMarker(newState, prevState);
+
         mWakeLock.acquire();
         mIntentBroadcastHandler.sendMessageDelayed(mIntentBroadcastHandler.obtainMessage(
                                                         MSG_CONNECTION_STATE_CHANGED,
@@ -847,18 +995,18 @@ final class A2dpSinkStateMachine extends StateMachine {
         sendMessage(STACK_EVENT, event);
     }
 
-    private void onAudioFocusRequest(int enable, byte[] address) {
-        BluetoothDevice device = getDevice(address);
-        logw(" checkaudiofocus for  " + device + " enable " + enable);
-        if (1 == enable) {
+    private void requestAudioFocus(boolean enable, BluetoothDevice device) {
+        logw(" RequestAudioFocus for  " + device + " enable " + enable);
+        if (enable) {
             // send a request for audio_focus
-            StackEvent event = new StackEvent(EVENT_TYPE_REQUEST_AUDIO_FOCUS);
-            event.valueInt = enable;
-            event.device = getDevice(address);
-            sendMessage(STACK_EVENT, event);
+            sendMessage(EVENT_TYPE_REQUEST_AUDIO_FOCUS, device);
         }
     }
 
+    private void setRenderingVolAfterStart() {
+       log(" SetRenderingVolAfterStart ");
+       sendMessageDelayed(SET_RENDERING_VOL, 500);
+    }
     private BluetoothDevice getDevice(byte[] address) {
         return mAdapter.getRemoteDevice(Utils.getAddressStringFromByte(address));
     }
@@ -931,7 +1079,60 @@ final class A2dpSinkStateMachine extends StateMachine {
             return false;
         }
     }
+    public void sendArcpVolUpdate(int streamVal, int streamPrevVal) {
+        AvrcpControllerService avrcpCtrlService = AvrcpControllerService.getAvrcpControllerService();
+        if (avrcpCtrlService != null){
+            log(" volChanged command sent ");
+            avrcpCtrlService.volChanged(streamVal, streamPrevVal, MAX_VOL);
+        } else {
+            log("volChanged not sent, service unavailable");
+        }
+    }
 
+    public void setStreamingVol(int volIndex, boolean updateStreamVolume, int maxPossibleIndex) {
+        log(" SetStreamingVol index = " + volIndex + "maxPossible " + maxPossibleIndex);
+        synchronized(mLockForVolUpdate) {
+            int prevVolGain = mCurVolGain;
+            mCurVolGain = (volIndex*MAX_VOL)/maxPossibleIndex;
+            mCurVolGain = (mCurVolGain > MAX_VOL) ? MAX_VOL:mCurVolGain;
+            mCurVolGain = (mCurVolGain < 1)? 1:mCurVolGain;
+            java.lang.StringBuilder sb = new java.lang.StringBuilder();
+            /* if current Index is 0, make it lowest possible gain */
+            if (volIndex == 0) {
+                mCurVolGain = 1;
+                sb.append(volSetMuteParamString);
+            } else {
+                if(prevVolGain == 1) {
+                    /* Vol was muted earlier */
+                    mAudioManager.setParameters(volSetUnMuteParamString);
+                }
+                /* If this is maximum possible index */
+                if(volIndex == maxPossibleIndex) {
+                    mCurVolGain = MAX_VOL;
+                }
+                sb.append(volSetParamString);
+                sb.append(mCurVolGain);
+            }
+            /*
+             * If Patch is not created and we do setParam
+             * Vol is updated as 1. We anyways set vol after
+             * doing patchPorts.
+             */
+            if(mA2dpSinkAudioPatch == null)
+                return;
+            log("setting Param " + sb.toString());
+            mAudioManager.setParameters(sb.toString());
+            if(updateStreamVolume)
+                mAudioManager.setStreamVolume(mCurrentStreamType,
+                                 (mCurVolGain/getGainMultiplier()), 0);
+        }
+    }
+    public int getMaxVolume() {
+        return MAX_VOL;
+    }
+    public int getCurVolume() {
+        return mCurVolGain;
+    }
     private final BroadcastReceiver mA2dpReceiver = new BroadcastReceiver() {
         @Override
             public void onReceive(Context context, Intent intent) {
@@ -953,11 +1154,23 @@ final class A2dpSinkStateMachine extends StateMachine {
                                 log("abandonAudioFocus returned" + status);
                                 if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                                     mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
-                                    informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                                 }
                             }
                         }
                     }
+                }
+                if (action.equals(AudioManager.VOLUME_CHANGED_ACTION)) {
+                    mCurrentStreamType = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1);
+                    log(" stream Type : " + mCurrentStreamType);
+                    int streamValue = intent
+                             .getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_VALUE, -1);
+                    int streamPrevValue = intent.getIntExtra(
+                             AudioManager.EXTRA_PREV_VOLUME_STREAM_VALUE, -1);
+                    log(" stream prev vol " + streamPrevValue + " new Val = " + streamValue);
+                    int prevVolGain = mCurVolGain;
+                    setStreamingVol(streamValue, false,
+                                     mAudioManager.getStreamMaxVolume(mCurrentStreamType));
+                    sendArcpVolUpdate(mCurVolGain, prevVolGain);
                 }
             }
         };
@@ -968,6 +1181,7 @@ final class A2dpSinkStateMachine extends StateMachine {
             switch(focusChange){
                 case AudioManager.AUDIOFOCUS_LOSS:
                     if (mCurrentDevice != null) {
+                        /* First Release the Patch Anyways */
                         if (SendPassThruPause(mCurrentDevice)) {
                             log(" Sending AVRCP Pause");
                         } else {
@@ -978,7 +1192,6 @@ final class A2dpSinkStateMachine extends StateMachine {
                         log("abandonAudioFocus returned" + status);
                         if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                             mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
-                            informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                         }
                     }
                     break;
@@ -986,12 +1199,11 @@ final class A2dpSinkStateMachine extends StateMachine {
                     if ((mCurrentDevice != null) && (getCurrentState() == mConnected)) {
                     /* don't abandon focus, but fake focus loss */
                        mAudioFocusAcquired = AUDIO_FOCUS_LOSS_TRANSIENT;
-                       informAudioFocusStateNative(AUDIO_FOCUS_LOSS);
                        if (SendPassThruPause(mCurrentDevice)) {
                             log(" Sending AVRCP Pause");
                         } else {
-                            log(" Sending AVDTP_Suspend AVRCP Not Up");
-                            suspendA2dpNative();
+                            log(" AVRCP Connection not UP");
+                            disconnectA2dpNative(getByteAddress(mCurrentDevice));
                         }
                     }
                     break;
@@ -1008,12 +1220,11 @@ final class A2dpSinkStateMachine extends StateMachine {
                             break;
                         }
                         mAudioFocusAcquired = AUDIO_FOCUS_GAIN;
-                        informAudioFocusStateNative(AUDIO_FOCUS_GAIN);
                         if (SendPassThruPlay(mCurrentDevice)) {
                             log(" Sending AVRCP Play");
                         } else {
-                            log(" Sending AVDTP_Start AVRCP Not Up");
-                            resumeA2dpNative();
+                            log(" AVRCP Connection not up");
+                            /* TODO what shld we do in case AVRCP connection is not there */
                         }
                     }
                     break;
@@ -1028,7 +1239,7 @@ final class A2dpSinkStateMachine extends StateMachine {
     final private static int EVENT_TYPE_CONNECTION_STATE_CHANGED = 1;
     final private static int EVENT_TYPE_AUDIO_STATE_CHANGED = 2;
     final private static int EVENT_TYPE_AUDIO_CONFIG_CHANGED = 3;
-    final private static int EVENT_TYPE_REQUEST_AUDIO_FOCUS = 4;
+
 
    // Do not modify without updating the HAL bt_av.h files.
 
@@ -1048,7 +1259,4 @@ final class A2dpSinkStateMachine extends StateMachine {
     private native void cleanupNative();
     private native boolean connectA2dpNative(byte[] address);
     private native boolean disconnectA2dpNative(byte[] address);
-    private native void suspendA2dpNative();
-    private native void resumeA2dpNative();
-    private native void informAudioFocusStateNative(int state);
 }
