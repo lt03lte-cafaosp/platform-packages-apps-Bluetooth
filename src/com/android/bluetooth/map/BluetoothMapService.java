@@ -151,6 +151,7 @@ public class BluetoothMapService extends ProfileService {
 
     private boolean isWaitingAuthorization = false;
     private boolean removeTimeoutMsg = false;
+    private boolean mRegisteredMapReceiver = false;
 
     // package and class name to which we send intent to check message access access permission
     private static final String ACCESS_AUTHORITY_PACKAGE = "com.android.settings";
@@ -430,10 +431,13 @@ public class BluetoothMapService extends ProfileService {
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        try {
-            registerReceiver(mMapReceiver, filter);
-        } catch (Exception e) {
-            Log.w(TAG,"Unable to register map receiver",e);
+        if(!mRegisteredMapReceiver) {
+            try {
+                registerReceiver(mMapReceiver, filter);
+                mRegisteredMapReceiver = true;
+            } catch (Exception e) {
+                Log.w(TAG,"Unable to register map receiver",e);
+            }
         }
         mConnectionManager.init();
         mAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -460,12 +464,14 @@ public class BluetoothMapService extends ProfileService {
     @Override
     protected boolean stop() {
         if (DEBUG) Log.d(TAG, "stop()");
-        try {
-            unregisterReceiver(mMapReceiver);
-        } catch (Exception e) {
-            Log.w(TAG,"Unable to unregister map receiver",e);
+        if(mRegisteredMapReceiver) {
+            try {
+                unregisterReceiver(mMapReceiver);
+                mRegisteredMapReceiver = false;
+            } catch (Exception e) {
+                Log.w(TAG,"Unable to unregister map receiver",e);
+            }
         }
-
         setState(BluetoothMap.STATE_DISCONNECTED, BluetoothMap.RESULT_CANCELED);
         closeService();
         try {
@@ -479,6 +485,14 @@ public class BluetoothMapService extends ProfileService {
 
     public boolean cleanup()  {
         if (DEBUG) Log.d(TAG, "cleanup()");
+        if(mRegisteredMapReceiver) {
+            try {
+                unregisterReceiver(mMapReceiver);
+                mRegisteredMapReceiver = false;
+            } catch (Exception e) {
+                Log.w(TAG,"Unable to unregister map receiver",e);
+            }
+        }
         setState(BluetoothMap.STATE_DISCONNECTED, BluetoothMap.RESULT_CANCELED);
         closeService();
         return true;
