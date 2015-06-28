@@ -92,6 +92,7 @@ final class A2dpStateMachine extends StateMachine {
     private static final int ENABLE_MULTICAST = 1;
     private static boolean isMultiCastEnabled = false;
     private static boolean isScanDisabled = false;
+    private static boolean isMultiCastFeatureEnabled = false;
 
     private Disconnected mDisconnected;
     private Pending mPending;
@@ -157,11 +158,12 @@ final class A2dpStateMachine extends StateMachine {
         mContext = context;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         maxA2dpConnections = maxConnections;
+        // By default isMultiCastEnabled is set to false, value changes based on stack update
+        isMultiCastEnabled = false;
         if (multiCastState == 1) {
-            isMultiCastEnabled = true;
-        }
-        else {
-            isMultiCastEnabled = false;
+            isMultiCastFeatureEnabled = true;
+        } else {
+            isMultiCastFeatureEnabled = false;
         }
 
         initNative(maxA2dpConnections, multiCastState);
@@ -1569,6 +1571,14 @@ final class A2dpStateMachine extends StateMachine {
         return mPlayingA2dpDevice;
     }
 
+    public boolean isMulticastEnabled() {
+        return isMultiCastEnabled;
+    }
+
+    public boolean isMulticastFeatureEnabled() {
+        return isMultiCastFeatureEnabled;
+    }
+
     boolean okToConnect(BluetoothDevice device) {
         AdapterService adapterService = AdapterService.getAdapterService();
         int priority = mService.getPriority(device);
@@ -1693,7 +1703,6 @@ final class A2dpStateMachine extends StateMachine {
     }
 
     private void onMulticastStateChanged(int state) {
-
         if (state == ENABLE_MULTICAST) {
             Log.i(TAG,"A2dp Multicast is Enabled");
             isMultiCastEnabled = true;

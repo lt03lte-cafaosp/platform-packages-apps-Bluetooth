@@ -242,6 +242,14 @@ public class A2dpService extends ProfileService {
         return mStateMachine.getPlayingDevice();
     }
 
+    public boolean isMulticastEnabled() {
+        return mStateMachine.isMulticastEnabled();
+    }
+
+    public boolean isMulticastFeatureEnabled() {
+        return mStateMachine.isMulticastFeatureEnabled();
+    }
+
     // return status of multicast,needed for blocking outgoing connections
     public boolean isMulticastOngoing(BluetoothDevice device) {
 
