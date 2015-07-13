@@ -94,7 +94,9 @@ public class AdapterService extends Service {
     private static final int MIN_ADVT_INSTANCES_FOR_MA = 5;
     private static final int MIN_OFFLOADED_FILTERS = 10;
     private static final int MIN_OFFLOADED_SCAN_STORAGE_BYTES = 2048;
-    private static final String delayConnectTimeoutDevice[] = {"00:23:3D"}; // volkswagen carkit
+    private static final String delayConnectTimeoutDevice[] =
+            {"00:23:3D", // volkswagen carkit
+             "00:0C:36"};// Bose series 2 HS
     //For Debugging only
     private static int sRefCount=0;
     private static int mScanmode;
