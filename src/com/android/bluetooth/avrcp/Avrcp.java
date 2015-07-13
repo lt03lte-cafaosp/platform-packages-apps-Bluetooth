@@ -1478,7 +1478,8 @@ public final class Avrcp {
     }
 
     private void updatePlayStatusForDevice(int deviceIndex,int state) {
-        Log.i(TAG,"updatePlayStatusForDevice");
+        Log.i(TAG,"updatePlayStatusForDevice: device: " +
+                    deviceFeatures[deviceIndex].mCurrentDevice);
         int oldPlayStatus = convertPlayStateToPlayStatus(
                     deviceFeatures[deviceIndex].mCurrentPlayState);
         int newPlayStatus = convertPlayStateToPlayStatus(state);
@@ -1565,7 +1566,8 @@ public final class Avrcp {
     }
 
     private boolean isPlayStateToBeUpdated(int deviceIndex) {
-        Log.v(TAG, "isPlayStateTobeUpdated");
+        Log.v(TAG, "isPlayStateTobeUpdated: device: "  +
+                    deviceFeatures[deviceIndex].mCurrentDevice);
         if (maxAvrcpConnections < 2) {
             Log.v(TAG, "maxAvrcpConnections: " + maxAvrcpConnections);
             return true;
@@ -3900,13 +3902,11 @@ public final class Avrcp {
 
         if(isResetFocusRequired) {
             for (int i = 0; i < maxAvrcpConnections; i++) {
-                if (deviceFeatures[i].mCurrentDevice != null) {
-                    if (mHandler != null) {
-                        if (DEBUG)
-                            Log.v(TAG, "Send MSG_UPDATE_ADDRESSED_PLAYER: 0");
-                        mHandler.obtainMessage(MSG_UPDATE_ADDRESSED_PLAYER,
-                                0, 0, 0).sendToTarget();
-                    }
+                if (mHandler != null) {
+                    if (DEBUG)
+                        Log.v(TAG, "Send MSG_UPDATE_ADDRESSED_PLAYER: 0");
+                    mHandler.obtainMessage(MSG_UPDATE_ADDRESSED_PLAYER,
+                            0, 0, 0).sendToTarget();
                 }
             }
         }
