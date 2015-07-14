@@ -1448,21 +1448,6 @@ public final class Avrcp {
 
     private void updateMetadata(MetadataEditor data) {
         if (DEBUG) Log.v(TAG, "updateMetadata");
-        if (mMediaPlayers.size() > 0) {
-            final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
-            while (rccIterator.hasNext()) {
-                final MediaPlayerInfo di = rccIterator.next();
-                if (di.GetPlayerFocus()) {
-                    if (DEBUG) Log.v(TAG, "resetting current MetaData");
-                    mMetadata.artist = di.GetMetadata().artist;
-                    mMetadata.trackTitle = di.GetMetadata().trackTitle;
-                    mMetadata.albumTitle = di.GetMetadata().albumTitle;
-                    mMetadata.genre = di.GetMetadata().genre;
-                    mMetadata.tracknum = di.GetMetadata().tracknum;
-                    break;
-                }
-            }
-        }
 
         String oldMetadata = mMetadata.toString();
         mMetadata.artist = data.getString(MediaMetadataRetriever.METADATA_KEY_ARTIST, null);
@@ -1474,18 +1459,6 @@ public final class Avrcp {
 
         Log.v(TAG,"old Metadata = " + oldMetadata);
         Log.v(TAG,"new MetaData " + mMetadata.toString());
-
-        if (mMediaPlayers.size() > 0) {
-            final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
-            while (rccIterator.hasNext()) {
-                final MediaPlayerInfo di = rccIterator.next();
-                if (di.GetPlayerFocus()) {
-                    if (DEBUG) Log.v(TAG, "updating List MetaData");
-                    di.SetMetadata(mMetadata);
-                    break;
-                }
-            }
-        }
 
         if (!oldMetadata.equals(mMetadata.toString())) {
             updateTrackNumber();
