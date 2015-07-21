@@ -122,6 +122,10 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
     boolean mTransferInProgress = false;
 
+    private BluetoothOppManager mOppManager;
+
+    private static final int OPP_A2DP_SCO_CONCURRENCY_REDUCED_MTU_SIZE = 8192;
+
     public BluetoothOppObexServerSession(Context context, ObexTransport transport) {
         mContext = context;
         mTransport = transport;
@@ -147,6 +151,14 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             if (D) Log.d(TAG, "Create ServerSession with transport " + mTransport.toString());
             mSession = new ServerSession(mTransport, this, null);
             int mps = ((BluetoothOppTransport)mTransport).getMaxPacketSize();
+            mOppManager = BluetoothOppManager.getInstance(mContext);
+            if ((mps > OPP_A2DP_SCO_CONCURRENCY_REDUCED_MTU_SIZE) && (mOppManager != null)
+                      && mOppManager.isA2DPPlaying ){
+                  //Reduce Obex over L2CAP MTU size for simultaneous A2DP and OPP
+                  mps = OPP_A2DP_SCO_CONCURRENCY_REDUCED_MTU_SIZE;
+                  mSession.reduceMTU(true);
+               if (V) Log.v(TAG, "Reducing Obex MTU to 8k as A2DP or SCO in progress");
+            }
             mSession.setMaxPacketSize(mps);
             if (D) Log.d(TAG, "Setting ServerSession mps " + mps);
 
