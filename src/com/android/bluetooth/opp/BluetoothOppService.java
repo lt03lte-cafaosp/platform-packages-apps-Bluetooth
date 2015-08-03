@@ -422,13 +422,10 @@ public class BluetoothOppService extends Service {
                         if (V) Log.v(TAG, "Receiver DISABLED_ACTION ");
 
                         if (mUpdateThread != null) {
-                            try {
-                                mUpdateThread.interrupt();
-                                mUpdateThread.join();
-                                mUpdateThread = null;
-                            } catch (InterruptedException ie) {
-                                Log.e(TAG, "OPPService Thread join interrupted");
-                            }
+
+                            mUpdateThread.interrupt();
+                            mUpdateThread = null;
+
                         }
 
                         mNotifier.btOffNotification();
