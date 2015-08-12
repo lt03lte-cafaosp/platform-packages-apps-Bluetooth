@@ -485,7 +485,10 @@ final class A2dpStateMachine extends StateMachine {
         @Override
         public void enter() {
             log("Enter Connected: " + getCurrentMessage().what);
-            removeMessages(CONNECT_TIMEOUT);
+            // remove timeout for connected device only.
+            if (mTargetDevice == null) {
+                removeMessages(CONNECT_TIMEOUT);
+            }
             // Upon connected, the audio starts out as stopped
             broadcastAudioState(mCurrentDevice, BluetoothA2dp.STATE_NOT_PLAYING,
                                 BluetoothA2dp.STATE_PLAYING);
@@ -545,6 +548,18 @@ final class A2dpStateMachine extends StateMachine {
                     }
                     transitionTo(mPending);
                 }
+                    break;
+                case CONNECT_TIMEOUT:
+                    if (mTargetDevice == null) {
+                        loge("CONNECT_TIMEOUT received : targetDevice : " + mTargetDevice);
+                    } else {
+                        loge("CONNECT_TIMEOUT received : connected device : " +
+                            mCurrentDevice + " : timedout device : " + mTargetDevice);
+                        broadcastConnectionState(mTargetDevice,
+                                BluetoothProfile.STATE_DISCONNECTED,
+                                BluetoothProfile.STATE_CONNECTING);
+                        mTargetDevice = null;
+                    }
                     break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
