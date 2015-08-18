@@ -97,6 +97,7 @@ public class AdapterService extends Service {
     private static final String delayConnectTimeoutDevice[] =
             {"00:23:3D", // volkswagen carkit
              "00:23:01", // Roman 9020 HS
+             "00:0C:8A", // Bose HS
              "00:0C:36"};// Bose series 2 HS
     //For Debugging only
     private static int sRefCount=0;
