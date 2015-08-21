@@ -475,10 +475,10 @@ public class BluetoothMapContentObserver {
 
         HashMap<Long, Msg> msgListSms = new HashMap<Long, Msg>();
 
-        Cursor c = mResolver.query(Sms.CONTENT_URI,
-            SMS_PROJECTION, null, null, null);
-
         synchronized(mMsgListSms) {
+            Cursor c = mResolver.query(Sms.CONTENT_URI,
+                SMS_PROJECTION, null, null, null);
+
             if (c != null && c.moveToFirst()) {
                 do {
                     long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
@@ -552,6 +552,10 @@ public class BluetoothMapContentObserver {
             }
 
             for (Msg msg : mMsgListSms.values()) {
+                if(V) {
+                    Log.d(TAG, "Event Del msgtype: " + msg.type);
+                    Log.d(TAG, "msgFolder: " + folderSms[msg.type]);
+                }
                 Event evt = new Event("MessageDeleted", msg.id, "deleted",
                     null, mSmsType);
                 sendEvent(evt);
@@ -566,10 +570,10 @@ public class BluetoothMapContentObserver {
 
         HashMap<Long, Msg> msgListMms = new HashMap<Long, Msg>();
 
-        Cursor c = mResolver.query(Mms.CONTENT_URI,
-            MMS_PROJECTION, null, null, null);
-
         synchronized(mMsgListMms) {
+            Cursor c = mResolver.query(Mms.CONTENT_URI,
+                MMS_PROJECTION, null, null, null);
+
             if (c != null && c.moveToFirst()) {
                 do {
                     long id = c.getLong(c.getColumnIndex(BaseColumns._ID));
