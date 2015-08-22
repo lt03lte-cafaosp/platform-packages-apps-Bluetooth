@@ -211,6 +211,10 @@ final class A2dpSinkStateMachine extends StateMachine {
                 " mPlayingDevice " + mPlayingDevice + " mOutPortSpeaker " + mOutPortSpeaker);
             if((mA2dpSinkAudioPatch == null) && (mPlayingDevice != null) &&
                (mOutPortSpeaker != null) && (mInPortA2dpSink != null)) {
+                if((mAudioConfigs == null)||(!mAudioConfigs.containsKey(mPlayingDevice))) {
+                    log(" AudioConfigs not yet received, returning");
+                    return;
+                }
                 int sampleRate = getAudioConfig(mPlayingDevice).getSampleRate();
                 int channelMask = getAudioConfig(mPlayingDevice).getChannelConfig();
                 int format = getAudioConfig(mPlayingDevice).getAudioFormat();
@@ -295,6 +299,7 @@ final class A2dpSinkStateMachine extends StateMachine {
     }
 
     public void cleanup() {
+        releasePatch();
         cleanupNative();
         if (mContext != null)
            mContext.unregisterReceiver(mA2dpReceiver);
@@ -682,7 +687,8 @@ final class A2dpSinkStateMachine extends StateMachine {
                 }
                     break;
                 case SET_RENDERING_VOL:
-                    setStreamingVol(mCurVolGain, true, MAX_VOL);
+                    setStreamingVol(mAudioManager.getStreamVolume(mCurrentStreamType), true,
+                                    mAudioManager.getStreamMaxVolume(mCurrentStreamType));
                     break;
                 case EVENT_TYPE_REQUEST_AUDIO_FOCUS:
                     processAudioFocusRequestEvent(1, (BluetoothDevice) message.obj);
