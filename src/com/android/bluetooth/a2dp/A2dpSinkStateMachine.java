@@ -108,6 +108,8 @@ final class A2dpSinkStateMachine extends StateMachine {
     private static final int AUDIO_FOCUS_GAIN = 1;
     private static final int AUDIO_FOCUS_LOSS_TRANSIENT = 2;
     private static final int AUDIO_FOCUS_LOSS_CAN_DUCK = 3;
+    private static final int AUDIO_FOCUS_REQUEST_MESSAGE_DELAYED = 500;
+
     private int mAudioFocusAcquired = AUDIO_FOCUS_LOSS;
 
     private static final int maxA2dpSinkConnections = 1;
@@ -760,7 +762,7 @@ final class A2dpSinkStateMachine extends StateMachine {
                     if (mPlayingDevice == null) {
                         mPlayingDevice = device;
                     }
-                    requestAudioFocus(true, device);
+                    requestAudioFocus(true, device, 0);
                     break;
                 case AUDIO_STATE_REMOTE_SUSPEND:
                 case AUDIO_STATE_STOPPED:
@@ -811,8 +813,8 @@ final class A2dpSinkStateMachine extends StateMachine {
                     patchPorts();
                 }
                 else {
-                    log(" Can't acquire Focus, Send Pause to Remote ");
-                    SendPassThruPause(device);
+                    log("Can't acquire Focus, request with delay");
+                    requestAudioFocus(true, device, AUDIO_FOCUS_REQUEST_MESSAGE_DELAYED);
                 }
             }
         }
@@ -1001,11 +1003,12 @@ final class A2dpSinkStateMachine extends StateMachine {
         sendMessage(STACK_EVENT, event);
     }
 
-    private void requestAudioFocus(boolean enable, BluetoothDevice device) {
+    private void requestAudioFocus(boolean enable, BluetoothDevice device, int delay) {
         logw(" RequestAudioFocus for  " + device + " enable " + enable);
         if (enable) {
             // send a request for audio_focus
-            sendMessage(EVENT_TYPE_REQUEST_AUDIO_FOCUS, device);
+            Message posMsg = obtainMessage(EVENT_TYPE_REQUEST_AUDIO_FOCUS, device);
+            sendMessageDelayed(posMsg, delay);
         }
     }
 
