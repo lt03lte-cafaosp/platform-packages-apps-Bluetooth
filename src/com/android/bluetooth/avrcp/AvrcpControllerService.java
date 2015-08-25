@@ -71,6 +71,7 @@ public class AvrcpControllerService extends ProfileService {
     private static final int MESSAGE_GET_PLAY_STATUS = 9;
     private static final int MESSAGE_DEINIT_AVRCP_DATABASE = 10;
     private static final int MESSAGE_REGISTER_NOTIFICATION = 11;
+    private static final int MESSAGE_SEND_GROUP_NAVIGATION_CMD = 12;
 
     private static final int MESSAGE_CMD_TIMEOUT = 100;
     /* Timeout Defined as per Spec */
@@ -242,17 +243,6 @@ public class AvrcpControllerService extends ProfileService {
     private static final int  AVRC_RSP_IMPL_STBL = 12;
     private static final int  AVRC_RSP_CHANGED  =  13;
     private static final int  AVRC_RSP_INTERIM  =  15;
-
-    /*
-     * AVRCP Key event
-     */
-    public static final int AVRC_ID_PLAY = 0x44;
-    public static final int AVRC_ID_PAUSE = 0x46;
-    public static final int AVRC_ID_STOP = 0x45;
-    public static final int AVRC_ID_FF = 0x49;
-    public static final int AVRC_ID_REWIND = 0x48;
-    public static final int AVRC_ID_FORWARD = 0x4B;
-    public static final int AVRC_ID_BACKWARD = 0x4C;
 
     public static final int ABS_VOL_BASE = 127;
 /*
@@ -472,9 +462,22 @@ public class AvrcpControllerService extends ProfileService {
             mRemoteData.absVolNotificationState = NOTIFY_RSP_INTERIM_SENT;
         }
     }
+    public void sendGroupNavigationCmd(BluetoothDevice device, int keyCode, int keyState) {
+        Log.v(TAG, "sendGroupNavigationCmd keyCode: " + keyCode + " keyState: " + keyState);
+        if (device == null) {
+            throw new NullPointerException("device == null");
+        }
+        if (!(mConnectedDevices.contains(device))) {
+            Log.d(TAG," Device does not match");
+            return;
+        }
+        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        Message msg = mHandler.obtainMessage(MESSAGE_SEND_GROUP_NAVIGATION_CMD,
+                 keyCode, keyState, device);
+        mHandler.sendMessage(msg);
+    }
     public void sendPassThroughCmd(BluetoothDevice device, int keyCode, int keyState) {
-        if (DBG) Log.d(TAG, "sendPassThroughCmd");
-        Log.v(TAG, "keyCode: " + keyCode + " keyState: " + keyState);
+        Log.v(TAG, "sendPassThroughCmd keyCode: " + keyCode + " keyState: " + keyState);
         if (device == null) {
             throw new NullPointerException("device == null");
         }
@@ -492,11 +495,11 @@ public class AvrcpControllerService extends ProfileService {
         }
         boolean sendCommand = false;
         switch(keyCode) {
-            case AVRC_ID_PLAY:
+            case BluetoothAvrcpController.AVRC_ID_PLAY:
                 sendCommand  = (mRemoteData.mMetadata.playStatus == PLAY_STATUS_STOPPED)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PAUSED);
                 break;
-            case AVRC_ID_PAUSE:
+            case BluetoothAvrcpController.AVRC_ID_PAUSE:
             /*
              * allowing pause command in pause state to handle A2DP Sink Concurrency
              * If call is ongoing and Start is initiated from remote, we will send pause again
@@ -509,17 +512,17 @@ public class AvrcpControllerService extends ProfileService {
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PAUSED)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_REV_SEEK);
                 break;
-            case AVRC_ID_STOP:
+            case BluetoothAvrcpController.AVRC_ID_STOP:
                 sendCommand  = (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PLAYING)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_FWD_SEEK)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_REV_SEEK)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_STOPPED)||
                                (mRemoteData.mMetadata.playStatus == PLAY_STATUS_PAUSED);
                 break;
-            case AVRC_ID_BACKWARD:
-            case AVRC_ID_FORWARD:
-            case AVRC_ID_FF:
-            case AVRC_ID_REWIND:
+            case BluetoothAvrcpController.AVRC_ID_BACKWARD:
+            case BluetoothAvrcpController.AVRC_ID_FORWARD:
+            case BluetoothAvrcpController.AVRC_ID_FF:
+            case BluetoothAvrcpController.AVRC_ID_REWIND:
                 sendCommand = true; // we can send this command in all states
                 break;
         }
@@ -877,6 +880,12 @@ public class AvrcpControllerService extends ProfileService {
             AvrcpControllerService service = getService();
             if (service == null) return;
             service.sendPassThroughCmd(device, keyCode, keyState);
+        }
+        public void sendGroupNavigationCmd(BluetoothDevice device, int keyCode, int keyState) {
+            Log.v(TAG,"Binder Call: sendGroupNavigationCmd");
+            AvrcpControllerService service = getService();
+            if (service == null) return;
+            service.sendGroupNavigationCmd(device, keyCode, keyState);
         }
 
         public void getMetaData(int[] attributeIds) {
@@ -1628,6 +1637,10 @@ public class AvrcpControllerService extends ProfileService {
                 BluetoothDevice device = (BluetoothDevice)msg.obj;
                 sendPassThroughCommandNative(getByteAddress(device), msg.arg1, msg.arg2);
                 break;
+            case MESSAGE_SEND_GROUP_NAVIGATION_CMD:
+                BluetoothDevice peerDevice = (BluetoothDevice)msg.obj;
+                sendGroupNavigationCommandNative(getByteAddress(peerDevice), msg.arg1, msg.arg2);
+                break;
             case MESSAGE_GET_SUPPORTED_COMPANY_ID: //first command in AVRCP 1.3 that we send.
                 /*
                  * If Sink is not active we won't allow AVRCP MetaData
@@ -1856,6 +1869,11 @@ public class AvrcpControllerService extends ProfileService {
 
     private void handlePassthroughRsp(int id, int keyState) {
         Log.d(TAG, "passthrough response received as: key: "
+                                + id + " state: " + keyState);
+    }
+
+    private void handleGroupNavigationRsp(int id, int keyState) {
+        Log.d(TAG, "group navigation response received as: key: "
                                 + id + " state: " + keyState);
     }
     private void handleGetCapabilitiesResponse(byte[] address, int capability_id,
@@ -2150,6 +2168,8 @@ public class AvrcpControllerService extends ProfileService {
     private native void initNative();
     private native void cleanupNative();
     private native boolean sendPassThroughCommandNative(byte[] address, int keyCode, int keyState);
+    private native boolean sendGroupNavigationCommandNative(byte[] address, int keyCode,
+                                                                                     int keyState);
     private native void getCapabilitiesNative(int capId);
     private native void listPlayerApplicationSettingAttributeNative();
     private native void listPlayerApplicationSettingValueNative(byte attribId);

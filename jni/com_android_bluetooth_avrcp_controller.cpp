@@ -40,6 +40,7 @@ static jmethodID method_handleGetPlayStatus;
 static jmethodID method_handleSetAbsVolume;
 static jmethodID method_handleRegisterNotificationAbsVol;
 static jmethodID method_handleSetPlayerApplicationResponse;
+static jmethodID method_handleGroupNavigationRsp;
 
 
 static const btrc_ctrl_interface_t *sBluetoothAvrcpInterface = NULL;
@@ -68,6 +69,19 @@ static void btavrcp_passthrough_response_callback(int id, int pressed) {
     }
 
     sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handlePassthroughRsp, (jint)id,
+                                                                             (jint)pressed);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+}
+
+static void btavrcp_groupnavigation_response_callback(int id, int pressed) {
+    ALOGI("%s", __FUNCTION__);
+
+    if (!checkCallbackThread()) {
+        ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
+        return;
+    }
+
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleGroupNavigationRsp, (jint)id,
                                                                              (jint)pressed);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
@@ -456,6 +470,9 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     method_handleSetPlayerApplicationResponse =
         env->GetMethodID(clazz, "handleSetPlayerApplicationResponse", "([BB)V");
 
+    method_handleGroupNavigationRsp =
+        env->GetMethodID(clazz, "handleGroupNavigationRsp", "(II)V");
+
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 
@@ -535,6 +552,32 @@ static jboolean sendPassThroughCommandNative(JNIEnv *env, jobject object, jbyteA
     if ((status = sBluetoothAvrcpInterface->send_pass_through_cmd((bt_bdaddr_t *)addr,
             (uint8_t)key_code, (uint8_t)key_state))!= BT_STATUS_SUCCESS) {
         ALOGE("Failed sending passthru command, status: %d", status);
+    }
+    env->ReleaseByteArrayElements(address, addr, 0);
+
+    return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
+}
+
+static jboolean sendGroupNavigationCommandNative(JNIEnv *env, jobject object, jbyteArray address,
+                                                    jint key_code, jint key_state) {
+    jbyte *addr;
+    bt_status_t status;
+
+    if (!sBluetoothAvrcpInterface) return JNI_FALSE;
+
+    ALOGI("%s: sBluetoothAvrcpInterface: %p", __FUNCTION__, sBluetoothAvrcpInterface);
+
+    ALOGI("key_code: %d, key_state: %d", key_code, key_state);
+
+    addr = env->GetByteArrayElements(address, NULL);
+    if (!addr) {
+        jniThrowIOException(env, EINVAL);
+        return JNI_FALSE;
+    }
+
+    if ((status = sBluetoothAvrcpInterface->send_group_navigation_cmd((bt_bdaddr_t *)addr,
+            (uint8_t)key_code, (uint8_t)key_state))!= BT_STATUS_SUCCESS) {
+        ALOGE("Failed sending Grp Navigation command, status: %d", status);
     }
     env->ReleaseByteArrayElements(address, addr, 0);
 
@@ -725,6 +768,7 @@ static JNINativeMethod sMethods[] = {
     {"initNative", "()V", (void *) initNative},
     {"cleanupNative", "()V", (void *) cleanupNative},
     {"sendPassThroughCommandNative", "([BII)Z",(void *) sendPassThroughCommandNative},
+    {"sendGroupNavigationCommandNative", "([BII)Z",(void *) sendGroupNavigationCommandNative},
     {"getCapabilitiesNative", "(I)V",(void *) getCapabilitiesNative},
     {"listPlayerApplicationSettingAttributeNative", "()V",
                                (void *) listPlayerApplicationSettingAttributeNative},
