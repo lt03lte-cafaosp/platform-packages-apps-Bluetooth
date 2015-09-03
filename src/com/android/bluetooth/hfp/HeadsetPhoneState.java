@@ -83,15 +83,27 @@ class HeadsetPhoneState {
     void listenForPhoneState(boolean start) {
         if (start) {
             if (!mListening) {
-                mTelephonyManager.listen(mPhoneStateListener,
-                                         PhoneStateListener.LISTEN_SERVICE_STATE |
-                                         PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
-                mListening = true;
+                try {
+                    mTelephonyManager.listen(mPhoneStateListener,
+                                             PhoneStateListener.LISTEN_SERVICE_STATE |
+                                             PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+                    mListening = true;
+                } catch (NullPointerException npe) {
+                    // Handle case where Telephoneymanager crashes
+                    // and context becomes NULL
+                    Log.e(TAG, "NullPointerException for Telephonymanager while startListen", npe);
+                }
             }
         } else {
             if (mListening) {
-                mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
-                mListening = false;
+                try {
+                    mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+                    mListening = false;
+                } catch (NullPointerException npe) {
+                    // Handle case where Telephoneymanager crashes
+                    // and context becomes NULL
+                    Log.e(TAG, "NullPointerException for Telephonymanager while stopListen", npe);
+                }
             }
         }
     }
