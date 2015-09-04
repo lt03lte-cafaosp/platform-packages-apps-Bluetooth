@@ -141,9 +141,14 @@ public abstract class ProfileService extends Service {
                     Log.d(mName, "Received stop request...Stopping profile...");
                     doStop(intent);
                 } else if (state == BluetoothAdapter.STATE_ON) {
-                    Log.d(mName, "Received start request. Starting profile...");
-                    doStart(intent);
+                    if (mAdapter.getState()== BluetoothAdapter.STATE_TURNING_ON) {
+                        Log.d(mName, "Received start request. Starting profile...");
+                        doStart(intent);
+                    } else {
+                        Log.e(mName, "AdapterStatechange intent is delayed,not starting profile");
+                    }
                 }
+
             }
         }
         return PROFILE_SERVICE_MODE;
