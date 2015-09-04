@@ -41,6 +41,8 @@ static jmethodID method_handleSetAbsVolume;
 static jmethodID method_handleRegisterNotificationAbsVol;
 static jmethodID method_handleSetPlayerApplicationResponse;
 static jmethodID method_handleGroupNavigationRsp;
+static jmethodID method_handleGetPlayerApplicationSettingAttributeText;
+static jmethodID method_handleGetPlayerApplicationSettingAttributeValueText;
 
 
 static const btrc_ctrl_interface_t *sBluetoothAvrcpInterface = NULL;
@@ -413,6 +415,78 @@ static void btavrcp_register_notification_absvol_callback(bt_bdaddr_t *bd_addr) 
     sCallbackEnv->DeleteLocalRef(addr);
 }
 
+static void btavrcp_get_player_app_attribute_txt_rsp_callback(bt_bdaddr_t *bd_addr,
+                                    uint8_t* attrib_txt_rsp, int rsp_len, uint8_t rsp_type) {
+    jbyteArray addr;
+    jbyteArray supported_val;
+
+    ALOGI("%s", __FUNCTION__);
+
+    if (!checkCallbackThread()) {                                       \
+        ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__); \
+        return;                                                         \
+    }
+
+    addr = sCallbackEnv->NewByteArray(sizeof(bt_bdaddr_t));
+    if (!addr) {
+        ALOGE("Fail to get new array ");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        return;
+    }
+    supported_val = sCallbackEnv->NewByteArray(rsp_len);
+    if (!supported_val) {
+        ALOGE("Fail to get new array ");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        sCallbackEnv->DeleteLocalRef(addr);
+        return;
+    }
+
+    sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
+    sCallbackEnv->SetByteArrayRegion(supported_val, 0, (rsp_len), (jbyte*)(attrib_txt_rsp));
+    sCallbackEnv->CallVoidMethod(mCallbacksObj,
+           method_handleGetPlayerApplicationSettingAttributeText,addr, supported_val,
+                                                   (jint)rsp_len, (jbyte)rsp_type);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(addr);
+    sCallbackEnv->DeleteLocalRef(supported_val);
+}
+
+static void btavrcp_get_player_app_attribute_value_txt_rsp_callback(bt_bdaddr_t *bd_addr,
+                                    uint8_t* attrib_val_txt_rsp, int rsp_len, uint8_t rsp_type) {
+    jbyteArray addr;
+    jbyteArray supported_val;
+
+    ALOGI("%s", __FUNCTION__);
+
+    if (!checkCallbackThread()) {                                       \
+        ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__); \
+        return;                                                         \
+    }
+
+    addr = sCallbackEnv->NewByteArray(sizeof(bt_bdaddr_t));
+    if (!addr) {
+        ALOGE("Fail to get new array ");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        return;
+    }
+    supported_val = sCallbackEnv->NewByteArray(rsp_len);
+    if (!supported_val) {
+        ALOGE("Fail to get new array ");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        sCallbackEnv->DeleteLocalRef(addr);
+        return;
+    }
+
+    sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
+    sCallbackEnv->SetByteArrayRegion(supported_val, 0, (rsp_len), (jbyte*)(attrib_val_txt_rsp));
+    sCallbackEnv->CallVoidMethod(mCallbacksObj,
+             method_handleGetPlayerApplicationSettingAttributeValueText,addr, supported_val,
+                                                   (jint)rsp_len, (jbyte)rsp_type);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(addr);
+    sCallbackEnv->DeleteLocalRef(supported_val);
+}
+
 static btrc_ctrl_callbacks_t sBluetoothAvrcpCallbacks = {
     sizeof(sBluetoothAvrcpCallbacks),
     btavrcp_passthrough_response_callback,
@@ -427,7 +501,10 @@ static btrc_ctrl_callbacks_t sBluetoothAvrcpCallbacks = {
     btavrcp_get_element_attrib_rsp_callback,
     btavrcp_get_playstatus_rsp_callback,
     btavrcp_set_abs_vol_cmd_callback,
-    btavrcp_register_notification_absvol_callback
+    btavrcp_register_notification_absvol_callback,
+    btavrcp_groupnavigation_response_callback,
+    btavrcp_get_player_app_attribute_txt_rsp_callback,
+    btavrcp_get_player_app_attribute_value_txt_rsp_callback
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
@@ -472,6 +549,12 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_handleGroupNavigationRsp =
         env->GetMethodID(clazz, "handleGroupNavigationRsp", "(II)V");
+
+    method_handleGetPlayerApplicationSettingAttributeText =
+     env->GetMethodID(clazz, "handleGetPlayerApplicationSettingAttributeText", "([B[BIB)V");
+
+    method_handleGetPlayerApplicationSettingAttributeValueText =
+     env->GetMethodID(clazz, "handleGetPlayerApplicationSettingAttributeValueText", "([B[BIB)V");
 
     ALOGI("%s: succeeds", __FUNCTION__);
 }
@@ -763,6 +846,72 @@ static void sendRegisterAbsVolRspNative(JNIEnv *env, jobject object, jbyte rsp_t
     }
 }
 
+static void listPlayerApplicationSettingAttributeTextNative(JNIEnv *env, jobject object,
+                                                    jbyte num_attrib, jbyteArray attrib_ids) {
+    bt_status_t status;
+    uint8_t *pAttrs = NULL;
+    int i;
+    jbyte *attr;
+
+    if (!sBluetoothAvrcpInterface) return;
+
+    pAttrs = new uint8_t[num_attrib];
+    if (!pAttrs) {
+        ALOGE("listPlayerApplicationSettingAttributeTextNative: not have enough memeory");
+        return;
+    }
+    attr = env->GetByteArrayElements(attrib_ids, NULL);
+    if (!attr) {
+        delete[] pAttrs;
+        jniThrowIOException(env, EINVAL);
+        return;
+    }
+    for (i = 0; i < num_attrib; ++i) {
+        pAttrs[i] = (uint8_t)attr[i];
+    }
+
+    ALOGI("%s: sBluetoothAvrcpInterface: %p", __FUNCTION__, sBluetoothAvrcpInterface);
+    if ((status = sBluetoothAvrcpInterface->get_player_app_setting_attr_txt_cmd((uint8_t)num_attrib,
+                                          pAttrs))!= BT_STATUS_SUCCESS) {
+        ALOGE("Failed sending ApplicationSettingAttributeText command, status: %d", status);
+    }
+    delete[] pAttrs;
+    env->ReleaseByteArrayElements(attrib_ids, attr, 0);
+}
+
+static void listPlayerApplicationSettingAttributeValueTextNative(JNIEnv *env, jobject object,
+                                  jbyte attrib_id, jbyte num_attrib, jbyteArray attrib_valids) {
+    bt_status_t status;
+    uint8_t *pAttrs = NULL;
+    int i;
+    jbyte *attr;
+
+    if (!sBluetoothAvrcpInterface) return;
+
+    pAttrs = new uint8_t[num_attrib];
+    if (!pAttrs) {
+        ALOGE("listPlayerApplicationSettingAttributeValueTextNative: not have enough memeory");
+        return;
+    }
+    attr = env->GetByteArrayElements(attrib_valids, NULL);
+    if (!attr) {
+        delete[] pAttrs;
+        jniThrowIOException(env, EINVAL);
+        return;
+    }
+    for (i = 0; i < num_attrib; ++i) {
+        pAttrs[i] = (uint8_t)attr[i];
+    }
+
+    ALOGI("%s: sBluetoothAvrcpInterface: %p", __FUNCTION__, sBluetoothAvrcpInterface);
+    if ((status = sBluetoothAvrcpInterface->get_player_app_setting_attr_value_txt_cmd(
+           (uint8_t)attrib_id, (uint8_t)num_attrib, pAttrs))!= BT_STATUS_SUCCESS) {
+        ALOGE("Failed sending AppSettingAttributeValueText command, status: %d", status);
+    }
+    delete[] pAttrs;
+    env->ReleaseByteArrayElements(attrib_valids, attr, 0);
+}
+
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
     {"initNative", "()V", (void *) initNative},
@@ -784,6 +933,10 @@ static JNINativeMethod sMethods[] = {
     {"getPlayStatusNative", "()V",(void *) getPlayStatusNative},
     {"sendAbsVolRspNative", "(I)V",(void *) sendAbsVolRspNative},
     {"sendRegisterAbsVolRspNative", "(BI)V",(void *) sendRegisterAbsVolRspNative},
+    {"listPlayerApplicationSettingAttributeTextNative", "(B[B)V",
+                               (void *) listPlayerApplicationSettingAttributeTextNative},
+    {"listPlayerApplicationSettingAttributeValueTextNative", "(BB[B)V",
+                               (void *) listPlayerApplicationSettingAttributeValueTextNative},
 };
 
 int register_com_android_bluetooth_avrcp_controller(JNIEnv* env)
