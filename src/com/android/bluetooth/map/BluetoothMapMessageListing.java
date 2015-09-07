@@ -34,6 +34,9 @@ public class BluetoothMapMessageListing {
     private boolean hasUnread = false;
     private static final String TAG = "BluetoothMapMessageListing";
     private List<BluetoothMapMessageListingElement> list;
+    private static final boolean D = BluetoothMapService.DEBUG;
+
+    private static final String BENZ_CARKIT = "00:26:e8";
 
     public BluetoothMapMessageListing(){
      list = new ArrayList<BluetoothMapMessageListingElement>();
@@ -81,7 +84,15 @@ public class BluetoothMapMessageListing {
      */
     public byte[] encode() throws UnsupportedEncodingException {
         Log.d(TAG, "encoding to UTF-8 format");
-        XmlSerializer xmlMsgElement = new FastXmlSerializer();
+        XmlSerializer xmlMsgElement = null;
+        boolean isBenzCarkit = BluetoothMapService.getRemoteDevice().getAddress().toLowerCase()
+                .startsWith(BENZ_CARKIT);
+        if(D) Log.d(TAG, "Remote is BENZ CARKIT: " + isBenzCarkit);
+        if(isBenzCarkit) {
+            xmlMsgElement = Xml.newSerializer();
+        } else {
+            xmlMsgElement = new FastXmlSerializer();
+        }
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         OutputStreamWriter myOutputStreamWriter = null;
         try {
@@ -95,9 +106,14 @@ public class BluetoothMapMessageListing {
             String str1;
             String str2 = "<?xml version=\"1.0\"?>";
             xmlMsgElement.setOutput(myOutputStreamWriter);
-            xmlMsgElement.startDocument("UTF-8", true);
-            xmlMsgElement.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
-            xmlMsgElement.text("\n");
+            if(isBenzCarkit) {
+                xmlMsgElement.text("\n");
+            } else {
+                xmlMsgElement.startDocument("UTF-8", true);
+                xmlMsgElement.text("\n");
+                xmlMsgElement.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output",
+                        true);
+            }
             xmlMsgElement.startTag(null, "MAP-msg-listing");
             xmlMsgElement.attribute(null, "version", "1.0");
             // Do the XML encoding of list
