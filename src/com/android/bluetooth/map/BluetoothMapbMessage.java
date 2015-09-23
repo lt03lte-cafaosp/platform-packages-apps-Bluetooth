@@ -428,7 +428,39 @@ public abstract class BluetoothMapbMessage {
             }
             return data;
         }
-
+        /**
+         * Read a part of BMessage including empty lines for last occurence of  terminator
+         * @return the string till terminator, or null at end of file, or if UTF-8 is not supported
+         * @hide
+         */
+        public String getLastStringTerminator(String terminator) {
+            StringBuilder dataStr = new StringBuilder();
+            String lineCur = getLineTerminator();
+            while ( lineCur != null ) {
+                String firstOccur = getStringTerminator(terminator);
+                if (firstOccur != null ) {
+                    if (dataStr.length() != 0 ) {
+                        dataStr.append(terminator);
+                        dataStr.append("\r\n");
+                    }
+                    dataStr.append(lineCur);
+                    if (!lineCur.equals("\r\n")) {
+                        dataStr.append("\r\n");
+                    }
+                    dataStr.append(firstOccur);
+                } else {
+                    //No more occureences of terminator
+                    break;
+                }
+                lineCur = getLineTerminator();
+            }
+            return dataStr.toString();
+        }
+        /**
+         * Read a part of BMessage including empty lines till terminator
+         * @return the string till terminator, or null at end of file, or if UTF-8 is not supported
+         * @hide
+         */
         public String getStringTerminator(String terminator) {
             StringBuilder dataStr= new StringBuilder();
             String lineCur = getLineTerminator();
@@ -439,7 +471,12 @@ public abstract class BluetoothMapbMessage {
                 }
                 lineCur = getLineTerminator();
            }
-           return dataStr.toString();
+           //Return string if only terminator is present.
+           if ( lineCur != null && lineCur.equals(terminator)) {
+               return dataStr.toString();
+           } else {
+               return null;
+           }
         }
     };
 
@@ -627,7 +664,7 @@ public abstract class BluetoothMapbMessage {
 
             if(type == TYPE.EMAIL){
                //TODO: Support Attachments also.
-               parseBodyEmail(reader.getStringTerminator("END:BBODY"));
+               parseBodyEmail(reader.getLastStringTerminator("END:BBODY"));
             } else
             parseBody(reader);
         }
