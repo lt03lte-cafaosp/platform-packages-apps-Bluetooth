@@ -121,7 +121,9 @@ public final class BluetoothAvrcpDataProvider extends ContentProvider {
                     + BluetoothAvrcpInfo.REPEAT_STATUS + " TEXT, "
                     + BluetoothAvrcpInfo.SHUFFLE_STATUS + " TEXT, "
                     + BluetoothAvrcpInfo.SCAN_STATUS + " TEXT, "
-                    + BluetoothAvrcpInfo.EQUALIZER_STATUS + " TEXT); ");
+                    + BluetoothAvrcpInfo.EQUALIZER_STATUS + " TEXT, "
+                    + BluetoothAvrcpInfo.BATTERY_STATUS + " TEXT, "
+                    + BluetoothAvrcpInfo.SYSETEM_STATUS + " TEXT); ");
         } catch (SQLException ex) {
             Log.e(TAG, "couldn't create table in downloads database");
             throw ex;
@@ -199,6 +201,8 @@ public final class BluetoothAvrcpDataProvider extends ContentProvider {
         copyString(BluetoothAvrcpInfo.SHUFFLE_STATUS, values, filteredValues);
         copyString(BluetoothAvrcpInfo.SCAN_STATUS, values, filteredValues);
         copyString(BluetoothAvrcpInfo.EQUALIZER_STATUS, values, filteredValues);
+        copyString(BluetoothAvrcpInfo.BATTERY_STATUS, values, filteredValues);
+        copyString(BluetoothAvrcpInfo.SYSETEM_STATUS, values, filteredValues);
 
         long rowID = db.insert(DB_TABLE, null, filteredValues);
 

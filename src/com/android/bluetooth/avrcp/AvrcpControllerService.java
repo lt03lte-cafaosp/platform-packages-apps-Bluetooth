@@ -72,6 +72,8 @@ public class AvrcpControllerService extends ProfileService {
     private static final int MESSAGE_DEINIT_AVRCP_DATABASE = 10;
     private static final int MESSAGE_REGISTER_NOTIFICATION = 11;
     private static final int MESSAGE_SEND_GROUP_NAVIGATION_CMD = 12;
+    private static final int MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT = 13;
+    private static final int MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT = 14;
 
     private static final int MESSAGE_CMD_TIMEOUT = 100;
     /* Timeout Defined as per Spec */
@@ -100,6 +102,8 @@ public class AvrcpControllerService extends ProfileService {
     private static final int MESSAGE_PROCESS_NOTIFICATION_RESPONSE = 1015;
     private static final int MESSAGE_PROCESS_SET_ABS_VOL_CMD = 1016;
     private static final int MESSAGE_PROCESS_REGISTER_ABS_VOL_REQUEST = 1017;
+    private static final int MESSAGE_PROCESS_PLAYER_APPLICATION_SETTING_ATTRIBUTE_TEXT = 1018;
+    private static final int MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES_TEXT = 1019;
 
     private static final int MESSAGE_PROCESS_RC_FEATURES = 1100;
     private static final int MESSAGE_PROCESS_CONNECTION_CHANGE = 1200;
@@ -122,7 +126,11 @@ public class AvrcpControllerService extends ProfileService {
     private static final byte EVENT_NOTIFICAION_ID_NONE = 0x00;
     private static final byte EVENT_PLAYBACK_STATUS_CHANGED = 0x01;
     private static final byte EVENT_TRACK_CHANGED = 0x02;
+    private static final byte EVENT_TRACK_REACHED_END = 0x03;
+    private static final byte EVENT_TRACK_REACHED_START = 0x04;
     private static final byte EVENT_PLAYBACK_POS_CHANGED = 0x05;
+    private static final byte EVENT_BATT_STATUS_CHANGED = 0x06;
+    private static final byte EVENT_SYSTEM_STATUS_CHANGED = 0x07;
     private static final byte EVENT_PLAYER_APPLICATION_SETTINGS_CHANGED = 0x08;
     private static final byte EVENT_VOLUME_CHANGED = 0x0d;
 /*
@@ -175,6 +183,22 @@ public class AvrcpControllerService extends ProfileService {
     private static final byte PLAY_STATUS_PAUSED = 0x02;
     private static final byte PLAY_STATUS_FWD_SEEK = 0x03;
     private static final byte PLAY_STATUS_REV_SEEK = 0x04;
+
+    /*
+     * Batt Status values
+     */
+    private static final byte BATT_STATUS_NORMAL = 0x00;
+    private static final byte BATT_STATUS_WARNING = 0x01;
+    private static final byte BATT_STATUS_CRITICAL = 0x02;
+    private static final byte BATT_STATUS_EXTERNAL = 0x03;
+    private static final byte BATT_STATUS_FULL_CHARGE = 0x04;
+
+    /*
+     * System Status values
+     */
+    private static final byte SYSTEM_STATUS_POWER_ON = 0x00;
+    private static final byte SYSTEM_STATUS_POWER_OFF = 0x01;
+    private static final byte SYSTEM_STATUS_UNPLUGGED = 0x02;
 /*
  *  values possible for notify_state
  */
@@ -254,11 +278,19 @@ public class AvrcpControllerService extends ProfileService {
     public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
     public static final int BTRC_FEAT_BROWSE = 0x04;
 
+    /*
+     * Player application text is not used often. Remote TG
+     * might behave in unexpected way if it receives this
+     * command. Providing an option to avoid sending this.
+     */
+    private final boolean USE_PLAYER_SETTING_TEXT = true;
     private class PlayerSettings
     {
         public byte attr_Id;
         public byte attr_val;
         public byte [] supported_values;
+        public String attr_text;
+        public String [] supported_values_text;// This is to keep displayable text in UTF-8
     };
     private class NotifyEvents
     {
@@ -305,6 +337,8 @@ public class AvrcpControllerService extends ProfileService {
         private ArrayList <PlayerSettings> mSupportedApplicationSettingsAttribute;
         private ArrayList <NotifyEvents> mNotifyEvent;
         private Metadata mMetadata;
+        private String mBatteryStatus;
+        private String mSystemStatus;
         int mRemoteFeatures;
         int absVolNotificationState;
         int playerSettingAttribIdFetch;
@@ -361,6 +395,8 @@ public class AvrcpControllerService extends ProfileService {
                  mRemoteData.mSupportedApplicationSettingsAttribute.clear();
                  mRemoteData.absVolNotificationState = NOTIFY_NOT_REGISTERED;
                  mRemoteData.mRemoteFeatures = 0;
+                 mRemoteData.mBatteryStatus = BluetoothAvrcpInfo.BATTERY_STATUS_INVALID;
+                 mRemoteData.mSystemStatus = BluetoothAvrcpInfo.SYSTEM_STATUS_INVALID;
                  Log.d(TAG," RC_features, STOP " + mRemoteData.mRemoteFeatures);
                  mRemoteData.playerSettingAttribIdFetch = 0;
                  mRemoteData = null;
@@ -646,11 +682,13 @@ public class AvrcpControllerService extends ProfileService {
             return null;
         byte[] attribIds = new byte[mRemoteData.mSupportedApplicationSettingsAttribute.size()];
         byte[] numAttribVals = new byte[mRemoteData.mSupportedApplicationSettingsAttribute.size()];
+        byte[] currAttribVals = new byte[mRemoteData.mSupportedApplicationSettingsAttribute.size()];
         ArrayList<Byte> supportedVals = new ArrayList<Byte>();
         int index = 0;
         for (PlayerSettings plSetting: mRemoteData.mSupportedApplicationSettingsAttribute) {
             attribIds[index] = plSetting.attr_Id;
             numAttribVals[index] = Integer.valueOf(plSetting.supported_values.length).byteValue();
+            currAttribVals[index] = plSetting.attr_val;
             for (int xx = 0; xx < numAttribVals[index]; xx++)
                 supportedVals.add(plSetting.supported_values[xx]);
             index++;
@@ -662,7 +700,7 @@ public class AvrcpControllerService extends ProfileService {
            (attribIds.length == 0)||(numAttribVals.length == 0))
             return null;
         BluetoothAvrcpInfo btAvrcpMetaData = new BluetoothAvrcpInfo(attribIds,
-                                        numAttribVals, supportedPlSettingsVals);
+                                        numAttribVals, supportedPlSettingsVals, currAttribVals);
         return btAvrcpMetaData;
     }
     public int getSupportedFeatures(BluetoothDevice device) {
@@ -1006,6 +1044,86 @@ public class AvrcpControllerService extends ProfileService {
         getElementAttributeNative(numAttrib,
                   requestedElementAttribs[mRemoteData.mMetadata.attributesFetchedId]);
     }
+    private void parsePlayerAppAttributeValuesText(ByteBuffer bbRsp)
+    {
+        if((mRemoteData == null)||(mRemoteData.mSupportedApplicationSettingsAttribute.size()<=0))
+            return;
+        Log.d(TAG," parsePlayerAppAttributeValuesText ");
+        byte numAppSettingValues = bbRsp.get();
+        while(bbRsp.hasRemaining())
+        {
+            byte playerAppSettingValueId = bbRsp.get();
+            int fetch_id = mRemoteData.playerSettingAttribIdFetch;
+            PlayerSettings plSetting = mRemoteData.mSupportedApplicationSettingsAttribute.
+                                                  get(fetch_id);
+            for (int count = 0; count < plSetting.supported_values.length; ++count)
+            {
+                if(playerAppSettingValueId == plSetting.supported_values[count])
+                {
+                    char charSet = bbRsp.getChar();
+                    byte attrValueTextLen = bbRsp.get();
+                    byte[] asciiAttrTextString = new byte[attrValueTextLen];
+                    bbRsp.get(asciiAttrTextString, 0, attrValueTextLen);
+                    /*
+                     * CT never sends InformCharacterSet, so charset should
+                     * be UTF-8 by default.
+                     */
+                    plSetting.supported_values_text[count] = utf8ToString(asciiAttrTextString);
+                }
+            }
+        }
+    }
+    private void getFurtherPlayerSettingAttribValueText(int operationId)
+    {
+        Log.d(TAG," getFurtherPlayerSettingAttribValueText  Id = " + operationId);
+        if (mRemoteData == null)
+            return;
+        if (operationId == ATTRIBUTE_FETCH_FRESH)
+            mRemoteData.playerSettingAttribIdFetch = 0;
+        else if(operationId == ATTRIBUTE_FETCH_SKIP)
+            mRemoteData.playerSettingAttribIdFetch ++;
+        int fetch_id = mRemoteData.playerSettingAttribIdFetch;
+        if (fetch_id >= mRemoteData.mSupportedApplicationSettingsAttribute.size())
+        {
+            Log.d(TAG," All Attrib Value Text Fetched " + fetch_id);
+            if(USE_PLAYER_SETTING_TEXT)
+                mHandler.sendEmptyMessage(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS);
+            return;
+        }
+        Log.d(TAG," fetching value text for = " + fetch_id);
+        Message msg = mHandler.obtainMessage(MESSAGE_CMD_TIMEOUT,
+                             0,0,MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT);
+        mHandler.sendMessageDelayed(msg, MSG_TIMEOUT_MTP);
+        byte attrib_id = mRemoteData.mSupportedApplicationSettingsAttribute.get(fetch_id).attr_Id;
+        byte num_attrib_value = (byte)mRemoteData.mSupportedApplicationSettingsAttribute.
+                                                       get(fetch_id).supported_values.length;
+        listPlayerApplicationSettingAttributeValueTextNative(attrib_id, num_attrib_value,
+             mRemoteData.mSupportedApplicationSettingsAttribute.get(fetch_id).supported_values);
+    }
+    private void getFurtherPlayerSettingAttribText(int operationId)
+    {
+        Log.d(TAG," getFurtherPlayerSettingAttribText  Id = " + operationId);
+        if (mRemoteData == null)
+            return;
+        if (operationId == ATTRIBUTE_FETCH_FRESH)
+            mRemoteData.playerSettingAttribIdFetch = 0;
+        else if(operationId == ATTRIBUTE_FETCH_SKIP)
+            mRemoteData.playerSettingAttribIdFetch ++;
+        int fetch_id = mRemoteData.playerSettingAttribIdFetch;
+        if (fetch_id >= mRemoteData.mSupportedApplicationSettingsAttribute.size())
+        {
+            Log.d(TAG," All Attrib Text Fetched " + fetch_id);
+            mHandler.sendEmptyMessage(MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT);
+            return;
+        }
+        Log.d(TAG," fetching text for = " + fetch_id);
+        Message msg = mHandler.obtainMessage(MESSAGE_CMD_TIMEOUT,
+                             0,0,MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT);
+        mHandler.sendMessageDelayed(msg, MSG_TIMEOUT_MTP);
+        byte []attrib_id = new byte[1];
+        attrib_id[0] = mRemoteData.mSupportedApplicationSettingsAttribute.get(fetch_id).attr_Id;
+        listPlayerApplicationSettingAttributeTextNative((byte)1, attrib_id);
+    }
     private void getFurtherPlayerSettingAttrib(int operationId)
     {
         Log.d(TAG," getFurtherPlayerSettingAttrib  Id = " + operationId);
@@ -1019,7 +1137,10 @@ public class AvrcpControllerService extends ProfileService {
         if (fetch_id >= mRemoteData.mSupportedApplicationSettingsAttribute.size())
         {
             Log.d(TAG," All Attrib Fetched " + fetch_id);
-            mHandler.sendEmptyMessage(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS);
+            if(USE_PLAYER_SETTING_TEXT)
+                mHandler.sendEmptyMessage(MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT);
+            else
+                mHandler.sendEmptyMessage(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS);
             return;
         }
         Log.d(TAG," fetching_id = " + fetch_id);
@@ -1109,6 +1230,8 @@ public class AvrcpControllerService extends ProfileService {
         values.put(BluetoothAvrcpInfo.SCAN_STATUS, BluetoothAvrcpInfo.SCAN_STATUS_INVALID);
         values.put(BluetoothAvrcpInfo.EQUALIZER_STATUS,
                                               BluetoothAvrcpInfo.EQUALIZER_STATUS_INVALID);
+        values.put(BluetoothAvrcpInfo.BATTERY_STATUS, BluetoothAvrcpInfo.BATTERY_STATUS_INVALID);
+        values.put(BluetoothAvrcpInfo.SYSETEM_STATUS, BluetoothAvrcpInfo.SYSTEM_STATUS_INVALID);
         Cursor cursor = getContentResolver().query(BluetoothAvrcpInfo.CONTENT_URI, null, null, null,
                 BluetoothAvrcpInfo._ID);
         if((cursor != null)&&(cursor.getCount() > 0)) {
@@ -1148,24 +1271,62 @@ public class AvrcpControllerService extends ProfileService {
         }
         return BluetoothAvrcpInfo.PLAY_STATUS_INVALID;
     }
+    private String convertDefaultShuffleAttrValToStr(byte attr_val)
+    {
+        String str = "NOT_SUPPORTED";
+        switch(attr_val)
+        {
+        case SHUFFLE_STATUS_OFF:
+             str =  "SHUFFLE_OFF";
+             break;
+        case SHUFFLE_STATUS_GROUP_SHUFFLE:
+            str =  "SHUFFLE_GROUP_SHUFFLE";
+            break;
+        case SHUFFLE_STATUS_ALL_TRACK_SHUFFLE:
+            str =  "SHUFFLE_ALL_TRACK_SHUFFLE";
+            break;
+        }
+        return str;
+    }
     private String getShuffleStatusString()
     {
         for (PlayerSettings plSettings: mRemoteData.mSupportedApplicationSettingsAttribute)
         {
             if (plSettings.attr_Id == ATTRIB_SHUFFLE_STATUS)
             {
-                switch(plSettings.attr_val)
+                StringBuffer strbuf = new StringBuffer();
+                strbuf.append(plSettings.attr_text);
+                strbuf.append(" : ");
+                int count, val_id = 0;
+                for (count = 0; count < plSettings.supported_values.length; count ++)
                 {
-                case SHUFFLE_STATUS_OFF:
-                     return "SHUFFLE_OFF";
-                case SHUFFLE_STATUS_GROUP_SHUFFLE:
-                    return "SHUFFLE_GROUP_SHUFFLE";
-                case SHUFFLE_STATUS_ALL_TRACK_SHUFFLE:
-                    return "SHUFFLE_ALL_TRACK_SHUFFLE";
+                    if(plSettings.attr_val == plSettings.supported_values[count])
+                        val_id = count;
                 }
+                strbuf.append(plSettings.supported_values_text[val_id]);
+                Log.d(TAG," getShuffleStatusString attr text" +
+                          plSettings.attr_text + " complete " + strbuf.toString());
+                return strbuf.toString();
             }
         }
         return BluetoothAvrcpInfo.SHUFFLE_STATUS_INVALID;
+    }
+    private String convertDefaultScanAttrValToStr(byte attr_val)
+    {
+        String str = "NOT_SUPPORTED";
+        switch(attr_val)
+        {
+        case SCAN_STATUS_OFF:
+            str =  "SCAN_OFF";
+            break;
+       case SCAN_STATUS_GROUP_SCAN:
+           str =  "SCAN_GROUP_SCAN";
+           break;
+       case SCAN_STATUS_ALL_TRACK_SCAN:
+           str =  "SCAN_ALL_TRACK_SCAN";
+           break;
+        }
+        return str;
     }
     private String getScanStatusString()
     {
@@ -1173,18 +1334,36 @@ public class AvrcpControllerService extends ProfileService {
         {
             if (plSettings.attr_Id == ATTRIB_SCAN_STATUS)
             {
-                switch(plSettings.attr_val)
+                StringBuffer strbuf = new StringBuffer();
+                strbuf.append(plSettings.attr_text);
+                strbuf.append(" : ");
+                int count, val_id = 0;
+                for (count = 0; count < plSettings.supported_values.length; count ++)
                 {
-                case SCAN_STATUS_OFF:
-                     return "SCAN_OFF";
-                case SCAN_STATUS_GROUP_SCAN:
-                    return "SCAN_GROUP_SCAN";
-                case SCAN_STATUS_ALL_TRACK_SCAN:
-                    return "SCAN_ALL_TRACK_SCAN";
+                    if(plSettings.attr_val == plSettings.supported_values[count])
+                        val_id = count;
                 }
+                strbuf.append(plSettings.supported_values_text[val_id]);
+                Log.d(TAG," getScanStatusString attr text" +
+                              plSettings.attr_text + " complete " + strbuf.toString());
+                return strbuf.toString();
             }
         }
         return BluetoothAvrcpInfo.SCAN_STATUS_INVALID;
+    }
+    private String convertDefaultEqualizerAttrValToStr(byte attr_val)
+    {
+        String str = "NOT_SUPPORTED";
+        switch(attr_val)
+        {
+        case EQUALIZER_STATUS_OFF:
+            str =  "EQUALIZER_STATUS_OFF";
+            break;
+       case EQUALIZER_STATUS_ON:
+           str =  "EQUALIZER_STATUS_ON";
+           break;
+        }
+        return str;
     }
     private String getEqualizerStatusString()
     {
@@ -1192,16 +1371,42 @@ public class AvrcpControllerService extends ProfileService {
         {
             if (plSettings.attr_Id == ATTRIB_EQUALIZER_STATUS)
             {
-                switch(plSettings.attr_val)
+                StringBuffer strbuf = new StringBuffer();
+                strbuf.append(plSettings.attr_text);
+                strbuf.append(" : ");
+                int count, val_id = 0;
+                for (count = 0; count < plSettings.supported_values.length; count ++)
                 {
-                case EQUALIZER_STATUS_OFF:
-                     return "EQUALIZER_OFF";
-                case EQUALIZER_STATUS_ON:
-                    return "EQUALIZER_ON";
+                    if(plSettings.attr_val == plSettings.supported_values[count])
+                        val_id = count;
                 }
+                strbuf.append(plSettings.supported_values_text[val_id]);
+                Log.d(TAG," getEqualizerStatusString attr text" +
+                          plSettings.attr_text + " complete " + strbuf.toString());
+                return strbuf.toString();
             }
         }
         return BluetoothAvrcpInfo.EQUALIZER_STATUS_INVALID;
+    }
+    private String convertDefaultRepeatAttrValToStr(byte attr_val)
+    {
+        String str = "NOT_SUPPORTED";
+        switch(attr_val)
+        {
+        case REPEAT_STATUS_OFF:
+            str =  "REPEAT_OFF";
+            break;
+       case REPEAT_STATUS_SINGLE_TRACK_REPEAT:
+           str =  "REPEAT_SINGLE_TRACK_REPEAT";
+           break;
+       case REPEAT_STATUS_GROUP_REPEAT:
+           str =  "REPEAT_GROUP_REPEAT";
+           break;
+       case REPEAT_STATUS_ALL_TRACK_REPEAT:
+           str =  "REPEAT_ALL_TRACK_REPEAT";
+           break;
+        }
+        return str;
     }
     private String getRepeatStatusString()
     {
@@ -1209,17 +1414,19 @@ public class AvrcpControllerService extends ProfileService {
         {
             if (plSettings.attr_Id == ATTRIB_REPEAT_STATUS)
             {
-                switch(plSettings.attr_val)
+                StringBuffer strbuf = new StringBuffer();
+                strbuf.append(plSettings.attr_text);
+                strbuf.append(" : ");
+                int count, val_id = 0;
+                for (count = 0; count < plSettings.supported_values.length; count ++)
                 {
-                case REPEAT_STATUS_OFF:
-                     return "REPEAT_OFF";
-                case REPEAT_STATUS_SINGLE_TRACK_REPEAT:
-                    return "REPEAT_SINGLE_TRACK_REPEAT";
-                case REPEAT_STATUS_GROUP_REPEAT:
-                    return "REPEAT_GROUP_REPEAT";
-                case REPEAT_STATUS_ALL_TRACK_REPEAT:
-                    return "REPEAT_ALL_TRACK_REPEAT";
+                    if(plSettings.attr_val == plSettings.supported_values[count])
+                        val_id = count;
                 }
+                strbuf.append(plSettings.supported_values_text[val_id]);
+                Log.d(TAG," getRepeatStatusString attr text" +
+                          plSettings.attr_text + " complete " + strbuf.toString());
+                return strbuf.toString();
             }
         }
         return  BluetoothAvrcpInfo.REPEAT_STATUS_INVALID;
@@ -1280,12 +1487,62 @@ public class AvrcpControllerService extends ProfileService {
                                    update(BluetoothAvrcpInfo.CONTENT_URI,values, null, null);
         Log.d(TAG," updatePlayStatus num_rows_updated " + rowsUpdated);
     }
+    private void updateBattStatus(byte battState) {
+        if(mRemoteData!= null) {
+            Log.d(TAG, "updateBattStatus %d " + battState);
+            switch(battState) {
+            case BATT_STATUS_NORMAL:
+                mRemoteData.mBatteryStatus = "BATTERY_LEVEL_NORMAL";
+                break;
+            case BATT_STATUS_WARNING:
+                mRemoteData.mBatteryStatus = "BATTERY_LEVEL_WARNING";
+                break;
+            case BATT_STATUS_CRITICAL:
+                mRemoteData.mBatteryStatus = "BATTERY_LEVEL_CRITICAL";
+                break;
+            case BATT_STATUS_EXTERNAL:
+                mRemoteData.mBatteryStatus = "BATTERY_LEVEL_EXTERNAL";
+                break;
+            case BATT_STATUS_FULL_CHARGE:
+                mRemoteData.mBatteryStatus = "BATTERY_LEVEL_FULL_CHARGE";
+                break;
+            }
+            ContentValues values =  new ContentValues();
+            values.put(BluetoothAvrcpInfo.BATTERY_STATUS,mRemoteData.mBatteryStatus);
+            int rowsUpdated = sAvrcpControllerService.getContentResolver().
+                    update(BluetoothAvrcpInfo.CONTENT_URI,values, null, null);
+        }
+    }
+    private void updateSystemStatus(byte systemState) {
+        if(mRemoteData!= null) {
+            Log.d(TAG, "updateSystemStatus %d " + systemState);
+            switch(systemState) {
+            case SYSTEM_STATUS_POWER_ON:
+                mRemoteData.mSystemStatus = "SYSTEM_STATUS_POWER_ON";
+                break;
+            case SYSTEM_STATUS_POWER_OFF:
+                mRemoteData.mSystemStatus = "SYSTEM_STATUS_POWER_OFF";
+                break;
+            case SYSTEM_STATUS_UNPLUGGED:
+                mRemoteData.mSystemStatus = "SYSTEM_STATUS_UNPLUGGED";
+                break;
+            }
+            ContentValues values =  new ContentValues();
+            values.put(BluetoothAvrcpInfo.SYSETEM_STATUS,mRemoteData.mSystemStatus);
+            int rowsUpdated = sAvrcpControllerService.getContentResolver().
+                    update(BluetoothAvrcpInfo.CONTENT_URI,values, null, null);
+        }
+    }
     private boolean isEventSupported(byte eventId)
     {
         if ((eventId == EVENT_PLAYBACK_STATUS_CHANGED)||
             (eventId == EVENT_PLAYBACK_POS_CHANGED)||
             (eventId == EVENT_PLAYER_APPLICATION_SETTINGS_CHANGED)||
-            (eventId == EVENT_TRACK_CHANGED))
+            (eventId == EVENT_TRACK_CHANGED)||
+            (eventId == EVENT_TRACK_REACHED_END)||
+            (eventId == EVENT_TRACK_REACHED_START)||
+            (eventId == EVENT_BATT_STATUS_CHANGED)||
+            (eventId == EVENT_SYSTEM_STATUS_CHANGED))
             return true;
         else
             return false;
@@ -1323,6 +1580,12 @@ public class AvrcpControllerService extends ProfileService {
             break;
         case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUES:
             getFurtherPlayerSettingAttrib(ATTRIBUTE_FETCH_SKIP);
+            break;
+        case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT:
+            getFurtherPlayerSettingAttribText(ATTRIBUTE_FETCH_SKIP);
+            break;
+        case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT:
+            getFurtherPlayerSettingAttribValueText(ATTRIBUTE_FETCH_SKIP);
             break;
         case MESSAGE_GET_SUPPORTED_EVENTS:
             /*
@@ -1389,6 +1652,32 @@ public class AvrcpControllerService extends ProfileService {
             case MEDIA_ATTRIBUTE_PLAYING_TIME:
                 mRemoteData.mMetadata.totalTrackLen = BluetoothAvrcpInfo.TOTAL_TRACK_TIME_INVALID;
                 break;
+            }
+        }
+    }
+    private void processPlayerApplicationSettingAttributeText(ByteBuffer bbRsp)
+    {
+        if((mRemoteData == null)||(mRemoteData.mSupportedApplicationSettingsAttribute.size()<=0))
+            return;
+        Log.d(TAG," processPlayerApplicationSettingAttributeText ");
+        byte numAttributes = bbRsp.get();
+        while(bbRsp.hasRemaining())
+        {
+            byte playerAppId = bbRsp.get();
+            for (PlayerSettings plSettings: mRemoteData.mSupportedApplicationSettingsAttribute)
+            {
+                if(plSettings.attr_Id == playerAppId) {
+                    char charSet = bbRsp.getChar();
+                    byte attrTextLen = bbRsp.get();
+                    byte[] asciiAttrTextString = new byte[attrTextLen];
+                    bbRsp.get(asciiAttrTextString, 0, attrTextLen);
+                    /*
+                     * CT never sends InformCharacterSet, so charset should
+                     * be UTF-8 by default.
+                     */
+                    plSettings.attr_text = utf8ToString(asciiAttrTextString);
+                    Log.d(TAG," appId " + playerAppId + " Text : " + plSettings.attr_text);
+                }
             }
         }
     }
@@ -1555,6 +1844,32 @@ public class AvrcpControllerService extends ProfileService {
                     mHandler.sendEmptyMessage(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS);
                 }
                 break;
+                /*
+                 * In case remote supports TRACK_REACHED_END and start and does not support
+                 * TRACK_CHANGED, we will use TRACK_REACHED_START to fetch element
+                 * attributes.
+                 */
+            case EVENT_TRACK_REACHED_START:
+                if ((oldState == NOTIFY_CHANGED_EXPECTED) &&
+                    (notificationType == NOTIFICATION_RSP_TYPE_CHANGED) &&
+                    !(mRemoteData.mEventsSupported.contains(EVENT_TRACK_CHANGED)))
+                {
+                    Log.d(TAG," new track START , que GetElement, PlayerSetting ");
+                    mHandler.sendEmptyMessage(MESSAGE_GET_ELEMENT_ATTRIBUTE);
+                    mHandler.sendEmptyMessage(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS);
+                }
+                break;
+            case EVENT_TRACK_REACHED_END:
+                    Log.d(TAG," track reached END, doing nothing ");
+                break;
+            case EVENT_BATT_STATUS_CHANGED:
+                Log.d(TAG," Batt Status Changed ");
+                updateBattStatus(notificationRsp.get(1));
+                break;
+            case EVENT_SYSTEM_STATUS_CHANGED:
+                Log.d(TAG," SYSTEM Status Changed ");
+                updateSystemStatus(notificationRsp.get(1));
+                break;
             }
         registerFurtherNotification(EVENT_NOTIFICAION_ID_NONE);
     }
@@ -1630,7 +1945,7 @@ public class AvrcpControllerService extends ProfileService {
 
         @Override
         public void handleMessage(Message msg) {
-            Log.d(TAG," HandleMessage: "+ msg.what +
+            Log.d(TAG," HandleMessage: "+ dumpMessageString(msg.what) +
                   " Remote Connected " + !mConnectedDevices.isEmpty());
             switch (msg.what) {
             case MESSAGE_SEND_PASS_THROUGH_CMD:
@@ -1662,6 +1977,12 @@ public class AvrcpControllerService extends ProfileService {
                 break;
             case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUES:
                 getFurtherPlayerSettingAttrib(ATTRIBUTE_FETCH_FRESH);
+                break;
+            case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT:
+                getFurtherPlayerSettingAttribText(ATTRIBUTE_FETCH_FRESH);
+                break;
+            case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT:
+                getFurtherPlayerSettingAttribValueText(ATTRIBUTE_FETCH_FRESH);
                 break;
             case MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS:
                 if (!(mHandler.hasMessages(MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS)))
@@ -1743,6 +2064,9 @@ public class AvrcpControllerService extends ProfileService {
                     mRemoteData.absVolNotificationState = NOTIFY_NOT_REGISTERED;
                     mRemoteData.playerSettingAttribIdFetch = 0;
                     mRemoteData.mRemoteFeatures = 0;
+                    mRemoteData.mBatteryStatus = BluetoothAvrcpInfo.BATTERY_STATUS_INVALID;
+                    mRemoteData.mSystemStatus = BluetoothAvrcpInfo.SYSTEM_STATUS_INVALID;
+
                 }
                 else
                 {
@@ -1790,10 +2114,26 @@ public class AvrcpControllerService extends ProfileService {
                 mRemoteData.playerSettingAttribIdFetch ++;
                 getFurtherPlayerSettingAttrib(msg.arg1);
                 break;
+            case MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES_TEXT:
+                if(msg.arg1 == ATTRIBUTE_FETCH_CONTINUE) {
+                    /* Parse Response here */
+                    parsePlayerAppAttributeValuesText((ByteBuffer)msg.obj);
+                    mRemoteData.playerSettingAttribIdFetch ++;
+                }
+                getFurtherPlayerSettingAttribValueText(msg.arg1);
+                break;
             case MESSAGE_PROCESS_CURRENT_PLAYER_APPLICATION_SETTINGS:
                 updatePlayerApplicationSettings();
                 if ((mRemoteData.mNotifyEvent != null)&&(mRemoteData.mNotifyEvent.isEmpty()))
                     mHandler.sendMessage(mHandler.obtainMessage(MESSAGE_GET_SUPPORTED_EVENTS));
+                break;
+            case MESSAGE_PROCESS_PLAYER_APPLICATION_SETTING_ATTRIBUTE_TEXT:
+                if(msg.arg1 == ATTRIBUTE_FETCH_CONTINUE) {
+                    /* Parse Response here */
+                    processPlayerApplicationSettingAttributeText((ByteBuffer)msg.obj);
+                    mRemoteData.playerSettingAttribIdFetch ++;
+                }
+                getFurtherPlayerSettingAttribText(msg.arg1);
                 break;
             case MESSAGE_PROCESS_NOTIFICATION_RESPONSE:
                 int notificationId = msg.arg1;
@@ -1962,6 +2302,23 @@ public class AvrcpControllerService extends ProfileService {
             PlayerSettings attrib = new PlayerSettings();
             attrib.attr_Id = supported_setting_attrib[count];
             attrib.supported_values = null;
+            /* Lets initialize with Default values */
+            switch(attrib.attr_Id)
+            {
+            case ATTRIB_REPEAT_STATUS:
+                attrib.attr_text = "REPEAT";
+                break;
+            case ATTRIB_EQUALIZER_STATUS:
+                attrib.attr_text = "EQUALIZER";
+                break;
+            case ATTRIB_SCAN_STATUS:
+                attrib.attr_text = "SCAN";
+                break;
+            case ATTRIB_SHUFFLE_STATUS:
+                attrib.attr_text = "SHUFFLE";
+                break;
+            }
+            attrib.supported_values_text = null;
             supported_attrib.add(attrib);
         }
         mHandler.sendMessage(mHandler.
@@ -1975,7 +2332,140 @@ public class AvrcpControllerService extends ProfileService {
     public void dump(StringBuilder sb) {
         super.dump(sb);
     }
-
+    private String dumpMessageString(int message)
+    {
+        String str = "UNKNOWN";
+        switch(message)
+        {
+            case MESSAGE_SEND_PASS_THROUGH_CMD:
+                str = "SEND_PASS_THROUGH_CMD";
+                break;
+            case MESSAGE_GET_SUPPORTED_COMPANY_ID:
+                str =  "GET_COMPANY_ID";
+                break;
+            case MESSAGE_GET_SUPPORTED_EVENTS:
+                str = "GET_SUPPORTED_EVENT";
+                break;
+            case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIB:
+                str = "PL_APP_SETTING_ATTRIB ";
+                break;
+            case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUES:
+                str = "PL_APP_SETTING_VALUES";
+                break;
+            case MESSAGE_GET_CURRENT_PLAYER_APPLICATION_SETTINGS:
+                str = "GET_CUR_PL_APP_SETTING";
+                break;
+            case MESSAGE_SET_CURRENT_PLAYER_APPLICATION_SETTINGS:
+                str = "SET_CUR_PL_APP_SETTING";
+                break;
+            case MESSAGE_GET_ELEMENT_ATTRIBUTE:
+                str = "GET_ELEM_ATTR";
+                break;
+            case MESSAGE_GET_PLAY_STATUS:
+                str = "GET_PLAY_STATUS";
+                break;
+            case MESSAGE_DEINIT_AVRCP_DATABASE:
+                str = "DEINIT_DATABSE";
+                break;
+            case MESSAGE_REGISTER_NOTIFICATION:
+                str = "REG_NOTIFICATION";
+                break;
+            case MESSAGE_SEND_GROUP_NAVIGATION_CMD:
+                str = "SEND_GRP_NAV_CMD";
+                break;
+            case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT:
+                str = "GET_PL_APP_SETT_ATTR_TXT";
+                break;
+            case MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT:
+               str = "GET_PL_APP_SETT_VAL_TXT";
+               break;
+            case MESSAGE_CMD_TIMEOUT:
+               str = "CMD_TIMEOUT";
+               break;
+            case MESSAGE_TIMEOUT_APPL_SETTINGS_CHANGED:
+               str = "TIMEOUT_NOTIFY_APP_SETT_CHANGED";
+               break;
+            case MESSAGE_TIMEOUT_PLAYBACK_POS_CHNAGED:
+                str = "TIMEOUT_NOTIFY_POS_CHANGED";
+                break;
+            case MESSAGE_TIMEOUT_PLAYBACK_STATUS_CHANGED:
+                str = "TIMEOUT_NOTIFY_STATUS_CHANGED";
+                break;
+            case MESSAGE_TIMEOUT_TRACK_CHANGED:
+                str = "TIMEOUT_NOTIFY_TRACK_CHANGED";
+                break;
+            case MESSAGE_TIMEOUT_VOLUME_CHANGED:
+                str = "TIMEOUT_NOTIFY_VOL_CHANGED";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_TITLE:
+                str = "TIMEOUT_ATTR_TITLE";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_ARTIST_NAME:
+                str = "TIMEOUT_ATTR_ARTIST";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_ALBUM_NAME:
+                str = "TIMEOUT_ATTR_ALBUM";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_GENRE:
+                str = "TIMEOUT_ATTR_GENRE";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_PLAYING_TIME:
+                str = "TIMEOUT_ATTR_PLAYING_TIME";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_TOTAL_TRACK_NUMBER:
+                str = "TIMEOUT_ATTR_TOTAL_TRACKS";
+                break;
+            case MESSAGE_TIMEOUT_ATTRIBUTE_TRACK_NUMBER:
+                str = "TIMEOUT_ATTR_TRACK_NUMBER";
+                break;
+            case ABORT_FETCH_ELEMENT_ATTRIBUTE:
+                str = "ABORT_GET_ELEM_ATTR";
+                break;
+            case MESSAGE_PROCESS_RC_FEATURES:
+                str = "CB_RC_FEATURES";
+                break;
+            case MESSAGE_PROCESS_CONNECTION_CHANGE:
+                str = "CB_CONN_CHANGE";
+                break;
+            case MESSAGE_PROCESS_SUPPORTED_COMPANY_ID:
+                str = "CB_COMP_ID";
+                break;
+            case MESSAGE_PROCESS_SUPPORTED_EVENTS:
+                str = "CB_SUPPORTED_EVENTS";
+                break;
+            case MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_ATTRIB:
+                str = "CB_PL_APP_SETT_ATTR";
+                break;
+            case MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES:
+                str = "CB_PL_APP_SETT_VALUES";
+                break;
+            case MESSAGE_PROCESS_CURRENT_PLAYER_APPLICATION_SETTINGS:
+                str = "CB_PL_APP_CURR_SETT";
+                break;
+            case MESSAGE_PROCESS_ELEMENT_ATTRIBUTE:
+                str = "CB_ELEM_ATTR";
+                break;
+            case MESSAGE_PROCESS_PLAY_STATUS:
+                str = "CB_PLAY_STATUS";
+                break;
+            case MESSAGE_PROCESS_NOTIFICATION_RESPONSE:
+                str = "CB_NOTIFICATION_RSP";
+                break;
+            case MESSAGE_PROCESS_SET_ABS_VOL_CMD:
+                str = "CB_SET_ABS_VOL_CMD";
+                break;
+            case MESSAGE_PROCESS_REGISTER_ABS_VOL_REQUEST:
+                str = "CB_REGISTER_ABS_VOL_REQ";
+                break;
+            case MESSAGE_PROCESS_PLAYER_APPLICATION_SETTING_ATTRIBUTE_TEXT:
+                str = "CB_PL_APP_SETT_ATTR_TEXT";
+                break;
+            case MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES_TEXT:
+                str = "CB_PL_APP_SETT_VALUES_TEXT";
+                break;
+        }
+        return str;
+    }
     private void handleListPlayerApplicationSettingValue(byte[] address, byte[] supported_val,
                         byte num_supported_val, byte rsp_type)
     {
@@ -2001,11 +2491,34 @@ public class AvrcpControllerService extends ProfileService {
         int fetch_id = mRemoteData.playerSettingAttribIdFetch;
         PlayerSettings plSetting = mRemoteData.mSupportedApplicationSettingsAttribute.get(fetch_id);
         plSetting.supported_values = new byte [num_supported_val];
+        plSetting.supported_values_text = new String [num_supported_val];
         for (int count = 0; count < num_supported_val; ++count)
+        {
             plSetting.supported_values[count] = supported_val[count];
+            switch(plSetting.attr_Id)
+            {
+            case ATTRIB_EQUALIZER_STATUS:
+                plSetting.supported_values_text[count] =
+                           convertDefaultEqualizerAttrValToStr(plSetting.supported_values[count]);
+                break;
+            case ATTRIB_REPEAT_STATUS:
+                plSetting.supported_values_text[count] =
+                           convertDefaultRepeatAttrValToStr(plSetting.supported_values[count]);
+                break;
+            case ATTRIB_SCAN_STATUS:
+                plSetting.supported_values_text[count] =
+                           convertDefaultScanAttrValToStr(plSetting.supported_values[count]);
+                break;
+            case ATTRIB_SHUFFLE_STATUS:
+                plSetting.supported_values_text[count] =
+                           convertDefaultShuffleAttrValToStr(plSetting.supported_values[count]);
+                break;
+            }
+        }
         mHandler.sendMessage(mHandler.obtainMessage(
               MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES, ATTRIBUTE_FETCH_CONTINUE, 0));
     }
+
     private void handleCurrentPlayerApplicationSettingsResponse(byte[] address,
                                      byte[] ids, byte[] values,byte num_attrib, byte rsp_type)
     {
@@ -2066,6 +2579,74 @@ public class AvrcpControllerService extends ProfileService {
         ByteBuffer bb = ByteBuffer.wrap(response, 0, rspLen);
         mHandler.sendMessage(mHandler.obtainMessage(MESSAGE_PROCESS_NOTIFICATION_RESPONSE,
               notificationEventId, notificaionRspType, bb));
+    }
+    /*
+     * attribRsp will start with number of player settting attributes values in response
+     * first byte would be number of attribute values in response.
+     * attribRspLen will have length of entire response packet.
+     */
+    private void handleGetPlayerApplicationSettingAttributeValueText(byte[] address,
+               byte[] attribRsp, int attribRspLen, byte rsp_type)
+    {
+        Log.d(TAG," handleGetPlayerApplicationSettingAttributeValueText  rsp = " + rsp_type +
+                "rsp_len " + attribRspLen);
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+
+        if (mHandler.hasMessages(MESSAGE_CMD_TIMEOUT,
+                       MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT))
+        {
+               mHandler.removeMessages(MESSAGE_CMD_TIMEOUT,
+                       MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_VALUE_TEXT);
+               Log.d(TAG," Timeout CMD dequeued ");
+        }
+        if ((!mConnectedDevices.contains(device))||(attribRspLen <= 0)||
+                                       (rsp_type != AVRC_RSP_IMPL_STBL)) {
+            mHandler.sendMessage(mHandler.obtainMessage(
+              MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES_TEXT, ATTRIBUTE_FETCH_SKIP, 0));
+            return;
+        }
+
+        ByteBuffer bb = ByteBuffer.wrap(attribRsp, 0, attribRspLen);
+        Message msg = mHandler.obtainMessage(
+              MESSAGE_PROCESS_PLAYER_APPLICATION_SETTINGS_VALUES_TEXT, ATTRIBUTE_FETCH_CONTINUE,
+              attribRspLen, bb);
+        mHandler.sendMessage(msg);
+    }
+
+    /*
+     * attribRsp will start with number of player settting attributes in response
+     * first byte would be number of attributes in response.
+     * attribRspLen will have length of entire response packet.
+     */
+    private void handleGetPlayerApplicationSettingAttributeText(byte[] address,
+               byte[] attribRsp, int attribRspLen, byte rsp_type)
+    {
+        Log.d(TAG," handleGetPlayerApplicationSettingAttributeText  rsp = " + rsp_type +
+                "rsp_len " + attribRspLen);
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+
+        if (mHandler.hasMessages(MESSAGE_CMD_TIMEOUT,
+            MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT))
+         {
+             mHandler.removeMessages(MESSAGE_CMD_TIMEOUT,
+                          MESSAGE_GET_PLAYER_APPLICATION_SETTINGS_ATTRIBUTE_TEXT);
+             Log.d(TAG," Timeout CMD dequeued ");
+         }
+
+        if ((!mConnectedDevices.contains(device))||(attribRspLen <= 0)||
+                                        (rsp_type != AVRC_RSP_IMPL_STBL)) {
+            mHandler.sendMessage(mHandler.obtainMessage(
+             MESSAGE_PROCESS_PLAYER_APPLICATION_SETTING_ATTRIBUTE_TEXT, ATTRIBUTE_FETCH_SKIP, 0));
+                  return;
+        }
+
+        ByteBuffer bb = ByteBuffer.wrap(attribRsp, 0, attribRspLen);
+        Message msg = mHandler.obtainMessage(
+            MESSAGE_PROCESS_PLAYER_APPLICATION_SETTING_ATTRIBUTE_TEXT, ATTRIBUTE_FETCH_CONTINUE,
+            attribRspLen,bb);
+        mHandler.sendMessage(msg);
     }
     /*
      * attribRsp contains array after Number of Attributes
@@ -2181,4 +2762,8 @@ public class AvrcpControllerService extends ProfileService {
     private native void getPlayStatusNative();
     private native void sendAbsVolRspNative(int absVol);
     private native void sendRegisterAbsVolRspNative(byte rspType, int absVol);
+    private native void listPlayerApplicationSettingAttributeTextNative(byte numAttrib,
+                   byte[] attribIds);
+    private native void listPlayerApplicationSettingAttributeValueTextNative(byte attrib_id,
+                                       byte numAttrib, byte[] attribIdVals);
 }
