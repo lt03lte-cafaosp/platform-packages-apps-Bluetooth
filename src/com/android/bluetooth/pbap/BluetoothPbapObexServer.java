@@ -488,14 +488,17 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         }
         // pull vcard entry request
         else if (type.equals(TYPE_VCARD)) {
-            return pullVcardEntry(appParam, appParamValue, op, name, mCurrentPath);
+            return pullVcardEntry(appParam, appParamValue, op, name, mCurrentPath,
+                    mService.getConnType());
         }
         // down load phone book request
         else if (type.equals(TYPE_PB)) {
             if (mVcardSelector)
-                return pullSelectedPhonebook(appParam, appParamValue, reply, op, name);
+                return pullSelectedPhonebook(appParam, appParamValue, reply, op, name,
+                    mService.getConnType());
             else
-                return pullPhonebook(appParam, appParamValue, reply, op, name);
+                return pullPhonebook(appParam, appParamValue, reply, op, name,
+                    mService.getConnType());
         } else {
             Log.w(TAG, "unknown type request!!!");
             return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
@@ -1154,7 +1157,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
     }
 
     private final int pullVcardEntry(byte[] appParam, AppParamValue appParamValue,
-            Operation op, final String name, final String current_path) {
+            Operation op, final String name, final String current_path, int connType) {
         if (name == null || name.length() < VCARD_NAME_SUFFIX_LENGTH) {
             if (D) Log.d(TAG, "Name is Null, or the length of name < 5 !");
             return ResponseCodes.OBEX_HTTP_NOT_ACCEPTABLE;
@@ -1186,11 +1189,12 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
                 return ResponseCodes.OBEX_HTTP_NOT_FOUND;
             } else if (intIndex == 0) {
                 // For PB_PATH, 0.vcf is the phone number of this phone.
-                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21,null);
+                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null,
+                    connType);
                 return pushBytes(op, ownerVcard);
             } else {
                 return mVcardManager.composeAndSendPhonebookOneVcard(op, intIndex, vcard21, null,
-                        mOrderBy, appParamValue.ignorefilter, appParamValue.propertySelector);
+                        mOrderBy, appParamValue.ignorefilter, appParamValue.propertySelector, connType);
             }
        } else if (appParamValue.needTag == ContentType.SIM_PHONEBOOK) {
             if (intIndex < 0 || intIndex >= size) {
@@ -1198,7 +1202,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
                 return ResponseCodes.OBEX_HTTP_NOT_FOUND;
             } else if (intIndex == 0) {
                 // For PB_PATH, 0.vcf is the phone number of this phone.
-                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null);
+                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null, connType);
                 return pushBytes(op, ownerVcard);
             } else {
                 return mVcardManager.composeAndSendSIMPhonebookOneVcard(op, intIndex, vcard21, null,
@@ -1212,15 +1216,16 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             // For others (ich/och/cch/mch), 0.vcf is meaningless, and must
             // begin from 1.vcf
             if (intIndex >= 1) {
-                return mVcardManager.composeAndSendCallLogVcards(appParamValue.needTag, op, intIndex,
-                    intIndex, vcard21, appParamValue.ignorefilter, appParamValue.propertySelector);
+                return mVcardManager.composeAndSendCallLogVcards(appParamValue.needTag, op,
+                    intIndex, intIndex, vcard21, appParamValue.ignorefilter,
+                        appParamValue.propertySelector);
             }
         }
         return ResponseCodes.OBEX_HTTP_OK;
     }
 
     private final int pullPhonebook(byte[] appParam, AppParamValue appParamValue, HeaderSet reply,
-            Operation op, final String name) {
+            Operation op, final String name, int connType) {
         // code start for passing PTS3.2 TC_PSE_PBD_BI_01_C
         if (name != null) {
             int dotIndex = name.indexOf(".");
@@ -1271,24 +1276,24 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         boolean vcard21 = appParamValue.vcard21;
         if (appParamValue.needTag == BluetoothPbapObexServer.ContentType.PHONEBOOK) {
             if (startPoint == 0) {
-                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null);
+                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null, connType);
                 if (endPoint == 0) {
                     return pushBytes(op, ownerVcard);
                 } else {
                     return mVcardManager.composeAndSendPhonebookVcards(op, 1, endPoint, vcard21,
                             ownerVcard, needSendBody, pbSize, appParamValue.ignorefilter,
                             appParamValue.propertySelector, appParamValue.vCardSelector,
-                            appParamValue.vCardSelectorOperator, mVcardSelector);
+                            appParamValue.vCardSelectorOperator, mVcardSelector, connType);
                 }
             } else {
                 return mVcardManager.composeAndSendPhonebookVcards(op, startPoint, endPoint,
                         vcard21, null, needSendBody, pbSize, appParamValue.ignorefilter,
                         appParamValue.propertySelector, appParamValue.vCardSelector,
-                        appParamValue.vCardSelectorOperator, mVcardSelector);
+                        appParamValue.vCardSelectorOperator, mVcardSelector, connType);
             }
         } else if (appParamValue.needTag == BluetoothPbapObexServer.ContentType.SIM_PHONEBOOK) {
             if (startPoint == 0) {
-                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null);
+                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null, connType);
                 if (endPoint == 0) {
                     return pushBytes(op, ownerVcard);
                 } else {
@@ -1307,7 +1312,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
     }
 
     private final int pullSelectedPhonebook(byte[] appParam, AppParamValue appParamValue,
-        HeaderSet reply, Operation op, final String name) {
+        HeaderSet reply, Operation op, final String name, int connType) {
         // code start for passing PTS3.2 TC_PSE_PBD_BI_01_C
         if (name != null) {
             int dotIndex = name.indexOf(".");
@@ -1358,24 +1363,24 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         boolean vcard21 = appParamValue.vcard21;
         if (appParamValue.needTag == BluetoothPbapObexServer.ContentType.PHONEBOOK) {
             if (startPoint == 0) {
-                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null);
+                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null, connType);
                 if (endPoint == 0) {
                     return pushBytes(op, ownerVcard);
                 } else {
                     return mVcardManager.composeAndSendPhonebookVcards(op, 1, endPoint, vcard21,
                             ownerVcard, needSendBody, pbSize, appParamValue.ignorefilter,
                             appParamValue.propertySelector, appParamValue.vCardSelector,
-                            appParamValue.vCardSelectorOperator, mVcardSelector);
+                            appParamValue.vCardSelectorOperator, mVcardSelector, connType);
                 }
             } else {
                 return mVcardManager.composeAndSendPhonebookVcards(op, startPoint, endPoint,
                         vcard21, null, needSendBody, pbSize, appParamValue.ignorefilter,
                         appParamValue.propertySelector, appParamValue.vCardSelector,
-                        appParamValue.vCardSelectorOperator, mVcardSelector);
+                        appParamValue.vCardSelectorOperator, mVcardSelector, connType);
             }
         } else if (appParamValue.needTag == BluetoothPbapObexServer.ContentType.SIM_PHONEBOOK) {
             if (startPoint == 0) {
-                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null);
+                String ownerVcard = mVcardManager.getOwnerPhoneNumberVcard(vcard21, null, connType);
                 if (endPoint == 0) {
                     return pushBytes(op, ownerVcard);
                 } else {
