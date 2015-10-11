@@ -323,7 +323,7 @@ public class AdapterService extends Service {
                 doUpdate=true;
             }
         }
-        debugLog("onProfileServiceStateChange() serviceName=" + serviceName
+        Log.w(TAG, "onProfileServiceStateChange() serviceName=" + serviceName
             + ", state=" + state +", doUpdate=" + doUpdate);
 
         if (!doUpdate) {
@@ -343,13 +343,13 @@ public class AdapterService extends Service {
                 while (i.hasNext()) {
                     Map.Entry<String,Integer> entry = i.next();
                     if (BluetoothAdapter.STATE_OFF != entry.getValue()) {
-                        debugLog("onProfileServiceStateChange() - Profile still running: "
+                        Log.w(TAG,"onProfileServiceStateChange() - Profile still running: "
                             + entry.getKey());
                         return;
                     }
                 }
             }
-            debugLog("onProfileServiceStateChange() - All profile services stopped...");
+            Log.w(TAG,"onProfileServiceStateChange() - All profile services stopped...");
             //Send message to state machine
             mProfilesStarted=false;
             mAdapterStateMachine.sendMessage(mAdapterStateMachine.obtainMessage(AdapterState.STOPPED));
@@ -362,13 +362,13 @@ public class AdapterService extends Service {
                     Map.Entry<String,Integer> entry = i.next();
                     if (BluetoothAdapter.STATE_ON != entry.getValue()
                             && !mDisabledProfiles.contains(entry.getKey())) {
-                        debugLog("onProfileServiceStateChange() - Profile still not running:"
+                        Log.w(TAG,"onProfileServiceStateChange() - Profile still not running:"
                             + entry.getKey());
                         return;
                     }
                 }
             }
-            debugLog("onProfileServiceStateChange() - All profile services started.");
+            Log.w(TAG,"onProfileServiceStateChange() - All profile services started.");
             mProfilesStarted=true;
             //Send message to state machine
             mAdapterStateMachine.sendMessage(mAdapterStateMachine.obtainMessage(AdapterState.STARTED));
@@ -627,31 +627,30 @@ public class AdapterService extends Service {
             expectedCurrentState= BluetoothAdapter.STATE_ON;
             pendingState = BluetoothAdapter.STATE_TURNING_OFF;
         }
+        Log.w(TAG, "Total profiles ="+ (services.length));
 
         for (int i=0; i <services.length;i++) {
             String serviceName = services[i].getName();
             Integer serviceState = mProfileServicesState.get(serviceName);
             if(serviceState != null && serviceState != expectedCurrentState) {
-                debugLog("setProfileServiceState() - Unable to "
+                Log.w(TAG, "setProfileServiceState() - Unable to "
                     + (state == BluetoothAdapter.STATE_OFF ? "start" : "stop" )
                     + " service " + serviceName
                     + ". Invalid state: " + serviceState);
                 continue;
             }
 
-            debugLog("setProfileServiceState() - "
+            Log.w(TAG, "setProfileServiceState() - "
                 + (state == BluetoothAdapter.STATE_OFF ? "Stopping" : "Starting")
                 + " service " + serviceName);
 
             if (state == BluetoothAdapter.STATE_ON && mDisabledProfiles.contains(serviceName)) {
-                Log.i(TAG, "skipping " + serviceName + " (disabled)");
+                Log.w(TAG, "skipping " + serviceName + " (disabled)");
                 continue;
             }
 
-            if (DBG) {
-                Log.w(TAG, (state == BluetoothAdapter.STATE_OFF? "Stopping" : "Starting" ) +" service " +
+            Log.w(TAG, (state == BluetoothAdapter.STATE_OFF? "Stopping" : "Starting" ) +" service " +
                         serviceName);
-            }
 
             mProfileServicesState.put(serviceName,pendingState);
             Intent intent = new Intent(this,services[i]);
