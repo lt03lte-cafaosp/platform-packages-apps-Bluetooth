@@ -47,7 +47,10 @@ import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothPbap;
 import android.bluetooth.BluetoothUuid;
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.Intent;
+import android.database.ContentObserver;
+import android.database.sqlite.SQLiteException;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -57,13 +60,15 @@ import android.os.ServiceManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
+import java.util.Calendar;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.android.bluetooth.ObexServerSockets;
 import com.android.bluetooth.BluetoothObexTransport;
 import com.android.bluetooth.IObexConnectionHandler;
 import com.android.bluetooth.sdp.SdpManager;
 import com.android.bluetooth.Utils;
-
+import com.android.bluetooth.util.DevicePolicyUtils;
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.btservice.AdapterService;
@@ -205,13 +210,27 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
 
     private boolean mIsWaitingAuthorization = false;
 
+    private static  AtomicLong mDbIndetifier = new AtomicLong();
+
     // package and class name to which we send intent to check phone book access permission
     private static final String ACCESS_AUTHORITY_PACKAGE = "com.android.settings";
     private static final String ACCESS_AUTHORITY_CLASS =
         "com.android.settings.bluetooth.BluetoothPermissionRequest";
 
+    private ContentObserver contactChangeObserver;
+    public static long primaryVersionCounter = 0;
+
     public BluetoothPbapService() {
         mState = BluetoothPbap.STATE_DISCONNECTED;
+        contactChangeObserver = new ContentObserver(null) {
+            @Override
+            public void onChange(boolean selfChange) {
+                Log.d(TAG,"**************onChange on contact uri ************");
+                primaryVersionCounter = primaryVersionCounter + 1;
+            }
+        };
+
+
     }
 
     @Override
@@ -236,6 +255,15 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                         .obtainMessage(START_LISTENER));
             }
         }
+        // Register observer on contact to update version counter
+        try {
+            if (DEBUG) Log.d(TAG,"Registering observer");
+            getContentResolver().registerContentObserver(
+               DevicePolicyUtils.getEnterprisePhoneUri(this), false, contactChangeObserver);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
+
     }
 
     @Override
@@ -367,6 +395,13 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
     public void onDestroy() {
         if (VERBOSE) Log.v(TAG, "Pbap Service onDestroy");
 
+        try {
+            if (DEBUG) Log.d(TAG,"Unregistering observer");
+                getContentResolver().unregisterContentObserver(contactChangeObserver);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "SQLite exception: " + e);
+        }
+
         super.onDestroy();
         setState(BluetoothPbap.STATE_DISCONNECTED, BluetoothPbap.RESULT_CANCELED);
         closeService();
@@ -423,9 +458,18 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                     mServerSockets.getL2capPsm(), SDP_PBAP_SERVER_VERSION,
                         SDP_PBAP_SUPPORTED_REPOSITORIES, SDP_PBAP_SUPPORTED_FEATURES);
 
-            if (VERBOSE) Log.d(TAG, "Creating new SDP record for PBAP server with handle: " +
-                mSdpHandle);
+            // Here we might have changed crucial data, hence reset DB identifier
+            updateDbIdentifier();
+            if(VERBOSE) Log.d(TAG, "Creating new SDP record for PBAP server with handle: " + mSdpHandle);
         }
+    }
+
+    private void updateDbIdentifier(){
+        mDbIndetifier.set(Calendar.getInstance().getTime().getTime());
+    }
+
+    public long getDbIdentifier() {
+        return mDbIndetifier.get();
     }
 
     private void setUserTimeoutAlarm(){
@@ -659,7 +703,7 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
             }
         }
 
-        mPbapServer = new BluetoothPbapObexServer(mSessionStatusHandler, this);
+        mPbapServer = new BluetoothPbapObexServer(mSessionStatusHandler, this, this);
         synchronized (this) {
             mAuth = new BluetoothPbapAuthenticator(mSessionStatusHandler);
             mAuth.setChallenged(false);

@@ -51,6 +51,7 @@ import android.provider.ContactsContract.RawContactsEntity;
 import android.telephony.PhoneNumberUtils;
 import android.text.TextUtils;
 import android.util.Log;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Comparator;
 import com.android.bluetooth.R;
@@ -112,6 +113,8 @@ public class BluetoothPbapVcardManager {
 
     static final int CONTACTS_NAME_COLUMN_INDEX = 1;
 
+    static long LAST_FETCHED_TIME_STAMP;
+
     // call histories use dynamic handles, and handles should order by date; the
     // most recently one should be the first handle. In table "calls", _id and
     // date are consistent in ordering, to implement simply, we sort by _id
@@ -124,6 +127,7 @@ public class BluetoothPbapVcardManager {
     public BluetoothPbapVcardManager(final Context context) {
         mContext = context;
         mResolver = mContext.getContentResolver();
+        LAST_FETCHED_TIME_STAMP = System.currentTimeMillis();
     }
 
     /**
@@ -578,6 +582,43 @@ public class BluetoothPbapVcardManager {
 
         return nameList;
     }
+
+    public byte[] getCallHistoryPrimaryFolderVersion(final int type) {
+        final Uri myUri = CallLog.Calls.CONTENT_URI;
+        String selection = BluetoothPbapObexServer.createSelectionPara(type);
+        selection = selection + " AND date >= " + LAST_FETCHED_TIME_STAMP;
+
+        Log.d(TAG,"LAST_FETCHED_TIME_STAMP is "+LAST_FETCHED_TIME_STAMP);
+        Cursor callCursor = null;
+        long count = 0;
+        long primaryVcMsb = 0;
+        ArrayList<String> list = new ArrayList<String>();
+        try {
+            callCursor = mResolver.query(myUri, null, selection, null,
+                    null);
+            while ( callCursor  != null && callCursor.moveToNext()) {
+                count = count +1;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "exception while fetching callHistory pvc");
+        } finally {
+            if (callCursor != null) {
+                callCursor.close();
+                callCursor = null;
+            }
+        }
+
+        LAST_FETCHED_TIME_STAMP = System.currentTimeMillis();
+        Log.d(TAG,"getCallHistoryPrimaryFolderVersion count is "+ count
+                +" type is " + type);
+        ByteBuffer pvc = ByteBuffer.allocate(16);
+        pvc.putLong(primaryVcMsb);
+        Log.d(TAG,"BluetoothPbapService.primaryVersionCounter is "+
+        BluetoothPbapService.primaryVersionCounter);
+        pvc.putLong(count);
+        return pvc.array();
+    }
+
 
     public final int composeAndSendCallLogVcards(final int type, Operation op,
             final int startPoint, final int endPoint, final boolean vcardType21,
