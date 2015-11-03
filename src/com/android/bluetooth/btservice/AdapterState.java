@@ -445,6 +445,7 @@ final class AdapterState extends StateMachine {
                     mPendingCommandState.setBleTurningOn(false);
                     transitionTo(mOffState);
                     adapterService.stopProfileServices();
+                    adapterService.stopGattProfileService();
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
                     break;
 
