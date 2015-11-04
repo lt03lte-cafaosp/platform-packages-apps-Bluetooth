@@ -174,6 +174,7 @@ public class BluetoothMapService extends ProfileService {
     public static final int MAX_INSTANCES = 2;
     BluetoothMapObexConnectionManager mConnectionManager = null;
     public static final int MAS_INS_INFO[] = {MESSAGE_TYPE_SMS_MMS, MESSAGE_TYPE_EMAIL};
+    private boolean isEmailAccountConfigured = false;
     private ContentObserver mEmailAccountObserver;
     public static final String AUTHORITY = "com.android.email.provider";
     public static final Uri EMAIL_URI = Uri.parse("content://" + AUTHORITY);
@@ -202,6 +203,11 @@ public class BluetoothMapService extends ProfileService {
                 if( mSessionStatusHandler.hasMessages(MSG_INTERNAL_REGISTER_EMAIL)) {
                         // Remove any pending requests in queue
                         mSessionStatusHandler.removeMessages(MSG_INTERNAL_REGISTER_EMAIL);
+                }
+                if (isEmailConfigured != -1) {
+                    isEmailAccountConfigured = true;
+                } else if (isEmailAccountConfigured) {
+                    isEmailAccountConfigured = false;
                 }
                 // Donot send request if Inprogress or already ON
                 if( isEmailConfigured != -1 && !isMapEmailRequestON && !isMapEmailStarted) {
@@ -449,6 +455,19 @@ public class BluetoothMapService extends ProfileService {
                 .obtainMessage(START_LISTENER));
         }
         if(mIsEmailEnabled ) {
+            final Context context = getApplicationContext();
+            Thread emailAccountIdThread = new Thread() {
+                public void run () {
+                    if (VERBOSE) Log.v(TAG,"EmailAccountThread ");
+                    if (context == null ) {
+                        Log.w(TAG,"App context not init.");
+                    } else if ( BluetoothMapUtils.getEmailAccountId(context)!= -1) {
+                        isEmailAccountConfigured = true;
+                        if (VERBOSE) Log.v(TAG,"EmailAccountThread account Is configured");
+                    }
+                }
+            };
+            emailAccountIdThread.start();
             // Register EmailAccountObserver for dynamic SDP update
             try {
                 if (DEBUG) Log.d(TAG,"Registering observer");
@@ -739,9 +758,11 @@ public class BluetoothMapService extends ProfileService {
             context = getApplicationContext();
             // Promote Email Instance only if primary email account configured
             if(mMasId == 1) {
-               if (BluetoothMapUtils.getEmailAccountId(context) == -1) {
-                   if (VERBOSE) Log.v(TAG, "account is not configured");
-                   return;
+               synchronized (this) {
+                   if (!isEmailAccountConfigured) {
+                       if (VERBOSE) Log.v(TAG, "account is not configured");
+                       return;
+                   }
                }
             }
 
@@ -767,9 +788,11 @@ public class BluetoothMapService extends ProfileService {
             context = getApplicationContext();
             // Promote Email Instance only if primary email account configured
             if(mMasId == 1) {
-               if (BluetoothMapUtils.getEmailAccountId(context) == -1) {
-                   if (VERBOSE) Log.v(TAG, "account is not configured");
-                   return;
+                synchronized (this) {
+                   if (!isEmailAccountConfigured) {
+                       if (VERBOSE) Log.v(TAG, "account is not configured");
+                       return;
+                   }
                }
             }
 
