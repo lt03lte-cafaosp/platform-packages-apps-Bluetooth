@@ -1626,6 +1626,7 @@ public class AdapterService extends Service {
         Log.i(TAG, "HF connected for device : " + device + " " + hfConnDevList.contains(device));
         Log.i(TAG, "A2DP connected for device : " + device + " " + a2dpConnDevList.contains(device));
         if((hfConnDevList.isEmpty() || !(hfConnDevList.contains(device))) &&
+            (hsService != null) &&
             (hsService.getPriority(device) >= BluetoothProfile.PRIORITY_ON) &&
             (a2dpConnected || (a2dpService.getPriority(device) == BluetoothProfile.PRIORITY_OFF))) {
             int maxHfpConnectionSysProp =
@@ -1646,6 +1647,7 @@ public class AdapterService extends Service {
             }
         }
         else if((a2dpConnDevList.isEmpty() || !(a2dpConnDevList.contains(device))) &&
+            (a2dpService != null) &&
             (a2dpService.getPriority(device) >= BluetoothProfile.PRIORITY_ON) &&
             (hsConnected || (hsService.getPriority(device) == BluetoothProfile.PRIORITY_OFF))) {
             int maxA2dpConnectionSysProp =
