@@ -58,8 +58,6 @@ import android.os.Process;
 import android.util.Log;
 import com.android.bluetooth.OolConnManager;
 
-import com.android.bluetooth.a2dp.A2dpService;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -734,15 +732,6 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                     mSessionHandler.obtainMessage(TRANSPORT_CONNECTED, transport).sendToTarget();
                 }
             } else {
-
-
-                //do not allow new connections with active multicast
-                A2dpService a2dpService = A2dpService.getA2dpService();
-                if (a2dpService != null &&
-                        a2dpService.isMulticastOngoing(device)) {
-                    Log.i(TAG,"A2dp Multicast is Ongoing, ignore OPP send");
-                    return ;
-                }
 
                 /* Use BluetoothSocket to connect */
                 l2cChannel = 0;

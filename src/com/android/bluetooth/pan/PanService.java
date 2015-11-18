@@ -41,7 +41,6 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.util.Log;
 
-import com.android.bluetooth.a2dp.A2dpService;
 import com.android.bluetooth.btservice.ProfileService;
 import com.android.bluetooth.Utils;
 
@@ -266,14 +265,6 @@ public class PanService extends ProfileService {
 
     boolean connect(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        A2dpService a2dpService = A2dpService.getA2dpService();
-        //do not allow new connections with active multicast
-        if (a2dpService != null &&
-                a2dpService.isMulticastOngoing(device)) {
-            Log.i(TAG,"A2dp Multicast is Ongoing, ignore Connection Request");
-            return false;
-        }
-
         if (getConnectionState(device) != BluetoothProfile.STATE_DISCONNECTED) {
             Log.e(TAG, "Pan Device not disconnected: " + device);
             return false;
