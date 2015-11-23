@@ -29,6 +29,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 
+
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -65,6 +66,7 @@ public class AvrcpControllerService extends ProfileService {
     RemoteFileSystem mRemoteFileSystem;
     RemoteMediaPlayers mRemoteMediaPlayers;
     NowPlaying mRemoteNowPlayingList;
+    AppProperties mAppProperties;
 
     private AvrcpMessageHandler mHandler;
     private static AvrcpControllerService sAvrcpControllerService;
@@ -98,6 +100,7 @@ public class AvrcpControllerService extends ProfileService {
         setAvrcpControllerService(this);
         mAudioManager = (AudioManager)sAvrcpControllerService.
                                   getSystemService(Context.AUDIO_SERVICE);
+        mAppProperties = new AppProperties();
         return true;
     }
 
@@ -124,6 +127,8 @@ public class AvrcpControllerService extends ProfileService {
             mRemoteNowPlayingList.cleanup();
             mRemoteNowPlayingList = null;
         }
+        if (mAppProperties != null)
+            mAppProperties.resetAppProperties();
     }
     protected boolean stop() {
         if (mHandler != null) {
@@ -209,6 +214,38 @@ public class AvrcpControllerService extends ProfileService {
                                                 : BluetoothProfile.STATE_DISCONNECTED);
     }
 
+    public void onBipConnected(BluetoothDevice mDevice) {
+        Log.v(TAG," onBipConnected device = " + mDevice);
+        if ((mAvrcpRemoteDevice != null) && (mAvrcpRemoteDevice.mBTDevice.equals(mDevice))) {
+            mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_PROCESS_BIP_CONNECTED);
+        }
+    }
+    public void onBipDisconnected() {
+        Log.d(TAG," onBipDisconnected");
+        mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_PROCESS_BIP_DISCONNECTED);
+    }
+    public void onThumbNailFetched(String mImageHandle, String mImageLocation) {
+        Log.v(TAG," onBipImageFetched HDL = " + mImageHandle + " Location" + mImageLocation);
+        if (mAvrcpRemoteDevice != null) {
+            ArrayList<String> bipResults = new ArrayList<String>();
+            bipResults.add(mImageHandle);
+            bipResults.add(mImageLocation);
+            Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                                     MESSAGE_PROCESS_THUMB_NAIL_FETCHED, bipResults);
+            mHandler.sendMessage(msg);
+        }
+    }
+    public void onImageFetched(String mImageHandle, String mImageLocation) {
+        Log.v(TAG," onBipImageFetched HDL = " + mImageHandle + " Location " + mImageLocation);
+        if (mAvrcpRemoteDevice != null) {
+            ArrayList<String> bipResults = new ArrayList<String>();
+            bipResults.add(mImageHandle);
+            bipResults.add(mImageLocation);
+            Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                                     MESSAGE_PROCESS_IMAGE_FETCHED, bipResults);
+            mHandler.sendMessage(msg);
+        }
+    }
     public void sendGroupNavigationCmd(BluetoothDevice device, int keyCode, int keyState) {
         Log.v(TAG, "sendGroupNavigationCmd keyCode: " + keyCode + " keyState: " + keyState);
         if (device == null) {
@@ -236,6 +273,8 @@ public class AvrcpControllerService extends ProfileService {
         if ((mAvrcpRemoteDevice == null)||
             (mAvrcpRemoteDevice.mRemoteFeatures == AvrcpControllerConstants.BTRC_FEAT_NONE)||
             (mRemoteMediaPlayers == null) ||
+            (keyCode == AvrcpControllerConstants.PTS_GET_ELEMENT_ATTRIBUTE_ID)||
+            (keyCode == AvrcpControllerConstants.PTS_GET_PLAY_STATUS_ID)||
             (mRemoteMediaPlayers.getAddressedPlayer() == null)){
             Log.d(TAG," Device connected but PlayState not present ");
             enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
@@ -286,8 +325,6 @@ public class AvrcpControllerService extends ProfileService {
             case BluetoothAvrcpController.PASS_THRU_CMD_ID_FORWARD:
             case BluetoothAvrcpController.PASS_THRU_CMD_ID_FF:
             case BluetoothAvrcpController.PASS_THRU_CMD_ID_REWIND:
-            case AvrcpControllerConstants.PTS_GET_ELEMENT_ATTRIBUTE_ID:
-            case AvrcpControllerConstants.PTS_GET_PLAY_STATUS_ID:
                 sendCommand = true; // we can send this command in all states
                 break;
         }
@@ -377,6 +414,17 @@ public class AvrcpControllerService extends ProfileService {
         return isSettingSupported;
     }
 
+    public void startFetchingAlbumArt(String mimeType, int height, int width, long maxSize) {
+        Log.d(TAG," startFetchingAlbumArt mimeType " + mimeType + " pixel " + height + " * "
+                + width + " maxSize: " + maxSize);
+        if (mAppProperties == null) return;
+        mAppProperties.isCoverArtRequested = true;
+        mAppProperties.mSupportedCoverArtMimetype = mimeType;
+        mAppProperties.mSupportedCoverArtWidth = width;
+        mAppProperties.mSupportedCovertArtHeight = height;
+        mAppProperties.mSupportedCoverArtMaxSize = maxSize;
+        mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_CONNECT_BIP);
+    }
     //Binder object: Must be static class or memory leak may occur
     private static class BluetoothAvrcpControllerBinder extends IBluetoothAvrcpController.Stub
         implements IProfileServiceBinder {
@@ -462,6 +510,11 @@ public class AvrcpControllerService extends ProfileService {
             if (service == null) return false;
             return service.setPlayerApplicationSetting(plAppSetting);
         }
+        public void startFetchingAlbumArt(String mimeType, int height, int width, long maxSize) {
+            AvrcpControllerService service = getService();
+            if (service == null) return;
+            service.startFetchingAlbumArt(mimeType, height, width, maxSize);
+        }
     };
 
     private String utf8ToString(byte[] input)
@@ -536,6 +589,15 @@ public class AvrcpControllerService extends ProfileService {
             switch (msg.what) {
             case AvrcpControllerConstants.MESSAGE_SEND_PASS_THROUGH_CMD:
                 BluetoothDevice device = (BluetoothDevice)msg.obj;
+                if (msg.arg1 == AvrcpControllerConstants.PTS_GET_ELEMENT_ATTRIBUTE_ID) {
+                    // Hack for PTS
+                    byte numAttribs = 2;
+                    byte[] attribs = new byte[numAttribs];
+                    attribs[0] = AvrcpControllerConstants.MEDIA_ATTRIBUTE_TITLE;
+                    attribs[1] = AvrcpControllerConstants.MEDIA_ATTRIBUTE_COVER_ART_HANDLE;
+                    getElementAttributesNative(getByteAddress(device), numAttribs, attribs);
+                    break;
+                }
                 sendPassThroughCommandNative(getByteAddress(device), msg.arg1, msg.arg2);
                 break;
             case AvrcpControllerConstants.MESSAGE_SEND_GROUP_NAVIGATION_CMD:
@@ -554,7 +616,25 @@ public class AvrcpControllerService extends ProfileService {
                 setPlayerApplicationSettingValuesNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
                         numAttributes, attributeIds, attributeVals);
                 break;
-
+            case AvrcpControllerConstants.MESSAGE_CONNECT_BIP:
+                /*
+                 * If Avrcp Connection is UP and we have psm, try connecting BIP connection.
+                 */
+                if ((mAvrcpRemoteDevice == null) || (!mAvrcpRemoteDevice.isCoverArtSupported()))
+                    return;
+                if (!mAvrcpRemoteDevice.isBipConnected()) {
+                    if (mAvrcpRemoteDevice.mBipL2capPsm != AvrcpControllerConstants.DEFAULT_PSM) {
+                        mAvrcpRemoteDevice.connectBip(mAvrcpRemoteDevice.mBipL2capPsm);
+                    }
+                }
+                else {
+                    /*
+                     * BIP is already connected in this case. Fetch Image
+                     */
+                    mHandler.sendEmptyMessage(AvrcpControllerConstants.
+                                                        MESSAGE_PROCESS_BIP_CONNECTED);
+                }
+                break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_CONNECTION_CHANGE:
                 int newState = msg.arg1;
                 int oldState = msg.arg2;
@@ -598,6 +678,7 @@ public class AvrcpControllerService extends ProfileService {
             case AvrcpControllerConstants.MESSAGE_PROCESS_RC_FEATURES:
                 if(mAvrcpRemoteDevice == null)
                     break;
+                Log.d(TAG," rc features " + msg.arg1);
                 mAvrcpRemoteDevice.mRemoteFeatures = msg.arg1;
                 /* in case of AVRCP version < 1.3, no need to add track info */
                 if(mAvrcpRemoteDevice.isMetaDataSupported()) {
@@ -611,6 +692,15 @@ public class AvrcpControllerService extends ProfileService {
                     mTrack.mItemUid = 0;
                     mRemoteNowPlayingList.addTrack(mTrack);
                     mRemoteNowPlayingList.setCurrTrack(mTrack);
+                    if(mAvrcpRemoteDevice.isCoverArtSupported()) {
+                        mAvrcpRemoteDevice.mBipL2capPsm = msg.arg2;
+                        Log.d(TAG," psm " + mAvrcpRemoteDevice.mBipL2capPsm);
+                        /*
+                         * We schedule BIP connect here, to get coverart Handle of current
+                         * track in case App launched later connect at later point of time.
+                         */
+                         mAvrcpRemoteDevice.connectBip(mAvrcpRemoteDevice.mBipL2capPsm);
+                    }
                 }
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_SET_ABS_VOL_CMD:
@@ -637,7 +727,23 @@ public class AvrcpControllerService extends ProfileService {
                 if(mRemoteNowPlayingList != null) {
                     mRemoteNowPlayingList.updateCurrentTrack((TrackInfo)msg.obj);
                     broadcastMetaDataChanged(AvrcpUtils.getMediaMetaData
-                                       (mRemoteNowPlayingList.getCurrentTrack()));
+                            (mRemoteNowPlayingList.getCurrentTrack()));
+                    if ((!mAppProperties.isCoverArtRequested) ||
+                            (!mAvrcpRemoteDevice.isCoverArtSupported()))
+                        break;
+                    if ((mAvrcpRemoteDevice != null) && (!mAvrcpRemoteDevice.isBipConnected())) {
+                        /*
+                         * If BIP not connected, try again.
+                         */
+                        mAvrcpRemoteDevice.connectBip(mAvrcpRemoteDevice.mBipL2capPsm);
+                    }
+                    else {
+                        mRemoteNowPlayingList.fetchCoverArtImage(mAppProperties.
+                                mSupportedCoverArtMimetype,
+                                mAppProperties.mSupportedCovertArtHeight,
+                                mAppProperties.mSupportedCoverArtWidth,
+                                mAppProperties.mSupportedCoverArtMaxSize);
+                    }
                 }
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_PLAY_POS_CHANGED:
@@ -677,6 +783,55 @@ public class AvrcpControllerService extends ProfileService {
                     mRemoteMediaPlayers.getAddressedPlayer().
                                            updatePlayerAppSetting((ByteBuffer)msg.obj);
                     broadcastPlayerAppSettingChanged(getCurrentPlayerAppSetting());
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_BIP_CONNECTED:
+                /*
+                 * BIP Connected Start Image Fetch operation
+                 */
+                if (mRemoteNowPlayingList != null) {
+                    int ret = mRemoteNowPlayingList.fetchCoverArtImage(mAppProperties.
+                            mSupportedCoverArtMimetype,
+                            mAppProperties.mSupportedCovertArtHeight,
+                            mAppProperties.mSupportedCoverArtWidth,
+                            mAppProperties.mSupportedCoverArtMaxSize);
+                    if (ret == AvrcpControllerConstants.ERROR_BIP_HANDLE_NOT_VALID) {
+                        /* Send a getElementAttrib command again */
+                        getElementAttributesNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
+                                (byte)0, null);
+                    }
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_BIP_DISCONNECTED:
+                /*
+                 * BIP Disconnected, We have to clear off imageLocation and
+                 * ImageHandles.
+                 */
+                if (mRemoteNowPlayingList != null) {
+                    mRemoteNowPlayingList.clearCoverArtData();
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_THUMB_NAIL_FETCHED:
+                ArrayList<String> bipResults = (ArrayList<String>)msg.obj;
+                String mImageHndl = bipResults.get(0);
+                String mImageLoc = bipResults.get(1);
+                if (mRemoteNowPlayingList != null) {
+                    mRemoteNowPlayingList.updateThumbNail(mImageHndl, mImageLoc);
+                    mRemoteNowPlayingList.fetchThumbNail();
+                    if (mAppProperties.isCoverArtRequested)
+                        broadcastMetaDataChanged(AvrcpUtils.getMediaMetaData
+                                       (mRemoteNowPlayingList.getCurrentTrack()));
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_IMAGE_FETCHED:
+                ArrayList<String> bipImageResults = (ArrayList<String>)msg.obj;
+                String mImageHandle = bipImageResults.get(0);
+                String mImageLocation = bipImageResults.get(1);
+                if (mRemoteNowPlayingList != null) {
+                    mRemoteNowPlayingList.updateImage(mImageHandle, mImageLocation);
+                    if (mAppProperties.isCoverArtRequested)
+                        broadcastMetaDataChanged(AvrcpUtils.getMediaMetaData
+                            (mRemoteNowPlayingList.getCurrentTrack()));
                 }
                 break;
             }
@@ -781,11 +936,11 @@ public class AvrcpControllerService extends ProfileService {
         }
     }
 
-    private void getRcFeatures(byte[] address, int features) {
+    private void getRcFeatures(byte[] address, int features, int ca_psm) {
         BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
                 (Utils.getAddressStringFromByte(address));
         Message msg = mHandler.obtainMessage(
-                AvrcpControllerConstants.MESSAGE_PROCESS_RC_FEATURES, features, 0, device);
+                AvrcpControllerConstants.MESSAGE_PROCESS_RC_FEATURES, features, ca_psm, device);
         mHandler.sendMessage(msg);
     }
     private void setPlayerAppSettingRsp(byte[] address, byte accepted) {
@@ -828,6 +983,20 @@ public class AvrcpControllerService extends ProfileService {
                 MESSAGE_PROCESS_TRACK_CHANGED, numAttributes, 0, mTrack);
         mHandler.sendMessage(msg);
     }
+
+    private void onElementAttributeUpdate(byte[] address, byte numAttributes, int[] attributes,
+            String[] attribVals)
+    {
+        Log.d(TAG,"onTrackChanged ");
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+            (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        TrackInfo mTrack = new TrackInfo(0, numAttributes, attributes, attribVals);
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_TRACK_CHANGED, numAttributes, 0, mTrack);
+        mHandler.sendMessage(msg);
+     }
 
     private void onPlayPositionChanged(byte[] address, int songLen, int currSongPosition) {
         Log.d(TAG,"onPlayPositionChanged ");
@@ -902,4 +1071,6 @@ public class AvrcpControllerService extends ProfileService {
     /* This api is used to inform remote for any volume level changes */
     private native void sendRegisterAbsVolRspNative(byte[] address, byte rspType, int absVol,
                                                     int label);
+    private native void getElementAttributesNative(byte[] address, byte numAttributes,
+            byte[] attribIds);
 }

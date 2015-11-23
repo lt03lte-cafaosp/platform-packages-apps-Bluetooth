@@ -90,6 +90,11 @@ public class NowPlaying {
         mCurrTrack.mTrackLen = mTrack.mTrackLen;
         mCurrTrack.mTrackTitle = mTrack.mTrackTitle;
         mCurrTrack.mTrackNum = mTrack.mTrackNum;
+        if (mCurrTrack.mCoverArtHandle != mTrack.mCoverArtHandle) {
+            mCurrTrack.mCoverArtHandle = mTrack.mCoverArtHandle;
+            mCurrTrack.mThumbNailLocation = AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
+            mCurrTrack.mImageLocation = AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
+        }
     }
 
     public TrackInfo getTrackFromId(int mTrackId) {
@@ -101,6 +106,74 @@ public class NowPlaying {
                     return mTrackInfo;
             }
             return null;
+        }
+    }
+    public void fetchThumbNail() {
+        /*
+         * Is BIP Fetch is in progress
+         */
+        if (!mDevice.isBipConnected())
+            return;
+        /*
+         * We will check which track has valid coverArtHandle but imageLcoation is empty
+         */
+        for (TrackInfo mTrackInfo: mNowPlayingList) {
+            Log.d(TAG,"HNDL: " + mTrackInfo.mCoverArtHandle + " Loc: " +
+                                                              mTrackInfo.mThumbNailLocation);
+            if ((!mTrackInfo.mCoverArtHandle.equals(AvrcpControllerConstants.
+                 COVER_ART_HANDLE_INVALID)) && (mTrackInfo.mThumbNailLocation.equals
+                 (AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
+                    mDevice.GetLinkedThumbnail(mTrackInfo.mCoverArtHandle);
+                    return;
+            }
+        }
+    }
+    /*
+     * Returns the error for which cover art is fetched, can be used to check if valid
+     * handle exists or not.
+     */
+    public int fetchCoverArtImage(String encoding, int height, int width, long maxSize) {
+        /*
+         * Is BIP Fetch is in progress
+         */
+        if (!mDevice.isBipConnected())
+            return AvrcpControllerConstants.ERROR_BIP_NOT_CONNECTED;
+        /*
+         * We will check which track has valid coverArtHandle but imageLcoation is empty
+         */
+        TrackInfo mTrackInfo = getCurrentTrack();
+        if (mTrackInfo.mCoverArtHandle.equals(AvrcpControllerConstants.COVER_ART_HANDLE_INVALID))
+            return AvrcpControllerConstants.ERROR_BIP_HANDLE_NOT_VALID;
+        if (mTrackInfo.mImageLocation.equals
+                (AvrcpControllerConstants.COVER_ART_LOCATION_INVALID)) {
+                   StringBuffer pixel = new StringBuffer();
+                   pixel.append(height); pixel.append("*"); pixel.append(width);
+                   mDevice.GetImage(mTrackInfo.mCoverArtHandle, encoding, pixel.toString(), 
+                           maxSize);
+        }
+        return AvrcpControllerConstants.NO_ERROR;
+    }
+    public void updateThumbNail(String mCoverArtHandle, String mImageLocation) {
+        Log.d(TAG," updateCoverArt HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
+        for (TrackInfo mTrackInfo: mNowPlayingList) {
+            if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
+                mTrackInfo.mThumbNailLocation = mImageLocation;
+        }
+    }
+    public void updateImage(String mCoverArtHandle, String mImageLocation) {
+        Log.d(TAG," updateImage HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
+        for (TrackInfo mTrackInfo: mNowPlayingList) {
+            if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
+                mTrackInfo.mImageLocation = mImageLocation;
+        }
+    }
+    public void clearCoverArtData() {
+        Log.d(TAG," clearCoverArtData");
+        if (mNowPlayingList == null) return;
+        for (TrackInfo mTrackInfo: mNowPlayingList) {
+            mTrackInfo.mCoverArtHandle = AvrcpControllerConstants.COVER_ART_HANDLE_INVALID;
+            mTrackInfo.mThumbNailLocation = AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
+            mTrackInfo.mImageLocation = AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
         }
     }
 }

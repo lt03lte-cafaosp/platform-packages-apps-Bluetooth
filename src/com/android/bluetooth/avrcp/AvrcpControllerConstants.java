@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -57,10 +57,11 @@ final class AvrcpControllerConstants {
     /*
      * Remote features
      */
-    public static final byte BTRC_FEAT_NONE = 0;
-    public static final byte BTRC_FEAT_METADATA = 1;
+    public static final byte BTRC_FEAT_NONE            = 0;
+    public static final byte BTRC_FEAT_METADATA        = 1;
     public static final byte BTRC_FEAT_ABSOLUTE_VOLUME = 2;
-    public static final byte BTRC_FEAT_BROWSE = 4;
+    public static final byte BTRC_FEAT_BROWSE          = 4;
+    public static final byte BTRC_FEAT_COVER_ART       = 8;
 
     /*
      *Element Id Values for GetMetaData
@@ -72,6 +73,7 @@ final class AvrcpControllerConstants {
     public static final int MEDIA_ATTRIBUTE_TOTAL_TRACK_NUMBER = 0x05;
     public static final int MEDIA_ATTRIBUTE_GENRE = 0x06;
     public static final int MEDIA_ATTRIBUTE_PLAYING_TIME = 0x07;
+    public static final int MEDIA_ATTRIBUTE_COVER_ART_HANDLE = 0x08;
 
     /*
      * Default values for each of the items
@@ -80,6 +82,8 @@ final class AvrcpControllerConstants {
     public static final int STATUS_INVALID = 0xFF;
     public static final String TITLE_INVALID = "NOT_SUPPORTED";
     public static final String ARTIST_NAME_INVALID = "NOT_SUPPORTED";
+    public static final String COVER_ART_HANDLE_INVALID = "NOT_SUPPORTED";
+    public static final String COVER_ART_LOCATION_INVALID = "EMPTY";
     public static final String ALBUM_NAME_INVALID = "NOT_SUPPORTED";
     public static final int TOTAL_TRACKS_INVALID = 0xFFFFFFFF;
     public static final String GENRE_INVALID = "NOT_SUPPORTED";
@@ -152,17 +156,22 @@ final class AvrcpControllerConstants {
     public static final int MESSAGE_SEND_PASS_THROUGH_CMD = 1;
     public static final int MESSAGE_SEND_SET_CURRENT_PLAYER_APPLICATION_SETTINGS = 2;
     public static final int MESSAGE_SEND_GROUP_NAVIGATION_CMD = 3;
+    public static final int MESSAGE_CONNECT_BIP = 4;
 
-    public static final int MESSAGE_PROCESS_SUPPORTED_PLAYER_APP_SETTING = 101;
-    public static final int MESSAGE_PROCESS_PLAYER_APP_SETTING_CHANGED = 102;
-    public static final int MESSAGE_PROCESS_SET_ABS_VOL_CMD = 103;
-    public static final int MESSAGE_PROCESS_REGISTER_ABS_VOL_NOTIFICATION = 104;
-    public static final int MESSAGE_PROCESS_TRACK_CHANGED = 105;
-    public static final int MESSAGE_PROCESS_PLAY_POS_CHANGED = 106;
-    public static final int MESSAGE_PROCESS_PLAY_STATUS_CHANGED = 107;
+    public static final int MESSAGE_PROCESS_SUPPORTED_PLAYER_APP_SETTING         = 101;
+    public static final int MESSAGE_PROCESS_PLAYER_APP_SETTING_CHANGED           = 102;
+    public static final int MESSAGE_PROCESS_SET_ABS_VOL_CMD                      = 103;
+    public static final int MESSAGE_PROCESS_REGISTER_ABS_VOL_NOTIFICATION        = 104;
+    public static final int MESSAGE_PROCESS_TRACK_CHANGED                        = 105;
+    public static final int MESSAGE_PROCESS_PLAY_POS_CHANGED                     = 106;
+    public static final int MESSAGE_PROCESS_PLAY_STATUS_CHANGED                  = 107;
+    public static final int MESSAGE_PROCESS_BIP_CONNECTED                        = 108;
+    public static final int MESSAGE_PROCESS_BIP_DISCONNECTED                     = 109;
+    public static final int MESSAGE_PROCESS_THUMB_NAIL_FETCHED                   = 110;
+    public static final int MESSAGE_PROCESS_IMAGE_FETCHED                        = 111;
 
-    public static final int MESSAGE_PROCESS_RC_FEATURES = 1100;
-    public static final int MESSAGE_PROCESS_CONNECTION_CHANGE = 1200;
+    public static final int MESSAGE_PROCESS_RC_FEATURES                          = 1100;
+    public static final int MESSAGE_PROCESS_CONNECTION_CHANGE                    = 1200;
 
     public static String dumpMessageString(int message)
     {
@@ -194,7 +203,7 @@ final class AvrcpControllerConstants {
                 str = "CB_TRACK_CHANGED";
                 break;
             case MESSAGE_PROCESS_PLAY_POS_CHANGED:
-                str = "CB_TRACK_CHANGED";
+                str = "CB_PLAY_POS_CHANGED";
                 break;
             case MESSAGE_PROCESS_PLAY_STATUS_CHANGED:
                 str = "CB_PLAY_STATUS_CHANGED";
@@ -205,8 +214,23 @@ final class AvrcpControllerConstants {
             case MESSAGE_PROCESS_CONNECTION_CHANGE:
                 str = "CB_CONN_CHANGED";
                 break;
+            case MESSAGE_PROCESS_BIP_CONNECTED:
+                str = "BIP_CONNECTED";
+                break;
+            case MESSAGE_PROCESS_THUMB_NAIL_FETCHED:
+                str = "THUMB_NAIL_FETCHED";
+                break;
+            case MESSAGE_PROCESS_IMAGE_FETCHED:
+                str = "IMAGE_FETCHED";
+                break;
+            case MESSAGE_PROCESS_BIP_DISCONNECTED:
+                str = "BIP_DISCONNECTED";
+                break;
+            case MESSAGE_CONNECT_BIP:
+                str = "CONNECT_BIP";
+                break;
             default:
-                str = "UNKNOWN";
+                str = Integer.toString(message);
                 break;
         }
         return str;
@@ -223,6 +247,20 @@ final class AvrcpControllerConstants {
      * We implement that by sending pass through command with F1 and F2 Ids.
      * We don't want any new interface for this.
      */
+
     public static final int PTS_GET_ELEMENT_ATTRIBUTE_ID = 0x71;
     public static final int PTS_GET_PLAY_STATUS_ID       = 0x72;
+
+    /*
+     * image Type
+     */
+    public static final int COVER_ART_THUMBNAIL = 0x00;
+    public static final int COVER_ART_IMAGE = 0x01;
+    public static final int DEFAULT_PSM = 0xFF;
+    /*
+     * Error cases
+     */
+    public static final int NO_ERROR = 0x00;
+    public static final int ERROR_BIP_NOT_CONNECTED = 0x01;
+    public static final int ERROR_BIP_HANDLE_NOT_VALID = 0x02;
 }

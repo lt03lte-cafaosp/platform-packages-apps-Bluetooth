@@ -41,6 +41,9 @@ import java.nio.charset.Charset;
 import java.nio.ByteBuffer;
 import android.media.session.PlaybackState;
 import android.media.MediaMetadata;
+import android.media.MediaMetadataEditor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 /**
  * Provides helper classes used by other AvrcpControllerClasses.
  */
@@ -167,7 +170,7 @@ class AvrcpUtils {
                 speed = -3;
             break;
         }
-        return new PlaybackState.Builder().setState(mState, position, speed).build(); 
+        return new PlaybackState.Builder().setState(mState, position, speed).build();
     }
     /*
      * This api converts meta info into MediaMetaData
@@ -191,6 +194,20 @@ class AvrcpUtils {
                 mTrackInfo.mTrackLen);
         mMetaDataBuilder.putString(MediaMetadata.METADATA_KEY_MEDIA_ID,
                 String.valueOf(mTrackInfo.mItemUid));
+        if ((mTrackInfo.mThumbNailLocation != null) && (!mTrackInfo.mThumbNailLocation.
+                equals(AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
+            Bitmap mThumbNail = BitmapFactory.decodeFile(mTrackInfo.mThumbNailLocation);
+            if(AvrcpControllerConstants.VDBG) Log.d(TAG, " put thumbnail " +
+                                                            mTrackInfo.mThumbNailLocation);
+            mMetaDataBuilder.putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, mThumbNail);
+        }
+        if ((mTrackInfo.mImageLocation != null) && (!mTrackInfo.mImageLocation.
+                equals(AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
+            if(AvrcpControllerConstants.VDBG) Log.d(TAG, " put Image " +
+                    mTrackInfo.mImageLocation);
+            mMetaDataBuilder.putString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI,
+                    mTrackInfo.mImageLocation);
+        }
         return mMetaDataBuilder.build();
     }
     /*
@@ -251,8 +268,15 @@ class RemoteDevice {
     int mSystemStatus;
     int mAbsVolNotificationState;
     int mNotificationLabel;
+    AvrcpBipInitiator mAvrcpBipInitiator;
+    int mBipL2capPsm;
+    private static final String TAG = "AvrcpControllerClasses_RemoteDevice";
 
     public void cleanup() {
+        if(mAvrcpBipInitiator != null) {
+            mAvrcpBipInitiator.cleanup();
+            mAvrcpBipInitiator =  null;
+        }
         mBTDevice = null;
         mRemoteFeatures = AvrcpControllerConstants.BTRC_FEAT_NONE;
         mBatteryStatus = AvrcpControllerConstants.BATT_POWER_UNDEFINED;
@@ -268,6 +292,8 @@ class RemoteDevice {
         mSystemStatus = AvrcpControllerConstants.SYSTEM_STATUS_UNDEFINED;
         mAbsVolNotificationState = AvrcpControllerConstants.DEFER_VOLUME_CHANGE_RSP;
         mNotificationLabel = AvrcpControllerConstants.VOLUME_LABEL_UNDEFINED;
+        mAvrcpBipInitiator =  null;
+        mBipL2capPsm = AvrcpControllerConstants.DEFAULT_PSM;
     }
 
     public boolean isBrowsingSupported() {
@@ -276,11 +302,49 @@ class RemoteDevice {
         else
            return false;
     }
+
     public boolean isMetaDataSupported() {
         if((mRemoteFeatures & AvrcpControllerConstants.BTRC_FEAT_METADATA) != 0)
             return true;
         else
            return false;
+    }
+
+    public boolean isCoverArtSupported() {
+        if((mRemoteFeatures & AvrcpControllerConstants.BTRC_FEAT_COVER_ART) != 0)
+            return true;
+        else
+           return false;
+    }
+
+    public void connectBip(int psm) {
+        if(mBTDevice == null)
+            return;
+        Log.d(TAG," connectBip psm " + psm);
+        if(mAvrcpBipInitiator == null)
+            mAvrcpBipInitiator = new AvrcpBipInitiator(mBTDevice, psm);
+        if (!mAvrcpBipInitiator.isObexConnected())
+            mAvrcpBipInitiator.connect();
+    }
+
+    public void GetLinkedThumbnail(String imgHandle) {
+
+        if ((mAvrcpBipInitiator != null) && (mAvrcpBipInitiator.isObexConnected())) {
+            mAvrcpBipInitiator.GetLinkedThumbnail(imgHandle);
+        }
+    }
+
+    public void GetImage(String imgHandle, String encoding, String pixel, long maxSize) {
+
+        if ((mAvrcpBipInitiator != null) && (mAvrcpBipInitiator.isObexConnected())) {
+            mAvrcpBipInitiator.GetImage(imgHandle, encoding, pixel, maxSize);
+        }
+    }
+
+    public boolean isBipConnected() {
+        if(mAvrcpBipInitiator != null)
+            return mAvrcpBipInitiator.isObexConnected();
+        return false;
     }
 }
 
@@ -387,7 +451,8 @@ class PlayerInfo {
         for(PlayerApplicationSettings plAppSetting: mPlayerAppSetting) {
             switch(plAppSetting.attr_Id) {
             case AvrcpControllerConstants.ATTRIB_EQUALIZER_STATUS:
-                mAvrcpPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
+                mAvrcpPlayerAppSetting.addSettingValue(
+                           BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
                            AvrcpUtils.mapAttribIdValtoAvrcpPlayerSetting(plAppSetting.attr_Id,
                                 plAppSetting.attr_val));
                 break;
@@ -454,6 +519,9 @@ class TrackInfo extends MediaItem {
     long mTrackNum; // number of audio file on original recording.
     long mTotalTracks;// total number of tracks on original recording
     long mTrackLen;// full length of AudioFile.
+    String mCoverArtHandle;
+    String mThumbNailLocation;
+    String mImageLocation;
     /* In case of 1.3 we have to set itemUid explicitly to 0 */
 
     /* reset it to default values */
@@ -465,12 +533,16 @@ class TrackInfo extends MediaItem {
         mTrackNum   = AvrcpControllerConstants.TRACK_NUM_INVALID;
         mTotalTracks = AvrcpControllerConstants.TOTAL_TRACK_TIME_INVALID;
         mTrackLen = AvrcpControllerConstants.TOTAL_TRACK_TIME_INVALID;
+        mCoverArtHandle = AvrcpControllerConstants.COVER_ART_HANDLE_INVALID;
+        mThumbNailLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
+        mImageLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
     }
     public TrackInfo() {
         resetTrackInfo();
     }
     public TrackInfo(int mTrackId, byte mNumAttributes, int[] mAttribIds, String[] mAttribs) {
         mItemUid = mTrackId;
+        resetTrackInfo();
         for (int i = 0; i < mNumAttributes; i++) {
             switch(mAttribIds[i]) {
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_TITLE:
@@ -497,6 +569,9 @@ class TrackInfo extends MediaItem {
                 if(!mAttribs[i].isEmpty())
                     mTrackLen = Long.valueOf(mAttribs[i]);
                 break;
+            case AvrcpControllerConstants.MEDIA_ATTRIBUTE_COVER_ART_HANDLE:
+                mCoverArtHandle = mAttribs[i];
+                break;
             }
         }
     }
@@ -505,5 +580,23 @@ class TrackInfo extends MediaItem {
                 " albumTitle= " + mAlbumTitle + " genre= " +mGenre+" trackNum= "+
                 Long.toString(mTrackNum) + " track_len : "+ Long.toString(mTrackLen) +
                 " TotalTracks " + Long.toString(mTotalTracks) + "]";
+    }
+}
+class AppProperties {
+    boolean isCoverArtRequested;
+    String mSupportedCoverArtMimetype;
+    int mSupportedCovertArtHeight;
+    int mSupportedCoverArtWidth;
+    long mSupportedCoverArtMaxSize;
+
+    void resetAppProperties() {
+        isCoverArtRequested = false;
+        mSupportedCoverArtMimetype = "JPEG";
+        mSupportedCovertArtHeight = 500;
+        mSupportedCoverArtWidth = 500;
+        mSupportedCoverArtMaxSize = 200000;
+    }
+    public AppProperties() {
+        resetAppProperties();
     }
 }

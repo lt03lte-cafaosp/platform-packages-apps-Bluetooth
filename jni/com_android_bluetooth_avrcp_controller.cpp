@@ -37,6 +37,7 @@ static jmethodID method_handleplayerappsettingchanged;
 static jmethodID method_handleSetAbsVolume;
 static jmethodID method_handleRegisterNotificationAbsVol;
 static jmethodID method_handletrackchanged;
+static jmethodID method_handleelementattrupdate;
 static jmethodID method_handleplaypositionchanged;
 static jmethodID method_handleplaystatuschanged;
 static jmethodID method_handleGroupNavigationRsp;
@@ -110,7 +111,7 @@ static void btavrcp_connection_state_callback(bool state, bt_bdaddr_t* bd_addr) 
     sCallbackEnv->DeleteLocalRef(addr);
 }
 
-static void btavrcp_get_rcfeatures_callback(bt_bdaddr_t *bd_addr, int features) {
+static void btavrcp_get_rcfeatures_callback(bt_bdaddr_t *bd_addr, int features, uint16_t ca_psm) {
     jbyteArray addr;
 
     ALOGI("%s", __FUNCTION__);
@@ -128,7 +129,8 @@ static void btavrcp_get_rcfeatures_callback(bt_bdaddr_t *bd_addr, int features) 
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getRcFeatures, addr, (jint)features);
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_getRcFeatures, addr, (jint)features,
+           (jint) ca_psm);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -157,13 +159,82 @@ static void btavrcp_setplayerapplicationsetting_rsp_callback(bt_bdaddr_t *bd_add
     sCallbackEnv->DeleteLocalRef(addr);
 }
 
+static void  btavrcp_get_mediaelementattribute_rsp_callback(bt_bdaddr_t *bd_addr, uint8_t num_attr,
+                                                     btrc_element_attr_val_t *p_attrs) {
+
+    /*
+     * byteArray will be formatted like this: id,len,string
+     * Assuming text feild to be null terminated.
+     */
+    jbyteArray addr;
+    jintArray attribIds;
+    jobjectArray stringArray;
+    jstring str;
+    jclass strclazz;
+    jint i;
+    ALOGI("%s", __FUNCTION__);
+    if (!checkCallbackThread()) {                                       \
+        ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__); \
+        return;                                                         \
+    }
+
+    addr = sCallbackEnv->NewByteArray(sizeof(bt_bdaddr_t));
+    if ((!addr)) {
+        ALOGE("Fail to get new array ");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        return;
+    }
+    attribIds = sCallbackEnv->NewIntArray(num_attr);
+    if(!attribIds) {
+        ALOGE(" failed to set new array for attribIds");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        sCallbackEnv->DeleteLocalRef(addr);
+        return;
+    }
+    sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*)bd_addr);
+
+    strclazz = sCallbackEnv->FindClass("java/lang/String");
+    stringArray = sCallbackEnv->NewObjectArray((jint)num_attr, strclazz, 0);
+    if(!stringArray) {
+        ALOGE(" failed to get String array");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        sCallbackEnv->DeleteLocalRef(addr);
+        sCallbackEnv->DeleteLocalRef(attribIds);
+        return;
+    }
+    for(i = 0; i < num_attr; i++)
+    {
+        str = sCallbackEnv->NewStringUTF((char*)(p_attrs[i].text));
+        if(!str) {
+            ALOGE(" Unable to get str ");
+            checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+            sCallbackEnv->DeleteLocalRef(addr);
+            sCallbackEnv->DeleteLocalRef(attribIds);
+            sCallbackEnv->DeleteLocalRef(stringArray);
+            return;
+        }
+        sCallbackEnv->SetIntArrayRegion(attribIds, i, 1, (jint*)&(p_attrs[i].attr_id));
+        sCallbackEnv->SetObjectArrayElement(stringArray, i,str);
+        sCallbackEnv->DeleteLocalRef(str);
+    }
+
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handletrackchanged, addr,
+         (jbyte)(num_attr), attribIds, stringArray);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(addr);
+    sCallbackEnv->DeleteLocalRef(attribIds);
+    /* TODO check do we need to delete str seperately or not */
+    sCallbackEnv->DeleteLocalRef(stringArray);
+    sCallbackEnv->DeleteLocalRef(strclazz);
+}
+
 static void btavrcp_playerapplicationsetting_callback(bt_bdaddr_t *bd_addr, uint8_t num_attr,
         btrc_player_app_attr_t *app_attrs, uint8_t num_ext_attr,
         btrc_player_app_ext_attr_t *ext_attrs) {
     ALOGI("%s", __FUNCTION__);
     jbyteArray addr;
     jbyteArray playerattribs;
-    jint arraylen;
+    jint arraylen = 0;
     int i,k;
 
     if (!checkCallbackThread()) {                                       \
@@ -181,7 +252,6 @@ static void btavrcp_playerapplicationsetting_callback(bt_bdaddr_t *bd_addr, uint
     /* TODO ext attrs
      * Flattening defined attributes: <id,num_values,values[]>
      */
-    arraylen = 0;
     for (i = 0; i < num_attr; i++)
     {
         /*2 bytes for id and num */
@@ -412,6 +482,7 @@ static void btavrcp_play_status_changed_callback(bt_bdaddr_t *bd_addr,
              (jbyte)play_status);
     sCallbackEnv->DeleteLocalRef(addr);
 }
+
 static void btavrcp_available_players_update_callback (bt_bdaddr_t *bd_addr,
                                          btrc_folder_list_entries_t *p_folder_entries)
 {
@@ -423,51 +494,62 @@ static void btavrcp_addressed_player_update_callback (bt_bdaddr_t *bd_addr,
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_set_browsed_player_rsp_callback (bt_bdaddr_t *bd_addr,
                                              uint8_t status, uint16_t uid_counter)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_set_addressed_player_rsp_callback (bt_bdaddr_t *bd_addr, uint8_t status)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_change_path_rsp_callback (bt_bdaddr_t *bd_addr, uint8_t status, uint32_t num_items)
 {
     ALOGI("%s", __FUNCTION__);
 }
-static 	void btavrcp_now_playing_list_update_callback (bt_bdaddr_t *bd_addr)
+
+static void btavrcp_now_playing_list_update_callback (bt_bdaddr_t *bd_addr)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_add_to_now_playing_list_rsp_callback (bt_bdaddr_t *bd_addr,
                                                                     uint8_t status)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_browse_folder_rsp_callback (bt_bdaddr_t *bd_addr,
                       uint8_t status, btrc_folder_list_entries_t *p_folder_entries)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_play_item_rsp_callback (bt_bdaddr_t *bd_addr, uint8_t status)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_serach_rsp_callback (bt_bdaddr_t *bd_addr, uint8_t status,
                                             uint16_t uid_counter, uint32_t num_items)
 {
     ALOGI("%s", __FUNCTION__);
 }
-void btavrcp_total_items_rsp_callback (bt_bdaddr_t *bd_addr, 
+
+static void btavrcp_total_items_rsp_callback (bt_bdaddr_t *bd_addr,
                            uint8_t status, uint16_t uid_counter, uint32_t num_items)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static void btavrcp_uids_changed_callback (bt_bdaddr_t *bd_addr, uint16_t uid_counter)
 {
     ALOGI("%s", __FUNCTION__);
 }
+
 static btrc_ctrl_callbacks_t sBluetoothAvrcpCallbacks = {
     sizeof(sBluetoothAvrcpCallbacks),
     btavrcp_passthrough_response_callback,
@@ -475,6 +557,7 @@ static btrc_ctrl_callbacks_t sBluetoothAvrcpCallbacks = {
     btavrcp_connection_state_callback,
     btavrcp_get_rcfeatures_callback,
     btavrcp_setplayerapplicationsetting_rsp_callback,
+    btavrcp_get_mediaelementattribute_rsp_callback,
     btavrcp_playerapplicationsetting_callback,
     btavrcp_playerapplicationsetting_changed_callback,
     btavrcp_set_abs_vol_cmd_callback,
@@ -507,7 +590,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
         env->GetMethodID(clazz, "onConnectionStateChanged", "(Z[B)V");
 
     method_getRcFeatures =
-        env->GetMethodID(clazz, "getRcFeatures", "([BI)V");
+        env->GetMethodID(clazz, "getRcFeatures", "([BII)V");
 
     method_setplayerappsettingrsp =
         env->GetMethodID(clazz, "setPlayerAppSettingRsp", "([BB)V");
@@ -526,6 +609,9 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_handletrackchanged =
         env->GetMethodID(clazz, "onTrackChanged", "([BB[I[Ljava/lang/String;)V");
+
+    method_handleelementattrupdate =
+        env->GetMethodID(clazz, "onElementAttributeUpdate", "([BB[I[Ljava/lang/String;)V");
 
     method_handleplaypositionchanged =
         env->GetMethodID(clazz, "onPlayPositionChanged", "([BII)V");
@@ -740,16 +826,54 @@ static void sendRegisterAbsVolRspNative(JNIEnv *env, jobject object, jbyteArray 
     env->ReleaseByteArrayElements(address, addr, 0);
 }
 
+static void getElementAttributesNative(JNIEnv *env, jobject object, jbyteArray address,
+                                        jbyte num_attribs, jbyteArray attrib_ids) {
+    bt_status_t status;
+    jbyte *addr;
+    uint32_t *pAttrs = NULL;
+    jbyte *attr;
+    int i;
+
+    if (!sBluetoothAvrcpInterface) return;
+    addr = env->GetByteArrayElements(address, NULL);
+    if (!addr) {
+        jniThrowIOException(env, EINVAL);
+        return;
+    }
+    if (num_attribs == 0)// we have to fetch all element attributes
+    {
+        sBluetoothAvrcpInterface->get_media_element_attributes((bt_bdaddr_t *)addr,
+                    (uint8_t)num_attribs, NULL);
+        env->ReleaseByteArrayElements(address, addr, 0);
+        return;
+    }
+    pAttrs = new uint32_t[num_attribs];
+    attr = env->GetByteArrayElements(attrib_ids, NULL);
+    for (i = 0; i < num_attribs; ++i) {
+        pAttrs[i] = (uint32_t)attr[i];
+    }
+    ALOGI("%s: sBluetoothAvrcpInterface: %p", __FUNCTION__, sBluetoothAvrcpInterface);
+    status = sBluetoothAvrcpInterface->get_media_element_attributes((bt_bdaddr_t *)addr,
+            (uint8_t)num_attribs, pAttrs);
+    if (status != BT_STATUS_SUCCESS) {
+        ALOGE("Failed sending getElementAttributesNative command, status: %d", status);
+    }
+    delete[] pAttrs;
+    env->ReleaseByteArrayElements(address, addr, 0);
+    env->ReleaseByteArrayElements(attrib_ids, attr, 0);
+}
+
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void *) classInitNative},
     {"initNative", "()V", (void *) initNative},
     {"cleanupNative", "()V", (void *) cleanupNative},
     {"sendPassThroughCommandNative", "([BII)Z",(void *) sendPassThroughCommandNative},
-{"sendGroupNavigationCommandNative", "([BII)Z",(void *) sendGroupNavigationCommandNative},
+    {"sendGroupNavigationCommandNative", "([BII)Z",(void *) sendGroupNavigationCommandNative},
     {"setPlayerApplicationSettingValuesNative", "([BB[B[B)V",
                                (void *) setPlayerApplicationSettingValuesNative},
     {"sendAbsVolRspNative", "([BII)V",(void *) sendAbsVolRspNative},
     {"sendRegisterAbsVolRspNative", "([BBII)V",(void *) sendRegisterAbsVolRspNative},
+    {"getElementAttributesNative", "([BB[B)V",(void *) getElementAttributesNative},
 };
 
 int register_com_android_bluetooth_avrcp_controller(JNIEnv* env)
