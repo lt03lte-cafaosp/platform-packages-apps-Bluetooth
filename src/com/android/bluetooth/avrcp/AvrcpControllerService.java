@@ -370,6 +370,13 @@ public class AvrcpControllerService extends ProfileService {
         unregisterReceiver(mBroadcastReceiver);
          try {
              deinitDatabase();
+             if (mHandler != null) {
+                 mHandler.removeCallbacksAndMessages(null);
+                 Looper looper = mHandler.getLooper();
+                 if (looper != null) {
+                     looper.quit();
+                 }
+             }
              if (mRemoteData != null) {
                  mRemoteData.mCompanyIDSupported.clear();
                  mRemoteData.mEventsSupported.clear();
