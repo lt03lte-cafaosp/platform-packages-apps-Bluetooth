@@ -1129,7 +1129,6 @@ public class BluetoothPbapVcardManager {
         final int contactIdColumn = cursor.getColumnIndex(Data.CONTACT_ID);
         final int idColumn = cursor.getColumnIndex(Data._ID);
         final int nameColumn = cursor.getColumnIndex(Data.DISPLAY_NAME);
-        long previousContactId = -1;
         cursor.moveToPosition(-1);
         while (cursor.moveToNext()) {
             final long contactId = cursor.getLong(contactIdColumn != -1 ? contactIdColumn : idColumn);
@@ -1138,9 +1137,9 @@ public class BluetoothPbapVcardManager {
                 displayName = defaultName;
             }
 
-            if (previousContactId != contactId) {
-                previousContactId = contactId;
-                resultList.add(displayName + "," + contactId);
+            String newString = displayName + "," + contactId;
+            if (!resultList.contains(newString)) {
+                resultList.add(newString);
             }
         }
         if (V) {
