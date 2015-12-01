@@ -304,6 +304,15 @@
         </service>
         <service
             android:process="@string/process"
+            android:name = ".avrcp.AvrcpControllerBrowseService"
+            android:exported="true"
+            android:enabled="@bool/profile_supported_avrcp_controller">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+        <service
+            android:process="@string/process"
             android:name = ".hid.HidService"
             android:enabled="@bool/profile_supported_hid">
             <intent-filter>

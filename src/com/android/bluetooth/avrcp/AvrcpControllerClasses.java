@@ -44,6 +44,8 @@ import android.media.MediaMetadata;
 import android.media.MediaMetadataEditor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Bundle;
+import java.util.LinkedList;
 /**
  * Provides helper classes used by other AvrcpControllerClasses.
  */
@@ -270,6 +272,14 @@ class RemoteDevice {
     int mNotificationLabel;
     AvrcpBipInitiator mAvrcpBipInitiator;
     int mBipL2capPsm;
+     /*
+      * this variable, if changes, it means, there is a change in UIDS on remote.
+      * We will get UIDs changed from remote. We just keep a copy of it as we have to
+      * send in some response.
+      */
+    int muidCounter;
+    int mCurrentScope;
+    PendingBrowsingCommands mPendingBrwCmds;
     private static final String TAG = "AvrcpControllerClasses_RemoteDevice";
 
     public void cleanup() {
@@ -283,6 +293,9 @@ class RemoteDevice {
         mSystemStatus = AvrcpControllerConstants.SYSTEM_STATUS_UNDEFINED;
         mAbsVolNotificationState = AvrcpControllerConstants.DEFER_VOLUME_CHANGE_RSP;
         mNotificationLabel = AvrcpControllerConstants.VOLUME_LABEL_UNDEFINED;
+        muidCounter = 0xFF;
+        mCurrentScope = AvrcpControllerConstants.AVRCP_SCOPE_NONE;
+        mPendingBrwCmds.cleanup();
     }
 
     public RemoteDevice(BluetoothDevice mDevice) {
@@ -294,6 +307,9 @@ class RemoteDevice {
         mNotificationLabel = AvrcpControllerConstants.VOLUME_LABEL_UNDEFINED;
         mAvrcpBipInitiator =  null;
         mBipL2capPsm = AvrcpControllerConstants.DEFAULT_PSM;
+        muidCounter = 0xFF;
+        mCurrentScope = AvrcpControllerConstants.AVRCP_SCOPE_NONE;
+        mPendingBrwCmds = new PendingBrowsingCommands();
     }
 
     public boolean isBrowsingSupported() {
@@ -346,6 +362,17 @@ class RemoteDevice {
             return mAvrcpBipInitiator.isObexConnected();
         return false;
     }
+    public boolean isBipFetchInProgress() {
+        if (mAvrcpBipInitiator != null)
+            return mAvrcpBipInitiator.isBipFetchInProgress();
+        return false;
+    }
+    public synchronized int getCurrentScope() {
+        return mCurrentScope;
+    }
+    public synchronized void setCurrentScope(int scope) {
+        mCurrentScope = scope;
+    }
 }
 
 /*
@@ -359,7 +386,7 @@ class MediaItem {
      * Can never be 0, used only for GetElementAttributes
      * TODO: UID counter, which is used for database aware player
      */
-    double mItemUid;
+    long mItemUid;
 }
 
 /*
@@ -383,13 +410,20 @@ class PlayerInfo {
      * 2 byte player id to identify player.
      * In 1.3 this value will be set to zero
      */
-    char mPlayerId;
+    int subType;
+    int mPlayerId;
+    byte majorType;
+    byte[] mFeatureMask;
+    String mPlayerName;
     ArrayList<PlayerApplicationSettings> mPlayerAppSetting;
+
     private void resetPlayer() {
         mPlayStatus = AvrcpControllerConstants.PLAY_STATUS_STOPPED;
         mPlayTime   = AvrcpControllerConstants.PLAYING_TIME_INVALID;
         mPlayerId   = 0;
         mPlayerAppSetting = new ArrayList<PlayerApplicationSettings>();
+        subType = 0; majorType = 0; mPlayerName = null;
+        mFeatureMask = new byte[AvrcpControllerConstants.PLAYER_FEATURE_MASK_SIZE];
     }
     public PlayerInfo() {
         resetPlayer();
@@ -506,6 +540,14 @@ class PlayerInfo {
         }
         return true;
     }
+    public boolean isFeatureMaskBitSet (int featureBit) {
+        int index = (featureBit)/8;
+        int bit = (featureBit)%8;
+        if ((mFeatureMask[index]&(1<<(bit-1))) != 0) {
+            return true;
+        }
+        return false;
+    }
 }
 
 /*
@@ -522,6 +564,7 @@ class TrackInfo extends MediaItem {
     String mCoverArtHandle;
     String mThumbNailLocation;
     String mImageLocation;
+    byte mediaType;
     /* In case of 1.3 we have to set itemUid explicitly to 0 */
 
     /* reset it to default values */
@@ -536,11 +579,12 @@ class TrackInfo extends MediaItem {
         mCoverArtHandle = AvrcpControllerConstants.COVER_ART_HANDLE_INVALID;
         mThumbNailLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
         mImageLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
+        mediaType = AvrcpControllerConstants.MEDIA_TYPE_AUDIO;
     }
     public TrackInfo() {
         resetTrackInfo();
     }
-    public TrackInfo(int mTrackId, byte mNumAttributes, int[] mAttribIds, String[] mAttribs) {
+    public TrackInfo(long mTrackId, byte mNumAttributes, int[] mAttribIds, String[] mAttribs) {
         mItemUid = mTrackId;
         resetTrackInfo();
         for (int i = 0; i < mNumAttributes; i++) {
@@ -598,5 +642,145 @@ class AppProperties {
     }
     public AppProperties() {
         resetAppProperties();
+    }
+}
+
+class PendingBrowsingCommands {
+    class cmdDetails {
+        int commandId;
+        int scope;
+        Bundle data;
+    }
+    LinkedList<cmdDetails> mPendingCmdList;
+    public PendingBrowsingCommands() {
+        mPendingCmdList = new LinkedList<cmdDetails>();
+    }
+    public void cleanup() {
+        mPendingCmdList.clear();
+    }
+    public void addCommand(int cmdId, int scope, Bundle cmdData) {
+        if (mPendingCmdList == null) return;
+        cmdDetails newCmd = new cmdDetails();
+        newCmd.commandId = cmdId; newCmd.scope = scope; newCmd.data = cmdData;
+        mPendingCmdList.add(newCmd);
+    }
+    /* Returns index of first match from start of list */
+    public int getCmdIndex(int cmdId, int scope) {
+        for (int index = 0; index < mPendingCmdList.size(); index ++) {
+            if ((mPendingCmdList.get(index).commandId == cmdId) &&
+                    (mPendingCmdList.get(index).scope == scope))
+                return index;
+        }
+        return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
+    }
+    public boolean checkAndClearCommand(int cmdId, int currentScope) {
+        /* First check if first cmd is the same as expected,
+         * if yes, deque command and return true
+         * if no, remove all commands from start of list with diff scope and return false.
+         * This will ensure only commands for relevant scope are processed.
+         */
+        if ((mPendingCmdList == null) || (mPendingCmdList.isEmpty()))
+            return false;
+        if ((mPendingCmdList.getFirst().commandId == cmdId) &&
+                (mPendingCmdList.getFirst().scope == currentScope)) {
+            mPendingCmdList.removeFirst();
+            return true;
+        }
+        /* If Command ID does not match, remove command */
+        if (mPendingCmdList.getFirst().commandId != cmdId) {
+            mPendingCmdList.removeFirst();
+            return false;
+        }
+        /* If scope does not match, remove all commands with diff scope from starting */
+        for (int i = mPendingCmdList.size(); i >= 0; i--) {
+            if (mPendingCmdList.get(i).scope == currentScope)
+                continue;
+            while (i >= 0) {
+                mPendingCmdList.remove(i--);
+            }
+            break;
+        }
+        return false;
+    }
+    /* update command at given index,
+     * if cmdId and scope matches with expected values, return false,
+     */
+    public boolean updateCommand(int index, int expectedCmdId, int expectedScope, Bundle data) {
+        if ((mPendingCmdList == null) || (mPendingCmdList.isEmpty()))
+            return false;
+        if ((mPendingCmdList.get(index).scope != expectedScope) ||
+                (mPendingCmdList.get(index).commandId != expectedCmdId)) {
+            mPendingCmdList.remove(index);
+            return false;
+        }
+        mPendingCmdList.get(index).data = data;
+        return true;
+    }
+    public int getCmdId(int index) {
+        if ((mPendingCmdList == null) || (mPendingCmdList.isEmpty()))
+            return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
+        return mPendingCmdList.get(index).commandId;
+    }
+    public int getCmdScope(int index) {
+        if ((mPendingCmdList == null) || (mPendingCmdList.isEmpty()))
+            return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
+        return mPendingCmdList.get(index).scope;
+    }
+    public Bundle getCmdData(int index) {
+        if ((mPendingCmdList == null) || (mPendingCmdList.isEmpty()))
+            return null;
+        return mPendingCmdList.get(index).data;
+    }
+    public boolean isListEmpty() {
+        if (mPendingCmdList == null)
+            return true;
+        return mPendingCmdList.isEmpty();
+    }
+    public int getListSize() {
+        if (mPendingCmdList == null)
+            return 0;
+        return mPendingCmdList.size();
+    }
+    public void removeCmd(int index) {
+        if (mPendingCmdList == null)
+            return ;
+        mPendingCmdList.remove(index);
+    }
+    public void addCommandFirst(int cmdId, int scope, Bundle cmdData) {
+        if (mPendingCmdList == null) return;
+        cmdDetails newCmd = new cmdDetails();
+        newCmd.commandId = cmdId; newCmd.scope = scope; newCmd.data = cmdData;
+        mPendingCmdList.addFirst(newCmd);
+    }
+}
+class FolderItems extends MediaItem {
+    String folderName;
+    byte isPlayable;
+    byte folderType;
+    public void resetFolderItems() {
+        folderName = AvrcpControllerConstants.DEFAULT_NAME;
+        isPlayable = AvrcpControllerConstants.FOLDER_TYPE_NOT_PLAYABLE;
+        folderType = (byte)AvrcpControllerConstants.FOLDER_TYPE_ERROR;
+    }
+    public FolderItems() {
+        resetFolderItems();
+    }
+    public FolderItems(long itemId, String name, byte isFolderPlayable, byte mFolderType) {
+        resetFolderItems();
+        mItemUid = itemId; folderName = name; isPlayable = isFolderPlayable;
+        folderType = mFolderType;
+    }
+}
+class FolderStackInfo {
+    String folderUid;
+    long uid;
+    int numItems;
+    public void reset() {
+        folderUid = AvrcpControllerConstants.DEFAULT_NAME;
+        uid = AvrcpControllerConstants.DEFAULT_FOLDER_ID;
+        numItems = 0;
+    }
+    public FolderStackInfo() {
+        reset();
     }
 }
