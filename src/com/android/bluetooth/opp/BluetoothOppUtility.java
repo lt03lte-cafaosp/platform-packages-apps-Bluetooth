@@ -105,7 +105,7 @@ public class BluetoothOppUtility {
                 info.mFileUri = cursor.getString(cursor.getColumnIndexOrThrow(BluetoothShare.URI));
 
                 if (info.mFileUri != null) {
-                    Uri u = Uri.parse(info.mFileUri);
+                    Uri u =originalUri( Uri.parse(info.mFileUri));
                     info.mFileType = context.getContentResolver().getType(u);
                 } else {
                     Uri u = Uri.parse(info.mFileName);
@@ -340,7 +340,7 @@ public class BluetoothOppUtility {
         int atIndex = fileInfo.lastIndexOf("@");
         fileInfo = fileInfo.substring(atIndex);
         uri = Uri.parse(uri + fileInfo);
-        if (V) Log.v(TAG, "generateUri: " + uri);
+        Log.v(TAG, "generateUri: " + uri);
         return uri;
     }
 
