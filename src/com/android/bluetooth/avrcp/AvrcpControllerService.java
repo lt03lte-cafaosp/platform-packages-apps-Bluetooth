@@ -21,6 +21,7 @@ package com.android.bluetooth.avrcp;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAvrcpController;
 import android.bluetooth.BluetoothAvrcpInfo;
+import android.bluetooth.BluetoothAvrcpPlayerSettings;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.IBluetoothAvrcpController;
@@ -29,6 +30,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ContentValues;
+import android.media.MediaMetadata;
+import android.media.session.PlaybackState;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -884,24 +887,28 @@ public class AvrcpControllerService extends ProfileService {
             return true;
         }
 
+        @Override
         public List<BluetoothDevice> getConnectedDevices() {
             AvrcpControllerService service = getService();
             if (service == null) return new ArrayList<BluetoothDevice>(0);
             return service.getConnectedDevices();
         }
 
+        @Override
         public List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
             AvrcpControllerService service = getService();
             if (service == null) return new ArrayList<BluetoothDevice>(0);
             return service.getDevicesMatchingConnectionStates(states);
         }
 
+        @Override
         public int getConnectionState(BluetoothDevice device) {
             AvrcpControllerService service = getService();
             if (service == null) return BluetoothProfile.STATE_DISCONNECTED;
             return service.getConnectionState(device);
         }
 
+        @Override
         public void sendPassThroughCmd(BluetoothDevice device, int keyCode, int keyState) {
             Log.v(TAG,"Binder Call: sendPassThroughCmd");
             AvrcpControllerService service = getService();
@@ -945,6 +952,23 @@ public class AvrcpControllerService extends ProfileService {
             AvrcpControllerService service = getService();
             if (service == null) return 0;
             return service.getSupportedFeatures(device);
+        }
+        @Override
+        public BluetoothAvrcpPlayerSettings getPlayerSettings(BluetoothDevice device) {
+            // TODO: Fill in the function.
+            return null;
+        }
+
+        @Override
+        public MediaMetadata getMetadata(BluetoothDevice device) {
+            // TODO: Fill in the function.
+            return null;
+        }
+
+        @Override
+        public PlaybackState getPlaybackState(BluetoothDevice device) {
+            // TODO: Fill in the function.
+            return null;
         }
     };
 
