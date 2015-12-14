@@ -126,7 +126,6 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CONNECT_TIMEOUT = 201;
     /* Allow time for possible LMP response timeout + Page timeout */
     private static final int CONNECT_TIMEOUT_SEC = 38000;
-
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
     private static final int CLCC_RSP_TIMEOUT_VALUE = 5000;
@@ -865,7 +864,7 @@ final class HeadsetStateMachine extends StateMachine {
                     }
 
                     int RetryConn = mRetryConnect.get(device);
-                    Log.d(TAG, "RetryConn = " + RetryConn);
+                    log("RetryConn = " + RetryConn);
                     if (RetryConn > 1) {
                         if (mRetryConnect.containsKey(device)) {
                             Log.d(TAG, "Removing device " + device +
@@ -1332,7 +1331,7 @@ final class HeadsetStateMachine extends StateMachine {
                     }
 
                     int RetryConn = mRetryConnect.get(device);
-                    Log.d(TAG, "RetryConn = " + RetryConn);
+                    log("RetryConn = " + RetryConn);
                     if (RetryConn > 1) {
                         if (mRetryConnect.containsKey(device)) {
                             Log.d(TAG, "Removing device " + device +
@@ -2073,7 +2072,6 @@ final class HeadsetStateMachine extends StateMachine {
                               mConnectedDevicesList.remove(device);
                               mHeadsetAudioParam.remove(device);
                               mHeadsetBrsf.remove(device);
-
                               Log.d(TAG, "device " + device.getAddress() +
                                            " is removed in MultiHFPending state");
                             }

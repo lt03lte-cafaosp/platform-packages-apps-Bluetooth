@@ -31,7 +31,6 @@ import android.os.Bundle;
 import android.os.Message;
 import android.provider.Settings;
 import android.util.Log;
-import com.android.bluetooth.a2dp.A2dpService;
 import com.android.bluetooth.btservice.ProfileService;
 import com.android.bluetooth.Utils;
 import java.util.ArrayList;
@@ -442,14 +441,6 @@ public class HeadsetClientService extends ProfileService {
                 "Need BLUETOOTH ADMIN permission");
 
         if (getPriority(device) == BluetoothProfile.PRIORITY_OFF) {
-            return false;
-        }
-
-        A2dpService a2dpService = A2dpService.getA2dpService();
-        //do not allow new connections with active multicast
-        if (a2dpService != null &&
-                (a2dpService.isMulticastOngoing(device))) {
-            Log.i(TAG,"A2dp Multicast is Ongoing, ignore Connection Request");
             return false;
         }
 
