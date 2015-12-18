@@ -139,7 +139,7 @@ public class BluetoothOppL2capListener {
                                 try {
                                     Thread.sleep(500);
                                 } catch (InterruptedException ie) {
-                                    Log.e(TAG, "socketAcceptThread thread was interrupted (4) "+ie);
+                                    Log.e(TAG, "mSocketAcceptThread was interrupted " + ie);
                                     mInterrupted = true;
                                 }
                             }
@@ -184,7 +184,7 @@ public class BluetoothOppL2capListener {
                 }
             }
             if (mSocketAcceptThread != null) {
-                if (V) Log.v(TAG, "Interrupting mSocketAcceptThread :"+mSocketAcceptThread);
+                if (V) Log.v(TAG, "Interrupting mSocketAcceptThread :" + mSocketAcceptThread);
                 mSocketAcceptThread.interrupt();
             }
             mSocketAcceptThread = null;
