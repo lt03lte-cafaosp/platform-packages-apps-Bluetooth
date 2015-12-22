@@ -61,6 +61,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.Iterator;
 
 /**
  * Provides Bluetooth Gatt profile, as a service in
@@ -617,7 +618,9 @@ public class GattService extends ProfileService {
         if (VDBG) Log.d(TAG, "onScanResult() - address=" + address
                     + ", rssi=" + rssi);
         List<UUID> remoteUuids = parseUuids(adv_data);
-        for (ScanClient client : mScanManager.getRegularScanQueue()) {
+        Iterator <ScanClient> it = mScanManager.getRegularScanQueue().iterator();
+        while (it.hasNext()) {
+            ScanClient client = it.next();
             if (client.uuids.length > 0) {
                 int matches = 0;
                 for (UUID search : client.uuids) {
