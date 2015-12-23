@@ -472,7 +472,7 @@ public class HeadsetClientService extends ProfileService {
         return mStateMachine.getConnectedDevices();
     }
 
-    private List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
+    public List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         return mStateMachine.getDevicesMatchingConnectionStates(states);
     }
@@ -487,7 +487,7 @@ public class HeadsetClientService extends ProfileService {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                 "Need BLUETOOTH_ADMIN permission");
         Settings.Global.putInt(getContentResolver(),
-                Settings.Global.getBluetoothHeadsetPriorityKey(device.getAddress()),
+                Settings.Global.getBluetoothHeadsetAgPriorityKey(device.getAddress()),
                 priority);
         if (DBG) {
             Log.d(TAG, "Saved priority " + device + " = " + priority);
@@ -499,7 +499,7 @@ public class HeadsetClientService extends ProfileService {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                 "Need BLUETOOTH_ADMIN permission");
         int priority = Settings.Global.getInt(getContentResolver(),
-                Settings.Global.getBluetoothHeadsetPriorityKey(device.getAddress()),
+                Settings.Global.getBluetoothHeadsetAgPriorityKey(device.getAddress()),
                 BluetoothProfile.PRIORITY_UNDEFINED);
         return priority;
     }
