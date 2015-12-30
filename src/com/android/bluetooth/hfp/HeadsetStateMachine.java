@@ -2455,8 +2455,7 @@ final class HeadsetStateMachine extends StateMachine {
             " isInCall: " + isInCall());
         if (state == HeadsetHalConstants.VR_STATE_STARTED) {
             if (!isVirtualCallInProgress() &&
-                !isInCall())
-            {
+                !isInCall()) {
                 IDeviceIdleController dic = IDeviceIdleController.Stub.asInterface(
                         ServiceManager.getService(Context.DEVICE_IDLE_CONTROLLER));
                 if (dic != null) {
@@ -2473,6 +2472,11 @@ final class HeadsetStateMachine extends StateMachine {
                     return;
                 }
                 expectVoiceRecognition(device);
+            } else {
+                // send error response if call is ongoing
+                atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_ERROR,
+                        0, getByteAddress(device));
+                return;
             }
         } else if (state == HeadsetHalConstants.VR_STATE_STOPPED) {
             if (mVoiceRecognitionStarted || mWaitingForVoiceRecognition)
