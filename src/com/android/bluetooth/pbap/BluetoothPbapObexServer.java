@@ -522,8 +522,13 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
     }
 
     private void updatePBSecondaryFolderVersion(long primaryCounter) {
-        BluetoothPbapService.secondaryVersionCounter =
+        if (SystemProperties.getBoolean("ro.bluetooth.pbap.sec", false) == true) {
+            Log.d(TAG,"Reset secondary folder version bit for PTS case");
+            BluetoothPbapService.secondaryVersionCounter = 0;
+        } else {
+            BluetoothPbapService.secondaryVersionCounter =
                 BluetoothPbapService.primaryVersionCounter;
+        }
     }
 
     private byte[] getPBSecondaryFolderVersion() {
