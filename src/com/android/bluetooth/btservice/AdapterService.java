@@ -1684,51 +1684,21 @@ public class AdapterService extends Service {
         if (getState()!= BluetoothAdapter.STATE_ON){
             return;
         }
-        boolean isA2dpSink = SystemProperties.getBoolean("persist.service.bt.a2dp.sink",
-                false);
-        boolean isHfpClient = SystemProperties.getBoolean("persist.service.bt.hfp.client",
-                false);
 
-        A2dpService a2dpService = null;
-        HeadsetService hsService = null;
         A2dpSinkService a2dpSinkService = null;
         HeadsetClientService hsClientService = null;
 
-        if (isA2dpSink) {
-            a2dpSinkService = A2dpSinkService.getA2dpSinkService();
-        } else {
-            a2dpService = A2dpService.getA2dpService();
-        }
-        if (isHfpClient) {
-            hsClientService = HeadsetClientService.getHeadsetClientService();
-        } else {
-            hsService = HeadsetService.getHeadsetService();
-        }
+        a2dpSinkService = A2dpSinkService.getA2dpSinkService();
+        hsClientService = HeadsetClientService.getHeadsetClientService();
 
-        // if any of the profile service is  null, second profile connection not required
-        if (((hsService == null) || (a2dpService == null )) &&
-                (!isA2dpSink && !isHfpClient)){
+        if ((a2dpSinkService == null) || (hsClientService == null)) {
             return;
         }
-        else if (((a2dpSinkService == null) || (hsClientService == null)) &&
-                (isA2dpSink && isHfpClient)){
-            return;
-        }
-        boolean a2dpConnected = false;
-        boolean hsConnected = false;
         List<BluetoothDevice> a2dpConnDevList;
         List<BluetoothDevice> hfConnDevList;
 
-        if (isA2dpSink) {
-            a2dpConnDevList = a2dpSinkService.getConnectedDevices();
-        } else {
-            a2dpConnDevList = a2dpService.getConnectedDevices();
-        }
-        if (isHfpClient) {
-            hfConnDevList = hsClientService.getConnectedDevices();
-        } else {
-            hfConnDevList = hsService.getConnectedDevices();
-        }
+        a2dpConnDevList = a2dpSinkService.getConnectedDevices();
+        hfConnDevList = hsClientService.getConnectedDevices();
 
         // Check if the device is in disconnected state and if so return
         // We ned to connect other profile only if one of the profile is still in connected state
@@ -1739,83 +1709,18 @@ public class AdapterService extends Service {
             (PROFILE_CONN_CONNECTED  == firstProfileStatus)){
             return;
         }
-        if(!a2dpConnDevList.isEmpty()) {
-            for (BluetoothDevice a2dpDevice : a2dpConnDevList)
-            {
-                if(a2dpDevice.equals(device))
-                {
-                    a2dpConnected = true;
-                }
-            }
-        }
-        if(!hfConnDevList.isEmpty()) {
-            for (BluetoothDevice hsDevice : hfConnDevList)
-            {
-                if(hsDevice.equals(device))
-                {
-                    hsConnected = true;
-                }
-            }
-        }
        // This change makes sure that we try to re-connect
        // the profile if its connection failed and priority
        // for desired profile is ON.
-        Log.i(TAG, "HF connected for device : " + device + " " + hfConnDevList.contains(device));
-        Log.i(TAG, "A2DP connected for device : " + device + " " + a2dpConnDevList.contains(device));
-        // check for auto PL first
-        if((hfConnDevList.isEmpty()) && (hsClientService != null) &&
+        if((hfConnDevList.isEmpty()) &&
                 (hsClientService.getPriority(device) >= BluetoothProfile.PRIORITY_ON)) {
             hsClientService.connect(device);
             return;
         }
-        else if ((a2dpConnDevList.isEmpty()) && (a2dpSinkService != null) &&
+        else if ((a2dpConnDevList.isEmpty()) &&
                 (a2dpSinkService.getPriority(device) >= BluetoothProfile.PRIORITY_ON)) {
             a2dpSinkService.connect(device);
             return;
-        }
-
-        // check for MTP now
-        if((hfConnDevList.isEmpty() || !(hfConnDevList.contains(device))) &&
-            (hsService != null) &&
-            (hsService.getPriority(device) >= BluetoothProfile.PRIORITY_ON) &&
-            (a2dpConnected || (a2dpService.getPriority(device) == BluetoothProfile.PRIORITY_OFF))) {
-            int maxHfpConnectionSysProp =
-                    SystemProperties.getInt("persist.bt.max.hs.connections", 1);
-
-            if (!hfConnDevList.isEmpty() && maxHfpConnectionSysProp == 1) {
-                Log.v(TAG,"HFP is already connected, ignore");
-                return;
-            }
-
-            // proceed connection only if a2dp is connected to this device
-            // add here as if is already overloaded
-            if (a2dpConnDevList.contains(device) ||
-                (hsService.getPriority(device) >= BluetoothProfile.PRIORITY_ON)) {
-                hsService.connect(device);
-            } else {
-                Log.d(TAG, "do not initiate connect as A2dp is not connected");
-            }
-        }
-        else if((a2dpConnDevList.isEmpty() || !(a2dpConnDevList.contains(device))) &&
-            (a2dpService != null) &&
-            (a2dpService.getPriority(device) >= BluetoothProfile.PRIORITY_ON) &&
-            (hsConnected || (hsService.getPriority(device) == BluetoothProfile.PRIORITY_OFF))) {
-            int maxA2dpConnectionSysProp =
-                    SystemProperties.getInt("persist.bt.max.a2dp.connections", 1);
-
-            if (!a2dpConnDevList.isEmpty() && maxA2dpConnectionSysProp == 1) {
-                Log.v(TAG,"A2DP is already connected, ignore");
-                return;
-            }
-
-            // proceed connection only if HFP is connected to this device
-            // add here as if is already overloaded
-            if (hfConnDevList.contains(device) ||
-                (a2dpService.getPriority(device) >= BluetoothProfile.PRIORITY_ON)) {
-                a2dpService.connect(device);
-            } else {
-                Log.v(TAG, "do not initiate connect as HFP is not connected");
-            }
         }
     }
 
