@@ -41,6 +41,7 @@ import android.provider.CallLog.Calls;
 import android.provider.CallLog;
 import android.text.TextUtils;
 import android.util.Log;
+import android.os.SystemProperties;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -509,11 +510,33 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         long primaryVcMsb = 0;
         ByteBuffer pvc = ByteBuffer.allocate(16);
         pvc.putLong(primaryVcMsb);
+
         Log.d(TAG,"BluetoothPbapService.primaryVersionCounter is "+
-        BluetoothPbapService.primaryVersionCounter);
+            BluetoothPbapService.primaryVersionCounter);
+
+        updatePBSecondaryFolderVersion(
+            BluetoothPbapService.primaryVersionCounter);
         pvc.putLong(BluetoothPbapService.primaryVersionCounter);
         BluetoothPbapService.primaryVersionCounter = 0;
         return pvc.array();
+    }
+
+    private void updatePBSecondaryFolderVersion(long primaryCounter) {
+        BluetoothPbapService.secondaryVersionCounter =
+                BluetoothPbapService.primaryVersionCounter;
+    }
+
+    private byte[] getPBSecondaryFolderVersion() {
+        long secondaryVcMsb = 0;
+        ByteBuffer svc = ByteBuffer.allocate(16);
+        svc.putLong(secondaryVcMsb);
+
+        Log.d(TAG,"BluetoothPbapService.secondaryVersionCounter is "+
+            BluetoothPbapService.secondaryVersionCounter);
+
+        svc.putLong(BluetoothPbapService.secondaryVersionCounter);
+        BluetoothPbapService.secondaryVersionCounter = 0;
+        return svc.array();
     }
 
     private boolean checkPbapFeatureSupport(long featureBit) {
@@ -974,7 +997,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
 
                 ap.addAPPHeader(ApplicationParameter.TRIPLET_TAGID.SECONDARYVERSIONCOUNTER_TAGID,
                 ApplicationParameter.TRIPLET_LENGTH.SECONDARYVERSIONCOUNTER_LENGTH,
-                    getPBPrimaryFolderVersion());
+                    getPBSecondaryFolderVersion());
 
                 reply.setHeader(HeaderSet.APPLICATION_PARAMETER, ap.getAPPparam());
             }
@@ -1060,7 +1083,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
 
             ap.addAPPHeader(ApplicationParameter.TRIPLET_TAGID.SECONDARYVERSIONCOUNTER_TAGID,
                 ApplicationParameter.TRIPLET_LENGTH.SECONDARYVERSIONCOUNTER_LENGTH,
-                    getPBPrimaryFolderVersion());
+                    getPBSecondaryFolderVersion());
 
             reply.setHeader(HeaderSet.APPLICATION_PARAMETER, ap.getAPPparam());
             try {
