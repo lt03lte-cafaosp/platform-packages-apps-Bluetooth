@@ -291,7 +291,7 @@ final class AvrcpControllerConstants {
      * Browsing
      */
     public static final int PLAYER_FEATURE_MASK_SIZE = 16;
-    public static final int DEFAULT_BROWSE_END_INDEX = 200;
+    public static final int DEFAULT_BROWSE_END_INDEX = 2000;
     public static final int DEFAULT_LIST_INDEX = 0xFFFF;
     public static final String AVRCP_BROWSE_ROOT_FOLDER = "__VFS_ROOT__";
     public static final byte DIRECTION_UP   = 0x00;

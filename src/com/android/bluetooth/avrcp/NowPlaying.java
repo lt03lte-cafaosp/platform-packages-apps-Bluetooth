@@ -120,6 +120,7 @@ public class NowPlaying {
         for (TrackInfo mTrackInfo: mNowPlayingList) {
             Log.d(TAG,"HNDL: " + mTrackInfo.mCoverArtHandle + " Loc: " +
                                                               mTrackInfo.mThumbNailLocation);
+            if (mTrackInfo.mItemUid == 0) continue;
             if ((!mTrackInfo.mCoverArtHandle.equals(AvrcpControllerConstants.
                  COVER_ART_HANDLE_INVALID)) && (mTrackInfo.mThumbNailLocation.equals
                  (AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
@@ -182,7 +183,11 @@ public class NowPlaying {
     public void clearNowPlayingList() {
         Log.d(TAG," clearNowPlayingList");
         if (mNowPlayingList == null) return;
-        mNowPlayingList.clear();
+        // first element would be current Track. track ID = 0;
+        int listSize = mNowPlayingList.size();
+        for (int index = 1; index < listSize; index++) {
+            mNowPlayingList.remove(1);
+        }
     }
     public int updateNowPlayingList(Bundle data) {
         Log.d(TAG, "udateNowPlayingList ");
@@ -210,6 +215,6 @@ public class NowPlaying {
             mNowPlayingList.add(mTrack);
             cumulativeAttribIndex += numAttrs[index];
         }
-        return mNowPlayingList.size();
+        return (mNowPlayingList.size() -1);// first item is currentTrack.
     }
 }

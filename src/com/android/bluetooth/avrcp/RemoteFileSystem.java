@@ -147,15 +147,28 @@ public class RemoteFileSystem {
         }
         return mSearchList.size();
     }
-    public long isIdInVFSList(String id) {
+    public long isIdInVFSFolderList(String id) {
         if ((mFolderItemList == null) || (mFolderItemList.isEmpty())) {
             Log.e(TAG," FolderItemList empty ");
             return AvrcpControllerConstants.DEFAULT_FOLDER_ID;
         }
         for (FolderItems mItem: mFolderItemList) {
             if (Long.toString(mItem.mItemUid).equals(id)) {
-                Log.d(TAG," isIdInVFSList item found ");
+                Log.d(TAG," isIdInVFSFolderList item found ");
                 return mItem.mItemUid;
+            }
+        }
+        return AvrcpControllerConstants.DEFAULT_FOLDER_ID;
+    }
+    public long isIdInVFSMediaList(String id) {
+        if ((mMediaItemList == null) || (mMediaItemList.isEmpty())) {
+            Log.e(TAG," MediaList empty ");
+            return AvrcpControllerConstants.DEFAULT_FOLDER_ID;
+        }
+        for (TrackInfo mTrackInfo: mMediaItemList) {
+            if (Long.toString(mTrackInfo.mItemUid).equals(id)) {
+                Log.d(TAG," isIdInVFSMediaList item found ");
+                return mTrackInfo.mItemUid;
             }
         }
         return AvrcpControllerConstants.DEFAULT_FOLDER_ID;
@@ -168,11 +181,14 @@ public class RemoteFileSystem {
         }
         return false;
     }
+    /*
+     * This api is called only from folderUp. We will check one less from top
+     */
     public int isIdInFolderStack(String id) {
-        if ((mFolderStack == null) || (mFolderStack.isEmpty()))
+        if ((mFolderStack == null) || (mFolderStack.size() < 2))
             return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
-        int index = mFolderStack.size() - 1;
-        for (;index > 0; index --) {
+        int index = mFolderStack.size() - 2;
+        for (;index >= 0; index --) {
             if (mFolderStack.get(index).folderUid.equals(id))
                 return (mFolderStack.size() - 1) - index;
         }
