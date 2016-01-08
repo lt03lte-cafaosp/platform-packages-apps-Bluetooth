@@ -34,9 +34,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
+
+import android.os.Bundle;
 import android.util.Log;
 import java.nio.charset.Charset;
 import java.nio.ByteBuffer;
+import android.bluetooth.BluetoothAvrcpRemoteMediaPlayers;
+import android.bluetooth.BluetoothAvrcpController;
 /**
  * Provides Bluetooth AVRCP Controller profile, as a service in the Bluetooth application.
  * @hide
@@ -82,12 +86,40 @@ public class RemoteMediaPlayers {
         mBrowsedPlayer = mPlayer;
     }
     /*
+     * Return true if we are able to set a player as browsed from available
+     * media player list
+     */
+    public boolean setBrowsedPlayerFromList(int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for (PlayerInfo mPlayerInfo : mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId != playerId)
+                continue;
+            setBrowsedPlayer(mPlayerInfo);
+            return true;
+        }
+        return false;
+    }
+    public boolean setAddressedPlayerFromList(int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for (PlayerInfo mPlayerInfo : mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId != playerId)
+                continue;
+            setAddressedPlayer(mPlayerInfo);
+            return true;
+        }
+        return false;
+    }
+    /*
      * Returns the currently addressed, browsed player
      */
     public PlayerInfo getAddressedPlayer() {
         return mAddressedPlayer;
     }
-
+    public PlayerInfo getBrowsedPlayer() {
+        return mBrowsedPlayer;
+    }
     /*
      * getPlayStatus of addressed player
      */
@@ -108,4 +140,158 @@ public class RemoteMediaPlayers {
             return AvrcpControllerConstants.PLAYING_TIME_INVALID;
     }
 
+    public  void updatePlayerList (byte numPlayers, Bundle data) {
+        Log.d(TAG," updatePlayerList numPlayers = " + numPlayers);
+
+        byte []featureMask = data.getByteArray("featureMask");
+        for (int i = 0; i < numPlayers; i++) {
+            PlayerInfo mPlayerInfo = new PlayerInfo();
+            mPlayerInfo.subType = data.getIntArray("subtype")[i];
+            mPlayerInfo.mPlayerId = data.getIntArray("playerId")[i];
+            mPlayerInfo.majorType = data.getByteArray("majorType")[i];
+            mPlayerInfo.mPlayStatus = data.getByteArray("playStatus")[i];
+            mPlayerInfo.mPlayerName = data.getStringArray("name")[i];
+            for (int k = 0; k < AvrcpControllerConstants.PLAYER_FEATURE_MASK_SIZE; k++)
+                mPlayerInfo.mFeatureMask[k] = featureMask[(i*AvrcpControllerConstants.
+                        PLAYER_FEATURE_MASK_SIZE) + k];
+            mMediaPlayerList.add(mPlayerInfo);
+        }
+        /* Once update is done, check if there is any player with status as playing
+         * Assign that player as addressed player.
+         */
+        int index = 0; boolean matchFound = false;
+        for (PlayerInfo mPlayerInfo: mMediaPlayerList) {
+            if ((mPlayerInfo.mPlayStatus == AvrcpControllerConstants.PLAY_STATUS_PLAYING)&&
+                (mPlayerInfo.mPlayerId != AvrcpControllerConstants.DEFAULT_PLAYER_ID)){
+                /* shuffle the entries, ideally this can be only 1 entry with status playing
+                 * By this time, the one with default player ID would have updated values.
+                 * update default ID and remove the new entry
+                 */
+                if (mMediaPlayerList.get(0).mPlayerId != AvrcpControllerConstants.DEFAULT_PLAYER_ID) {
+                    Log.e(TAG," Player ID did not match, bail out");
+                    break;
+                }
+                Log.d(TAG," Shuffling player Data");
+                mMediaPlayerList.get(0).mPlayerId = mPlayerInfo.mPlayerId;
+                mMediaPlayerList.get(0).subType = mPlayerInfo.subType;
+                mMediaPlayerList.get(0).majorType = mPlayerInfo.majorType;
+                mMediaPlayerList.get(0).mFeatureMask = mPlayerInfo.mFeatureMask;
+                mMediaPlayerList.get(0).mPlayerName = mPlayerInfo.mPlayerName;
+                matchFound = true;
+                break;
+            }
+            index ++;
+        }
+        if (matchFound) {
+            mMediaPlayerList.remove(index);
+            Log.d(TAG," removed index = " + index + " curSize = " + mMediaPlayerList.size());
+        }
+    }
+    /*
+     * API to get remote media player list
+     */
+    public BluetoothAvrcpRemoteMediaPlayers getTotalMediaPlayerList() {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return null;
+        BluetoothAvrcpRemoteMediaPlayers mRemoteMediaPlayers = new BluetoothAvrcpRemoteMediaPlayers();
+        for (PlayerInfo mPlayerInfo: mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId == AvrcpControllerConstants.DEFAULT_PLAYER_ID)
+                continue;
+            mRemoteMediaPlayers.addPlayer(mPlayerInfo.mPlayStatus, mPlayerInfo.subType,
+                    mPlayerInfo.mPlayerId, mPlayerInfo.majorType, mPlayerInfo.mFeatureMask,
+                    mPlayerInfo.mPlayerName);
+        }
+        return mRemoteMediaPlayers;
+    }
+    public BluetoothAvrcpRemoteMediaPlayers getBrowsedMediaPlayerList() {
+        BluetoothAvrcpRemoteMediaPlayers mRemoteMediaPlayers = new BluetoothAvrcpRemoteMediaPlayers();
+        PlayerInfo mPlayerInfo = getBrowsedPlayer();
+        if (mPlayerInfo == null) return null;
+        mRemoteMediaPlayers.addPlayer(mPlayerInfo.mPlayStatus, mPlayerInfo.subType,
+                mPlayerInfo.mPlayerId, mPlayerInfo.majorType, mPlayerInfo.mFeatureMask,
+                mPlayerInfo.mPlayerName);
+        return mRemoteMediaPlayers;
+    }
+    public BluetoothAvrcpRemoteMediaPlayers getAddressedMediaPlayerList() {
+        BluetoothAvrcpRemoteMediaPlayers mRemoteMediaPlayers = new BluetoothAvrcpRemoteMediaPlayers();
+        PlayerInfo mPlayerInfo = getAddressedPlayer();
+        if (mPlayerInfo == null) return null;
+        mRemoteMediaPlayers.addPlayer(mPlayerInfo.mPlayStatus, mPlayerInfo.subType,
+                mPlayerInfo.mPlayerId, mPlayerInfo.majorType, mPlayerInfo.mFeatureMask,
+                mPlayerInfo.mPlayerName);
+        return mRemoteMediaPlayers;
+    }
+    public boolean isPlayerInList(int playerId) {
+        if((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for ( PlayerInfo mPlayerInfo :mMediaPlayerList) {
+            if(mPlayerInfo.mPlayerId == playerId)
+                return true;
+        }
+        return false;
+    }
+    public boolean isPlayerBrowsable (int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for ( PlayerInfo mPlayerInfo :mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId == playerId) {
+                if (!mPlayerInfo.isFeatureMaskBitSet(BluetoothAvrcpController.
+                        PLAYER_FEATURE_BITMASK_BROWSING_BIT))
+                    return false;
+                if (mPlayerInfo.isFeatureMaskBitSet(BluetoothAvrcpController.
+                        PLAYER_FEATURE_BITMASK_ONLY_BROWSABLE_WHEN_ADDRESSED) &&
+                        (getAddressedPlayer().mPlayerId != playerId)) {
+                    return false;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+    public boolean isPlayerSearchable(int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for ( PlayerInfo mPlayerInfo :mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId == playerId) {
+                if (!mPlayerInfo.isFeatureMaskBitSet(BluetoothAvrcpController.
+                        PLAYER_FEATURE_BITMASK_SEARCH_BIT))
+                    return false;
+                if (mPlayerInfo.isFeatureMaskBitSet(BluetoothAvrcpController.
+                        PLAYER_FEATURE_BITMASK_ONLY_SEARCHABLE_WHEN_ADDRESSED) &&
+                        (getAddressedPlayer().mPlayerId != playerId)) {
+                    return false;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+    public boolean isPlayerSupportNowPlaying(int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for ( PlayerInfo mPlayerInfo :mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId == playerId) {
+                if (!mPlayerInfo.isFeatureMaskBitSet(BluetoothAvrcpController.
+                        PLAYER_FEATURE_BITMASK_NOW_PLAYING_BIT))
+                    return false;
+
+                return true;
+            }
+        }
+        return false;
+    }
+    public boolean isPlayerSupportAddToNowPlaying(int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
+            return false;
+        for ( PlayerInfo mPlayerInfo :mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId == playerId) {
+                if (!mPlayerInfo.isFeatureMaskBitSet(BluetoothAvrcpController.
+                        PLAYER_FEATURE_BITMASK_ADD_TO_NOW_PLAYING_BIT))
+                    return false;
+
+                return true;
+            }
+        }
+        return false;
+    }
 }

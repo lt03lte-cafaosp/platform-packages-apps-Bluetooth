@@ -21,14 +21,17 @@ package com.android.bluetooth.avrcp;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAvrcpController;
 import android.bluetooth.BluetoothAvrcpPlayerSettings;
+import android.bluetooth.BluetoothAvrcpRemoteMediaPlayers;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.IBluetoothAvrcpController;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-
+import android.media.browse.MediaBrowser;
+import android.os.Bundle;
 
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -129,6 +132,12 @@ public class AvrcpControllerService extends ProfileService {
         }
         if (mAppProperties != null)
             mAppProperties.resetAppProperties();
+        AvrcpControllerBrowseService avrcpBrowseService = AvrcpControllerBrowseService.
+                getAvrcpControllerBrowseService();
+        if(avrcpBrowseService != null) {
+            Log.d(TAG," Close Browsing Service");
+            avrcpBrowseService.cleanup();
+        }
     }
     protected boolean stop() {
         if (mHandler != null) {
@@ -215,7 +224,7 @@ public class AvrcpControllerService extends ProfileService {
     }
 
     public void onBipConnected(BluetoothDevice mDevice) {
-        Log.v(TAG," onBipConnected device = " + mDevice);
+        Log.v(TAG, " onBipConnected device = " + mDevice);
         if ((mAvrcpRemoteDevice != null) && (mAvrcpRemoteDevice.mBTDevice.equals(mDevice))) {
             mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_PROCESS_BIP_CONNECTED);
         }
@@ -225,7 +234,7 @@ public class AvrcpControllerService extends ProfileService {
         mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_PROCESS_BIP_DISCONNECTED);
     }
     public void onThumbNailFetched(String mImageHandle, String mImageLocation) {
-        Log.v(TAG," onBipImageFetched HDL = " + mImageHandle + " Location" + mImageLocation);
+        Log.v(TAG, " onBipImageFetched HDL = " + mImageHandle + " Location" + mImageLocation);
         if (mAvrcpRemoteDevice != null) {
             ArrayList<String> bipResults = new ArrayList<String>();
             bipResults.add(mImageHandle);
@@ -236,7 +245,7 @@ public class AvrcpControllerService extends ProfileService {
         }
     }
     public void onImageFetched(String mImageHandle, String mImageLocation) {
-        Log.v(TAG," onBipImageFetched HDL = " + mImageHandle + " Location " + mImageLocation);
+        Log.v(TAG, " onBipImageFetched HDL = " + mImageHandle + " Location " + mImageLocation);
         if (mAvrcpRemoteDevice != null) {
             ArrayList<String> bipResults = new ArrayList<String>();
             bipResults.add(mImageHandle);
@@ -425,6 +434,195 @@ public class AvrcpControllerService extends ProfileService {
         mAppProperties.mSupportedCoverArtMaxSize = maxSize;
         mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_CONNECT_BIP);
     }
+    public boolean SetBrowsedPlayer(int playerId) {
+        Log.d(TAG," SetBrowsedPlayer id = " + playerId);
+        if (!mRemoteMediaPlayers.isPlayerBrowsable(playerId))
+            return false;
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SET_BROWSED_PLAYER,
+                playerId, 0);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+    public boolean SetAddressedPlayer(int playerId) {
+        Log.d(TAG," SetAddressedPlayer id = " + playerId);
+        if(!mRemoteMediaPlayers.isPlayerInList(playerId))
+            return false;
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SET_ADDRESSED_PLAYER,
+                playerId, 0);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+    public BluetoothAvrcpRemoteMediaPlayers GetRemoteAvailableMediaPlayer() {
+        if (mRemoteMediaPlayers == null) return null;
+        return mRemoteMediaPlayers.getTotalMediaPlayerList();
+    }
+    public BluetoothAvrcpRemoteMediaPlayers GetAddressedPlayer() {
+        if (mRemoteMediaPlayers == null) return null;
+        return mRemoteMediaPlayers.getAddressedMediaPlayerList();
+    }
+    public BluetoothAvrcpRemoteMediaPlayers GetBrowsedPlayer() {
+        if (mRemoteMediaPlayers == null) return null;
+        return mRemoteMediaPlayers.getBrowsedMediaPlayerList();
+    }
+    public boolean browseToRoot() {
+        Log.d(TAG," browseToRoot ");
+        if (GetBrowsedPlayer() == null){
+            Log.d(TAG," browseToRoot called when Browsed player is not set");
+            return false;
+        }
+        if (mRemoteFileSystem == null) return false;
+        mRemoteFileSystem.clearSearchList();
+        mRemoteNowPlayingList.clearNowPlayingList();
+        mAvrcpRemoteDevice.setCurrentScope(AvrcpControllerConstants.AVRCP_SCOPE_VFS);
+        if (mRemoteFileSystem.mFolderStack.isEmpty()) {
+            FolderStackInfo stackInfo = new FolderStackInfo();
+            stackInfo.folderUid = AvrcpControllerConstants.AVRCP_BROWSE_ROOT_FOLDER;
+            mRemoteFileSystem.mFolderStack.add(stackInfo);
+            return true;
+        }
+        /* We have to perform changePath to Root */
+        int changePathDepth = -1 * (mRemoteFileSystem.mFolderStack.size() - 1);
+        if (changePathDepth != 0) {
+            Message msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SEND_CHANGE_PATH,
+                    changePathDepth, 0);
+            mHandler.sendMessage(msg);
+        }
+        return true;
+    }
+    public boolean loadChildren(final String parentMediaId) {
+        if ((mAvrcpRemoteDevice == null) || (mAvrcpRemoteDevice.getCurrentScope() !=
+                AvrcpControllerConstants.AVRCP_SCOPE_VFS)) {
+            Log.e(TAG," loadChildren, wrong currScope = " + mAvrcpRemoteDevice.getCurrentScope());
+            return false;
+        }
+        Message msg;
+        Log.d(TAG," loadChildren parentId = " + parentMediaId);
+        /* If this is root folder */
+        if (parentMediaId.equals(AvrcpControllerConstants.AVRCP_BROWSE_ROOT_FOLDER)) {
+            mRemoteFileSystem.clearVFSList();
+            msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST, 0,
+                    AvrcpControllerConstants.DEFAULT_BROWSE_END_INDEX);
+            mHandler.sendMessage(msg);
+            return true;
+        }
+        /* check in VFS List */
+        long uid = mRemoteFileSystem.isIdInVFSList(parentMediaId);
+        if (uid != AvrcpControllerConstants.DEFAULT_FOLDER_ID) {
+            /* Found ID in VFS list, from here we can go only 1 step down */
+            FolderStackInfo stackInfo = new FolderStackInfo();
+            stackInfo.folderUid = parentMediaId;
+            stackInfo.uid = uid;
+            mRemoteFileSystem.mFolderStack.add(stackInfo);
+            msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SEND_CHANGE_PATH, 1, 0);
+            mHandler.sendMessage(msg);
+            mRemoteFileSystem.clearVFSList();
+            msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST, 0, 0);
+            mHandler.sendMessage(msg);
+            return true;
+        }
+        /* Not found in VFS list , check in folderStack */
+        int folderDepth = mRemoteFileSystem.isIdInFolderStack(parentMediaId);
+        if (folderDepth != AvrcpControllerConstants.DEFAULT_LIST_INDEX) {
+            msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SEND_CHANGE_PATH,
+                    folderDepth, 0);
+            mHandler.sendMessage(msg);
+            mRemoteFileSystem.clearVFSList();
+            msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST, 0, 0);
+            mHandler.sendMessage(msg);
+            return true;
+        }
+        return false;
+    }
+    public void addToNowPlayingList(long id) {
+        if ((mAvrcpRemoteDevice == null) || (mRemoteMediaPlayers == null)) return;
+        PlayerInfo mAdrPlayer = mRemoteMediaPlayers.getAddressedPlayer();
+        if(mAdrPlayer == null) return;
+        if (!mRemoteMediaPlayers.isPlayerSupportAddToNowPlaying(mAdrPlayer.mPlayerId)) {
+            Log.e(TAG," remote player does not support Add to Now Playing");
+            return;
+        }
+        Log.d(TAG," addtoNowPlayingList id = " + id + "scope = " + mAvrcpRemoteDevice.getCurrentScope());
+        Bundle data = new Bundle();
+        data.putLong("id", id);
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_ADD_TO_NPL, 0,0);
+        msg.setData(data);
+        mHandler.sendMessage(msg);
+    }
+    public void fetchNowPlayingList() {
+        Log.d(TAG, "fetchNowPLayingList ");
+        if ((mAvrcpRemoteDevice == null) || (mRemoteMediaPlayers == null)) return;
+        PlayerInfo mAdrPlayer = mRemoteMediaPlayers.getAddressedPlayer();
+        if(mAdrPlayer == null) return;
+        if (!mRemoteMediaPlayers.isPlayerSupportNowPlaying(mAdrPlayer.mPlayerId)) {
+            Log.e(TAG," remote player does not support Now Playing id = " + mAdrPlayer.mPlayerId);
+            return;
+        }
+        mRemoteFileSystem.clearVFSList();mRemoteFileSystem.clearFolderStack();
+        mRemoteFileSystem.clearSearchList();
+        mRemoteNowPlayingList.clearNowPlayingList();
+        mAvrcpRemoteDevice.setCurrentScope(AvrcpControllerConstants.AVRCP_SCOPE_NOW_PLAYING);
+        mHandler.sendEmptyMessage(AvrcpControllerConstants.
+                MESSAGE_FETCH_NOW_PLAYING_LIST);
+    }
+    public void skipToQueItem(long id) {
+        if (mAvrcpRemoteDevice == null) return;
+        Log.d(TAG," skipToQueItem id " + id + " scope " + mAvrcpRemoteDevice.getCurrentScope());
+        Message msg;
+        Bundle data = new Bundle();
+        int currScope = mAvrcpRemoteDevice.getCurrentScope();
+        if (currScope == AvrcpControllerConstants.AVRCP_SCOPE_NOW_PLAYING) {
+            if (mRemoteNowPlayingList.getTrackFromId(id) != null) {
+                msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SEND_PLAY_ITEM,
+                        currScope,0);
+                data.putLong("id", id);
+                msg.setData(data);mHandler.sendMessage(msg);
+            }
+        }
+        if (currScope == AvrcpControllerConstants.AVRCP_SCOPE_SEARCH) {
+            if (mRemoteFileSystem.isIdInSearchList(id)) {
+                msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SEND_PLAY_ITEM,
+                        currScope,0);
+                data.putLong("id", id);
+                msg.setData(data);mHandler.sendMessage(msg);
+            }
+        }
+    }
+    public void playFromMediaId(String id) {
+        Log.d(TAG," playFromMediaId id = " + id);
+        Message msg;
+        Bundle data = new Bundle();
+        int currScope = mAvrcpRemoteDevice.getCurrentScope();
+        if (currScope == AvrcpControllerConstants.AVRCP_SCOPE_VFS) {
+            long uid = mRemoteFileSystem.isIdInVFSList(id);
+            if (uid != AvrcpControllerConstants.DEFAULT_FOLDER_ID) {
+                msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_SEND_PLAY_ITEM,
+                        currScope,0);
+                data.putLong("id", uid);
+                msg.setData(data);mHandler.sendMessage(msg);
+            }
+        }
+    }
+    public void fetchBySearchString(String searchQuery) {
+        Log.d(TAG, " playFromSearch = " + searchQuery);
+        if ((mAvrcpRemoteDevice == null) || (mRemoteMediaPlayers == null)) return;
+        PlayerInfo mBrowsedPlayer = mRemoteMediaPlayers.getBrowsedPlayer();
+        if(mBrowsedPlayer == null) return;
+        if (!mRemoteMediaPlayers.isPlayerSearchable(mBrowsedPlayer.mPlayerId)) {
+            Log.e(TAG," remote player does not support search");
+            return;
+        }
+        mAvrcpRemoteDevice.setCurrentScope(AvrcpControllerConstants.AVRCP_SCOPE_SEARCH);
+        Bundle data = new Bundle();
+        data.putString("pattern", searchQuery);
+        mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(AvrcpControllerConstants.
+                MESSAGE_GET_NUM_ITEMS_SEARCH, mAvrcpRemoteDevice.getCurrentScope(), data);
+        Bundle searchListData = new Bundle();
+        searchListData.putInt("start", 0);
+        searchListData.putInt("end", AvrcpControllerConstants.DEFAULT_BROWSE_END_INDEX);
+        mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(AvrcpControllerConstants.
+                MESSAGE_FETCH_SEARCH_LIST, mAvrcpRemoteDevice.getCurrentScope(), searchListData);
+        checkAndProcessBrowsingCommand(2);
+    }
     //Binder object: Must be static class or memory leak may occur
     private static class BluetoothAvrcpControllerBinder extends IBluetoothAvrcpController.Stub
         implements IProfileServiceBinder {
@@ -515,6 +713,31 @@ public class AvrcpControllerService extends ProfileService {
             if (service == null) return;
             service.startFetchingAlbumArt(mimeType, height, width, maxSize);
         }
+        public boolean SetBrowsedPlayer(int playerId) {
+            AvrcpControllerService service = getService();
+            if (service == null) return false;
+            return service.SetBrowsedPlayer(playerId);
+        }
+        public boolean SetAddressedPlayer(int playerId) {
+            AvrcpControllerService service = getService();
+            if (service == null) return false;
+            return service.SetAddressedPlayer(playerId);
+        }
+        public BluetoothAvrcpRemoteMediaPlayers GetRemoteAvailableMediaPlayer() {
+            AvrcpControllerService service = getService();
+            if (service == null) return null;
+            return service.GetRemoteAvailableMediaPlayer();
+        }
+        public BluetoothAvrcpRemoteMediaPlayers GetAddressedPlayer() {
+            AvrcpControllerService service = getService();
+            if (service == null) return null;
+            return service.GetAddressedPlayer();
+        }
+        public BluetoothAvrcpRemoteMediaPlayers GetBrowsedPlayer() {
+            AvrcpControllerService service = getService();
+            if (service == null) return null;
+            return service.GetBrowsedPlayer();
+        }
     };
 
     private String utf8ToString(byte[] input)
@@ -541,7 +764,7 @@ public class AvrcpControllerService extends ProfileService {
                 mRemoteMediaPlayers.getAddressedPlayer().mPlayStatus,
                 mRemoteMediaPlayers.getAddressedPlayer().mPlayTime);
     }
-    private MediaMetadata getCurrentMetaData(int scope, int trackId) {
+    private MediaMetadata getCurrentMetaData(int scope, long trackId) {
         /* if scope is now playing */
         if(scope == AvrcpControllerConstants.AVRCP_SCOPE_NOW_PLAYING) {
             if((mRemoteNowPlayingList == null) || (mRemoteNowPlayingList.
@@ -556,24 +779,72 @@ public class AvrcpControllerService extends ProfileService {
         }
         return null;
     }
+    private void broadcastThumbNailUpdate() {
+        if(DBG) Log.d(TAG," broadcastThumbNailUpdate = ");
+        int index = 0;
+        long [] mediaIdList = new long[mRemoteNowPlayingList.mNowPlayingList.size() - 1 ];
+        String [] thumbNailList = new String[mRemoteNowPlayingList.mNowPlayingList.size() - 1];
+        for(TrackInfo mTrackinfo: mRemoteNowPlayingList.mNowPlayingList) {
+            if (mTrackinfo.mItemUid == 0) // 0 represents currently playing track.
+                continue;
+            mediaIdList[index] = mTrackinfo.mItemUid;
+            thumbNailList[index++] = mTrackinfo.mThumbNailLocation;
+        }
+        Intent intent = new Intent(BluetoothAvrcpController.AVRCP_BROWSE_THUMBNAILS_UPDATE);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_MEDIA_IDS, mediaIdList);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_THUMBNAILS, thumbNailList);
+        sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+    }
     private void broadcastMetaDataChanged(MediaMetadata mMetaData) {
         Intent intent = new Intent(BluetoothAvrcpController.ACTION_TRACK_EVENT);
         intent.putExtra(BluetoothAvrcpController.EXTRA_METADATA, mMetaData);
         if(DBG) Log.d(TAG," broadcastMetaDataChanged = " +
                                                    AvrcpUtils.displayMetaData(mMetaData));
         sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        AvrcpControllerBrowseService avrcpBrowseService = AvrcpControllerBrowseService.
+                getAvrcpControllerBrowseService();
+        if(avrcpBrowseService != null) {
+            avrcpBrowseService.updateMetaData(mMetaData);
+        }
     }
     private void broadcastPlayBackStateChanged(PlaybackState mState) {
         Intent intent = new Intent(BluetoothAvrcpController.ACTION_TRACK_EVENT);
         intent.putExtra(BluetoothAvrcpController.EXTRA_PLAYBACK, mState);
         if(DBG) Log.d(TAG," broadcastPlayBackStateChanged = " + mState.toString());
         sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        AvrcpControllerBrowseService avrcpBrowseService = AvrcpControllerBrowseService.
+                getAvrcpControllerBrowseService();
+        if(avrcpBrowseService != null) {
+            avrcpBrowseService.updatePlayBackState(mState);
+        }
     }
     private void broadcastPlayerAppSettingChanged(BluetoothAvrcpPlayerSettings mPlAppSetting) {
         Intent intent = new Intent(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         intent.putExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING, mPlAppSetting);
         if(DBG) Log.d(TAG," broadcastPlayerAppSettingChanged = " +
                 AvrcpUtils.displayBluetoothAvrcpSettings(mPlAppSetting));
+        sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+    }
+    private void broadcastRemoteMediaPlayerList(BluetoothAvrcpRemoteMediaPlayers mMediaPlayers) {
+        Intent intent = new Intent(BluetoothAvrcpController.AVAILABLE_MEDIA_PLAYERS_UPDATE);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_REMOTE_PLAYERS, mMediaPlayers);
+        if(DBG) Log.d(TAG, " broadcastRemoteMediaPlayerList ");
+        sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+    }
+    private void broadcastBrowsedPlayerChanged(boolean status,
+                                            BluetoothAvrcpRemoteMediaPlayers mBrowsedMediaPlayer) {
+        Intent intent = new Intent(BluetoothAvrcpController.BROWSED_PLAYER_CHANGED);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_REMOTE_PLAYERS, mBrowsedMediaPlayer);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_PLAYER_UPDATE_STATUS, status);
+        if(DBG) Log.d(TAG, " broadcastBrowsedPlayerChanged ");
+        sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+    }
+    private void broadcastAddressedPlayerChanged(boolean status,
+                                          BluetoothAvrcpRemoteMediaPlayers mAddressedMediaPlayer) {
+        Intent intent = new Intent(BluetoothAvrcpController.ADDRESSED_PLAYER_CHANGED);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_REMOTE_PLAYERS, mAddressedMediaPlayer);
+        intent.putExtra(BluetoothAvrcpController.EXTRA_PLAYER_UPDATE_STATUS, status);
+        if(DBG) Log.d(TAG, " broadcastAddressedPlayerChanged ");
         sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
     }
     /** Handles Avrcp messages. */
@@ -584,8 +855,14 @@ public class AvrcpControllerService extends ProfileService {
 
         @Override
         public void handleMessage(Message msg) {
+            int playerId = AvrcpControllerConstants.DEFAULT_PLAYER_ID;
+            boolean retVal = false; Bundle data = null; int ret = 0; int cmdId = 0;
+            int cmdScope;
             Log.d(TAG," HandleMessage: "+ AvrcpControllerConstants.dumpMessageString(msg.what) +
                   " Remote Connected " + !mConnectedDevices.isEmpty());
+            if (mAvrcpRemoteDevice != null) {
+                Log.d(TAG," Current Scope " + mAvrcpRemoteDevice.getCurrentScope());
+            }
             switch (msg.what) {
             case AvrcpControllerConstants.MESSAGE_SEND_PASS_THROUGH_CMD:
                 BluetoothDevice device = (BluetoothDevice)msg.obj;
@@ -635,6 +912,68 @@ public class AvrcpControllerService extends ProfileService {
                                                         MESSAGE_PROCESS_BIP_CONNECTED);
                 }
                 break;
+            case AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST:
+                if (mAvrcpRemoteDevice.getCurrentScope() != AvrcpControllerConstants.
+                        AVRCP_SCOPE_NOW_PLAYING) {
+                    Log.e(TAG," Scope not proper currscope " + mAvrcpRemoteDevice.
+                            getCurrentScope());
+                    break;
+                }
+                manageFetchListCommands(msg.what, AvrcpControllerConstants.AVRCP_SCOPE_NOW_PLAYING);
+                break;
+            case AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST:
+                if (mAvrcpRemoteDevice.getCurrentScope() != AvrcpControllerConstants.
+                        AVRCP_SCOPE_VFS) {
+                    Log.e(TAG," Scope not proper currscope " + mAvrcpRemoteDevice.
+                            getCurrentScope());
+                    break;
+                }
+                data = new Bundle();
+                data.putInt("start", 0);data.putInt("end", msg.arg2);
+                mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(msg.what,
+                        mAvrcpRemoteDevice.getCurrentScope(), data);
+                checkAndProcessBrowsingCommand(1);
+                break;
+            case AvrcpControllerConstants.MESSAGE_FETCH_SEARCH_LIST:
+                if (mAvrcpRemoteDevice.getCurrentScope() != AvrcpControllerConstants.
+                        AVRCP_SCOPE_SEARCH) {
+                    Log.e(TAG," Scope not proper currscope " + mAvrcpRemoteDevice.
+                            getCurrentScope());
+                    break;
+                }
+                data = new Bundle();
+                data.putInt("start", msg.arg1);
+                data.putInt("end", msg.arg2);
+                mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(AvrcpControllerConstants.
+                        MESSAGE_FETCH_SEARCH_LIST, mAvrcpRemoteDevice.getCurrentScope(), data);
+                checkAndProcessBrowsingCommand(1);
+                break;
+            case AvrcpControllerConstants.MESSAGE_ADD_TO_NPL:
+                addToNowPlayingListNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
+                        (byte)mAvrcpRemoteDevice.getCurrentScope(), msg.getData().getLong("id"),
+                        mAvrcpRemoteDevice.muidCounter);
+                break;
+            case AvrcpControllerConstants.MESSAGE_SET_ADDRESSED_PLAYER:
+            case AvrcpControllerConstants.MESSAGE_SET_BROWSED_PLAYER:
+                data = new Bundle();
+                data.putInt("playerId", msg.arg1);
+                mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(msg.what, mAvrcpRemoteDevice.
+                        getCurrentScope(), data);
+                checkAndProcessBrowsingCommand(1);
+                break;
+            case AvrcpControllerConstants.MESSAGE_SEND_CHANGE_PATH:
+                data = new Bundle();
+                data.putInt("delta",msg.arg1);
+                mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(msg.what, mAvrcpRemoteDevice.
+                        getCurrentScope(), data);
+                checkAndProcessBrowsingCommand(1);
+                break;
+            case AvrcpControllerConstants.MESSAGE_SEND_PLAY_ITEM:
+                data = msg.getData();
+                playItemNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice), (byte)msg.arg1,
+                        mAvrcpRemoteDevice.muidCounter, data.getLong("id"));
+                break;
+
             case AvrcpControllerConstants.MESSAGE_PROCESS_CONNECTION_CHANGE:
                 int newState = msg.arg1;
                 int oldState = msg.arg2;
@@ -652,8 +991,9 @@ public class AvrcpControllerService extends ProfileService {
                          */
                         if(mRemoteMediaPlayers == null) {
                             mRemoteMediaPlayers = new RemoteMediaPlayers(mAvrcpRemoteDevice);
+                            /* At this stage we create a default player */
                             PlayerInfo mPlayer = new PlayerInfo();
-                            mPlayer.mPlayerId = 0;
+                            mPlayer.mPlayerId = AvrcpControllerConstants.DEFAULT_PLAYER_ID;
                             mRemoteMediaPlayers.addPlayer(mPlayer);
                             mRemoteMediaPlayers.setAddressedPlayer(mPlayer);
                         }
@@ -692,9 +1032,13 @@ public class AvrcpControllerService extends ProfileService {
                     mTrack.mItemUid = 0;
                     mRemoteNowPlayingList.addTrack(mTrack);
                     mRemoteNowPlayingList.setCurrTrack(mTrack);
+                    if (mAvrcpRemoteDevice.isBrowsingSupported()) {
+                        Log.d(TAG," Remote supports Browsing");
+                        mRemoteFileSystem = new RemoteFileSystem();
+                    }
                     if(mAvrcpRemoteDevice.isCoverArtSupported()) {
                         mAvrcpRemoteDevice.mBipL2capPsm = msg.arg2;
-                        Log.d(TAG," psm " + mAvrcpRemoteDevice.mBipL2capPsm);
+                        Log.d(TAG," Remote supports coverart psm " + mAvrcpRemoteDevice.mBipL2capPsm);
                         /*
                          * We schedule BIP connect here, to get coverart Handle of current
                          * track in case App launched later connect at later point of time.
@@ -790,7 +1134,7 @@ public class AvrcpControllerService extends ProfileService {
                  * BIP Connected Start Image Fetch operation
                  */
                 if (mRemoteNowPlayingList != null) {
-                    int ret = mRemoteNowPlayingList.fetchCoverArtImage(mAppProperties.
+                    ret = mRemoteNowPlayingList.fetchCoverArtImage(mAppProperties.
                             mSupportedCoverArtMimetype,
                             mAppProperties.mSupportedCovertArtHeight,
                             mAppProperties.mSupportedCoverArtWidth,
@@ -817,10 +1161,16 @@ public class AvrcpControllerService extends ProfileService {
                 String mImageLoc = bipResults.get(1);
                 if (mRemoteNowPlayingList != null) {
                     mRemoteNowPlayingList.updateThumbNail(mImageHndl, mImageLoc);
-                    mRemoteNowPlayingList.fetchThumbNail();
-                    if (mAppProperties.isCoverArtRequested)
-                        broadcastMetaDataChanged(AvrcpUtils.getMediaMetaData
-                                       (mRemoteNowPlayingList.getCurrentTrack()));
+                    ret = mRemoteNowPlayingList.fetchThumbNail();
+                    if (ret == AvrcpControllerConstants.ALL_THUMBNAILS_FETCHED) {
+                        mRemoteNowPlayingList.fetchCoverArtImage(mAppProperties.
+                                mSupportedCoverArtMimetype, mAppProperties.
+                                mSupportedCovertArtHeight, mAppProperties.
+                                mSupportedCoverArtWidth, mAppProperties.mSupportedCoverArtMaxSize);
+                        if (mAppProperties.isCoverArtRequested) {
+                            broadcastThumbNailUpdate();
+                        }
+                    }
                 }
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_IMAGE_FETCHED:
@@ -829,15 +1179,414 @@ public class AvrcpControllerService extends ProfileService {
                 String mImageLocation = bipImageResults.get(1);
                 if (mRemoteNowPlayingList != null) {
                     mRemoteNowPlayingList.updateImage(mImageHandle, mImageLocation);
-                    if (mAppProperties.isCoverArtRequested)
-                        broadcastMetaDataChanged(AvrcpUtils.getMediaMetaData
-                            (mRemoteNowPlayingList.getCurrentTrack()));
+                    /* It is possible that during last image fetch request, BIP fetch operation
+                     * was in progress, we need to checkif CA Handle has changed.
+                     */
+                    ret = mRemoteNowPlayingList.fetchCoverArtImage(mAppProperties.
+                                    mSupportedCoverArtMimetype,
+                            mAppProperties.mSupportedCovertArtHeight,
+                            mAppProperties.mSupportedCoverArtWidth,
+                            mAppProperties.mSupportedCoverArtMaxSize);
+                    if (ret == AvrcpControllerConstants.IMAGE_FETCHED) {
+                        if (mAppProperties.isCoverArtRequested)
+                            broadcastMetaDataChanged(AvrcpUtils.getMediaMetaData
+                                    (mRemoteNowPlayingList.getCurrentTrack()));
+                        /* Image is fetched, try fetching Thumbnail */
+                        if (mRemoteNowPlayingList.mNowPlayingList.size() > 1) {
+                            /* If there is only 1 element, we do not fetch thumbnail */
+                            mRemoteNowPlayingList.fetchThumbNail();
+                        }
+                    }
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_SUPPORTED_PLAYER:
+                if (mAvrcpRemoteDevice == null)
+                    break;
+                mAvrcpRemoteDevice.muidCounter = msg.arg1;
+                byte mNumPlayers = (byte)msg.arg2;
+                if (mRemoteMediaPlayers != null) {
+                    mRemoteMediaPlayers.updatePlayerList(mNumPlayers, msg.getData());
+                    broadcastRemoteMediaPlayerList(mRemoteMediaPlayers.
+                            getTotalMediaPlayerList());
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_GET_TOTAL_NUM_ITEMS:
+                /* Check pending command */
+                mAvrcpRemoteDevice.muidCounter =  msg.arg1;
+                retVal = mAvrcpRemoteDevice.mPendingBrwCmds.checkAndClearCommand(msg.what,
+                        mAvrcpRemoteDevice.getCurrentScope());
+                cmdId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0);
+                if ((retVal)&&(cmdId == AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST)) {
+                    data = new Bundle();
+                    data.putInt("start", 0);data.putInt("end", msg.arg2);
+                    mAvrcpRemoteDevice.mPendingBrwCmds.updateCommand(0,
+                            AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST,
+                            mAvrcpRemoteDevice.getCurrentScope(), data);
+                }
+                checkAndProcessBrowsingCommand(0);
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_PENDING_BROWSING_COMMANDS:
+                sendBrowsingCommands();
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_BROWSE_FOLDER_RESPONSE:
+                data = msg.getData();
+                byte status = data.getByte("status");
+                mAvrcpRemoteDevice.muidCounter = data.getInt("uidCounter");
+                /* If we get this, check topmost pending command */
+                int commandId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0);
+
+                if (!((commandId == AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST) ||
+                    (commandId == AvrcpControllerConstants.MESSAGE_FETCH_SEARCH_LIST) ||
+                    (commandId == AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST))) {
+                    Log.e(TAG," Unexpected Command cmdID " + commandId);
+                    // something wrong happened, drop this Callback.
+                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                /* If there is diff in scope */
+                if (mAvrcpRemoteDevice.mPendingBrwCmds.getCmdScope(0) !=
+                        mAvrcpRemoteDevice.getCurrentScope()) {
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                /* If we get Status out of bound, we are done, remove this command and move
+                 * to next command from pending browsing commands
+                 */
+                Log.d(TAG, " Last command = "+ commandId + " status = " + status);
+                if (status == AvrcpControllerConstants.AVRC_RET_BAD_RANGE) {
+                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                    completeBrowseFolderRequest(commandId);
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                int currentSize = 0;
+                switch (commandId) {
+                    case AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST:
+                        currentSize = mRemoteNowPlayingList.updateNowPlayingList(data);
+                        break;
+                    case AvrcpControllerConstants.MESSAGE_FETCH_SEARCH_LIST:
+                        currentSize = mRemoteFileSystem.updateSearchList(data);
+                        break;
+                    case AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST:
+                        currentSize = mRemoteFileSystem.updateVFSList(data);
+                        break;
+                }
+                Bundle cmdData = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdData(0);
+                int newStartIndex = cmdData.getInt("start") + 1;
+                newStartIndex = Math.max(newStartIndex, currentSize);
+                cmdData.putInt("start", newStartIndex);
+                mAvrcpRemoteDevice.mPendingBrwCmds.updateCommand(0, commandId,
+                        mAvrcpRemoteDevice.getCurrentScope(), cmdData);
+                checkAndProcessBrowsingCommand(0);
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_SET_BROWSED_PLAYER_RSP:
+                mAvrcpRemoteDevice.muidCounter  = msg.arg2;
+                if (mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0) != AvrcpControllerConstants.
+                        MESSAGE_SET_BROWSED_PLAYER) {
+                    Log.e(TAG," UnExpected Command, process pending ones");
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                playerId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdData(0).getInt("playerId");
+                boolean browsedPlayerSet = false;
+                if (msg.arg1 == AvrcpControllerConstants.AVRC_RET_NO_ERROR) {
+                    browsedPlayerSet = mRemoteMediaPlayers.setBrowsedPlayerFromList(playerId);
+                    Log.d(TAG," browsedPlayerSet = " + browsedPlayerSet + " playerId = " + playerId);
+                    if (browsedPlayerSet) {
+                        mRemoteFileSystem.clearVFSList();mRemoteFileSystem.clearFolderStack();
+                        mRemoteFileSystem.clearSearchList();
+                    }
+                }
+                mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                broadcastBrowsedPlayerChanged(browsedPlayerSet, mRemoteMediaPlayers.
+                        getBrowsedMediaPlayerList());
+                checkAndProcessBrowsingCommand(0);
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_SET_ADDRESSED_PLAYER_RSP:
+                if (mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0) != AvrcpControllerConstants.
+                        MESSAGE_SET_ADDRESSED_PLAYER) {
+                    Log.e(TAG," UnExpected Command, process pending ones");
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                playerId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdData(0).getInt("playerId");
+                boolean addressedPlayerSet = false;
+                if (msg.arg1 == AvrcpControllerConstants.AVRC_RET_NO_ERROR) {
+                    addressedPlayerSet = mRemoteMediaPlayers.setAddressedPlayerFromList(playerId);
+                    if (addressedPlayerSet) {
+                        mRemoteNowPlayingList.clearNowPlayingList();
+                    }
+                }
+                mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                broadcastAddressedPlayerChanged(addressedPlayerSet, mRemoteMediaPlayers.
+                        getAddressedMediaPlayerList());
+                checkAndProcessBrowsingCommand(0);
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_ADDRESSED_PLAYER_CHANGED:
+                mAvrcpRemoteDevice.muidCounter  = msg.arg2;
+                if (mRemoteMediaPlayers.setAddressedPlayerFromList((char)msg.arg1)) {
+                    mRemoteNowPlayingList.clearNowPlayingList();
+                    broadcastAddressedPlayerChanged(true, mRemoteMediaPlayers.
+                            getAddressedMediaPlayerList());
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_PATH_CHANGED:
+                int returnStatus = msg.arg1;
+                if ((returnStatus == AvrcpControllerConstants.AVRC_RET_BAD_DIR) ||
+                   (returnStatus == AvrcpControllerConstants.AVRC_RET_NOT_EXIST) ||
+                   (returnStatus == AvrcpControllerConstants.AVRC_RET_NOT_DIR)) {
+                    Log.e(TAG, " Change Path Error = " + returnStatus);
+                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                    int pendingCommandId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0);
+                    Log.d(TAG, "Pending command = " + pendingCommandId);
+                    if (pendingCommandId == AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST) {
+                        mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                        /* App subscribe for browsing data, complete it with empty list */
+                        completeBrowseFolderRequest(AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST);
+                    }
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                /* path change is successful */
+                cmdId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0);
+                cmdScope = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdScope(0);
+                if ((cmdId != AvrcpControllerConstants.MESSAGE_SEND_CHANGE_PATH) || (mAvrcpRemoteDevice.
+                        getCurrentScope() != AvrcpControllerConstants.AVRCP_SCOPE_VFS)) {
+                    Log.e(TAG," Unexpected Command ");
+                    mAvrcpRemoteDevice.mPendingBrwCmds.checkAndClearCommand(cmdId, cmdScope);
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                data = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdData(0);
+                int folderDepth = data.getInt("delta");
+                Log.d(TAG, " folderDepth = " + folderDepth + " numItems = " + msg.arg2);
+                if (folderDepth > 0) {
+                    /* new entry is already there in folderStack */
+                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                }
+                else if (folderDepth < 0) {
+                    folderDepth = folderDepth + 1;
+                    mRemoteFileSystem.mFolderStack.remove(mRemoteFileSystem.mFolderStack.size() - 1);
+                    if (folderDepth == 0)
+                        mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                }
+                mRemoteFileSystem.mFolderStack.get(mRemoteFileSystem.mFolderStack.size() - 1)
+                        .numItems = msg.arg2;
+                checkAndProcessBrowsingCommand(0);
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_SEARCH_ITEM_RSP:
+                mAvrcpRemoteDevice.muidCounter = msg.getData().getInt("uidCounter");
+                if (mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0) !=
+                        AvrcpControllerConstants.MESSAGE_GET_NUM_ITEMS_SEARCH) {
+                    Log.e(TAG," Unexpected Command ");
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                if (msg.arg1 != AvrcpControllerConstants.AVRC_RET_NO_ERROR) {
+                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                if (mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0) == AvrcpControllerConstants.
+                                                                      MESSAGE_FETCH_SEARCH_LIST) {
+                    mAvrcpRemoteDevice.mPendingBrwCmds.getCmdData(0).putInt("end", msg.arg2);
+                }
+                checkAndProcessBrowsingCommand(0);
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_NPL_LIST_UPDATE:
+                AvrcpControllerBrowseService avrcpBrowseService;
+                if (mAvrcpRemoteDevice.getCurrentScope() == AvrcpControllerConstants.
+                        AVRCP_SCOPE_NOW_PLAYING) {
+                    avrcpBrowseService = AvrcpControllerBrowseService.
+                            getAvrcpControllerBrowseService();
+                    if(avrcpBrowseService != null) {
+                        avrcpBrowseService.refreshListCallback();
+                    }
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_PROCESS_UIDS_CHANGED:
+                avrcpBrowseService = AvrcpControllerBrowseService.
+                        getAvrcpControllerBrowseService();
+                if(avrcpBrowseService != null) {
+                    avrcpBrowseService.refreshListCallback();
                 }
                 break;
             }
         }
     }
 
+    private void manageFetchListCommands( int commandId, int scope) {
+        Log.d(TAG," manageFetchLIstCommands cmd = "+ commandId + "scope = "+ scope );
+        if (mAvrcpRemoteDevice.isCoverArtSupported()) {
+                    /* Que Get Total Num Items and put NPL request in pending command */
+            mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(AvrcpControllerConstants.
+                            MESSAGE_GET_TOTAL_NUM_ITEMS, mAvrcpRemoteDevice.getCurrentScope(),
+                    null);
+                    /* Que FetchNPLCommand */
+            mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(commandId,
+                    mAvrcpRemoteDevice.getCurrentScope(), null);
+            /* If these are the only commands */
+            checkAndProcessBrowsingCommand(2);
+        }
+        else {
+            Bundle fetchNPLCmd = new Bundle();
+            fetchNPLCmd.putInt("start", 0);
+            fetchNPLCmd.putInt("end", AvrcpControllerConstants.DEFAULT_BROWSE_END_INDEX);
+            mAvrcpRemoteDevice.mPendingBrwCmds.addCommand(commandId,
+                    mAvrcpRemoteDevice.getCurrentScope(), fetchNPLCmd);
+            checkAndProcessBrowsingCommand(1);
+        }
+    }
+    /*
+     * This queues MESSAGE_PROCESS_BROWSING_COMMAND if these are the only commands to send
+     * returns false if other messages are also there, true otherwise.
+     */
+    private boolean checkAndProcessBrowsingCommand(int checkForSize) {
+        if ((mAvrcpRemoteDevice == null) || (mAvrcpRemoteDevice.mPendingBrwCmds == null))
+            return false;
+        /* If these are the only commands, then que msg to process them
+         * otherwise wait for a callback to come and process further
+         */
+        if (mAvrcpRemoteDevice.mPendingBrwCmds.isListEmpty())
+            return false;
+        if (mHandler.hasMessages(AvrcpControllerConstants.MESSAGE_PROCESS_PENDING_BROWSING_COMMANDS))
+            return false;
+        /* 0 is for the cases where we want to handle any pending command */
+        if ((checkForSize == 0) ||
+           (mAvrcpRemoteDevice.mPendingBrwCmds.getListSize() == checkForSize)) {
+                mHandler.sendEmptyMessage(AvrcpControllerConstants.
+                        MESSAGE_PROCESS_PENDING_BROWSING_COMMANDS);
+            return true;
+        }
+        return false;
+    }
+    private void completeBrowseFolderRequest(int commandId) {
+        Log.d(TAG," completeBrowseFolderRequest cmdId = " + commandId);
+        AvrcpControllerBrowseService avrcpBrowseService;
+        switch (commandId) {
+            case AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST:
+                avrcpBrowseService = AvrcpControllerBrowseService.
+                        getAvrcpControllerBrowseService();
+                if(avrcpBrowseService != null) {
+                    avrcpBrowseService.updateNowPlayingList(mRemoteNowPlayingList);
+                }
+                /* Start fetching Thumbnails */
+                if ((!mAppProperties.isCoverArtRequested) ||
+                        (!mAvrcpRemoteDevice.isCoverArtSupported()))
+                    break;
+                mRemoteNowPlayingList.fetchThumbNail();
+                break;
+            case AvrcpControllerConstants.MESSAGE_FETCH_SEARCH_LIST:
+                avrcpBrowseService = AvrcpControllerBrowseService.
+                        getAvrcpControllerBrowseService();
+                if(avrcpBrowseService != null) {
+                    avrcpBrowseService.updateSearchList(mRemoteFileSystem);
+                }
+                break;
+            case AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST:
+                avrcpBrowseService = AvrcpControllerBrowseService.
+                        getAvrcpControllerBrowseService();
+                Log.d(TAG," avrcpBrowseService = " + avrcpBrowseService);
+                if(avrcpBrowseService != null) {
+                    Log.d(TAG," update VFS list to browsing service");
+                    avrcpBrowseService.updateVFSList(mRemoteFileSystem);
+                }
+                break;
+        }
+    }
+    private void sendBrowsingCommands () {
+        if (mAvrcpRemoteDevice.mPendingBrwCmds.isListEmpty()) {
+            Log.d(TAG," Browsing command list empty ");
+            return;
+        }
+        int commandId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0);
+        int cmdScope = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdScope(0);
+        Bundle cmdData = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdData(0);
+        int startIndex, endIndex;
+        Log.d(TAG," SendBrowsingCommands id " + commandId + " scope = " + cmdScope);
+        /*
+         * For following commands we don't have to check scope
+         */
+        if ((commandId != AvrcpControllerConstants.MESSAGE_SET_BROWSED_PLAYER)||
+            (commandId != AvrcpControllerConstants.MESSAGE_SET_ADDRESSED_PLAYER)){
+            if (cmdScope != mAvrcpRemoteDevice.getCurrentScope()) {
+                Log.e(TAG," sendBrowsingCommands, scope did not match, clearing this command ");
+                mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                checkAndProcessBrowsingCommand(0);
+                return;
+            }
+        }
+        switch(commandId) {
+            case AvrcpControllerConstants.MESSAGE_FETCH_SEARCH_LIST:
+            case AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST:
+                startIndex = cmdData.getInt("start");
+                endIndex = cmdData.getInt("end");
+                browseFolderNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice), (byte)cmdScope,
+                        startIndex, endIndex, (byte)0, null);
+                break;
+            case AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST:
+                startIndex = cmdData.getInt("start");
+                endIndex = cmdData.getInt("end");
+                if (startIndex == 0) {
+                    /* First iteration of VFS */
+                    int topIndex = mRemoteFileSystem.mFolderStack.size() - 1;
+                    if (!mRemoteFileSystem.mFolderStack.get(topIndex).folderUid.equals(AvrcpControllerConstants.
+                            AVRCP_BROWSE_ROOT_FOLDER)) {
+                        endIndex = mRemoteFileSystem.mFolderStack.get(topIndex).numItems - 1;
+                        cmdData.putInt("end", endIndex);
+                        mAvrcpRemoteDevice.mPendingBrwCmds.updateCommand(0,commandId,cmdScope,cmdData);
+                    }
+                }
+                Log.d(TAG," FETCH_VFS start " + startIndex + " end = " + endIndex);
+                if (endIndex < startIndex) {
+                    Log.d(TAG, " All items fetched");
+                    completeBrowseFolderRequest(commandId);
+                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
+                    checkAndProcessBrowsingCommand(0);
+                    break;
+                }
+                browseFolderNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice), (byte)cmdScope,
+                        startIndex, endIndex, (byte)0, null);
+                break;
+            case AvrcpControllerConstants.MESSAGE_GET_TOTAL_NUM_ITEMS:
+                getTotalNumberOfItemsNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
+                        (byte)cmdScope);
+                break;
+            case AvrcpControllerConstants.MESSAGE_SET_BROWSED_PLAYER:
+                setBrowsedPlayerNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
+                        cmdData.getInt("playerId"));
+                break;
+            case AvrcpControllerConstants.MESSAGE_SET_ADDRESSED_PLAYER:
+                setAddressedPlayerNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
+                        cmdData.getInt("playerId"));
+                break;
+            case AvrcpControllerConstants.MESSAGE_SEND_CHANGE_PATH:
+                int folderDepth = cmdData.getInt("delta");
+                if (folderDepth == 0) break;
+                byte direction = (folderDepth > 0)? AvrcpControllerConstants.DIRECTION_DOWN:
+                                                   AvrcpControllerConstants.DIRECTION_UP;
+                long uid = 0;
+                if (direction == AvrcpControllerConstants.DIRECTION_DOWN) {
+                    uid = mRemoteFileSystem.mFolderStack.get
+                            (mRemoteFileSystem.mFolderStack.size() - 1).uid;
+                }
+                else if(direction == AvrcpControllerConstants.DIRECTION_UP) {
+                    /* If we are moving up, we have to send uid of parent one down folder */
+                    uid = mRemoteFileSystem.mFolderStack.
+                            get(mRemoteFileSystem.mFolderStack.size() - 2).uid;
+                }
+                changePathNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),
+                        mAvrcpRemoteDevice.muidCounter, direction, uid);
+                break;
+            case AvrcpControllerConstants.MESSAGE_GET_NUM_ITEMS_SEARCH:
+                searchNative(getByteAddress(mAvrcpRemoteDevice.mBTDevice),AvrcpControllerConstants.
+                        AVRC_CHARSET_UTF8, cmdData.getString("pattern").length(),
+                        cmdData.getString("pattern"));
+                break;
+        }
+    }
     private void setAbsVolume(int absVol, int label)
     {
         int maxVolume = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
@@ -946,9 +1695,8 @@ public class AvrcpControllerService extends ProfileService {
     private void setPlayerAppSettingRsp(byte[] address, byte accepted) {
               /* TODO do we need to do anything here */
     }
-    private void handleRegisterNotificationAbsVol(byte[] address, byte label)
-    {
-        Log.d(TAG,"handleRegisterNotificationAbsVol ");
+    private void handleRegisterNotificationAbsVol(byte[] address, byte label) {
+        Log.d(TAG, "handleRegisterNotificationAbsVol ");
         BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
                 (Utils.getAddressStringFromByte(address));
         if (!mConnectedDevices.contains(device))
@@ -958,8 +1706,7 @@ public class AvrcpControllerService extends ProfileService {
         mHandler.sendMessage(msg);
     }
 
-    private void handleSetAbsVolume(byte[] address, byte absVol, byte label)
-    {
+    private void handleSetAbsVolume(byte[] address, byte absVol, byte label) {
         Log.d(TAG,"handleSetAbsVolume ");
         BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
                 (Utils.getAddressStringFromByte(address));
@@ -1046,7 +1793,155 @@ public class AvrcpControllerService extends ProfileService {
 
     private void handleGroupNavigationRsp(int id, int keyState) {
         Log.d(TAG, "group navigation response received as: key: "
-                                + id + " state: " + keyState);
+                + id + " state: " + keyState);
+    }
+    private void handleAvailablePlayersList (byte[] address, int uidCounter, byte numPlayers,
+        int[] subType, int[] playerId, byte[] majorType, byte[] playStatus, byte[] featureMask, String[] name) {
+        Log.d(TAG,"handleAvailablePlayersList numPlayers = " + numPlayers );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Bundle data = new Bundle();
+        data.putIntArray("subtype", subType); data.putIntArray("playerId", playerId);
+        data.putByteArray("majorType", majorType); data.putByteArray("playStatus", playStatus);
+        data.putByteArray("featureMask", featureMask); data.putStringArray("name", name);
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_SUPPORTED_PLAYER, uidCounter, numPlayers);
+        msg.setData(data);
+        mHandler.sendMessage(msg);
+    }
+    private void onGetTotalNumItems(byte[] address, byte status, int uidCounter, int numItems) {
+        Log.d(TAG,"onGetTotalNumItems ");
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_GET_TOTAL_NUM_ITEMS, uidCounter, numItems);
+        mHandler.sendMessage(msg);
+    }
+    private void handleBrowseFolderResponse (byte[] address, byte status, int uidCounter, int numItems,
+                                             byte[] itemType, long[] uids, byte[] type,
+                                             byte[] playable, String[] itemName, byte[] numAttrs,
+                                             int[] attrs, String[] attributes) {
+        Log.d(TAG," handleBrowseFolderResponse staus = " + status );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Message msg;
+        if ((status != AvrcpControllerConstants.AVRC_RET_NO_ERROR) || (numItems == 0)) {
+            Bundle data = new Bundle();
+            data.putByte("status", status);
+            data.putInt("uidCounter", uidCounter);
+            data.putInt("numItems", numItems);
+            msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                    MESSAGE_PROCESS_BROWSE_FOLDER_RESPONSE);
+            msg.setData(data);
+            mHandler.sendMessage(msg);
+            return;
+        }
+        Bundle data = new Bundle();
+        data.putByte("status", status);
+        data.putInt("uidCounter", uidCounter);
+        data.putInt("numItems", numItems);
+        data.putByteArray("itemType", itemType);
+        data.putLongArray("uids", uids);
+        data.putByteArray("type", type);
+        data.putByteArray("playable", playable);
+        data.putStringArray("itemName", itemName);
+        data.putByteArray("numAttrs", numAttrs);
+        data.putIntArray("attrs", attrs);
+        data.putStringArray("attributes", attributes);
+        msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_BROWSE_FOLDER_RESPONSE);
+        msg.setData(data);
+        mHandler.sendMessage(msg);
+    }
+    private void onAddressedPlayerChanged(byte[] address, int playerId, int uidCounter) {
+        Log.d(TAG," onAddressedPlayerChanged playerId = " +playerId );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_ADDRESSED_PLAYER_CHANGED, playerId, uidCounter);
+        mHandler.sendMessage(msg);
+    }
+    private void handleSetBrowsedPlayerRsp (byte[] address, byte status, int uidCounter) {
+        Log.d(TAG," handleSetBrowsedPlayerRsp status = " + status );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_SET_BROWSED_PLAYER_RSP, status, uidCounter);
+        mHandler.sendMessage(msg);
+    }
+    private void handleSetAddressedPlayerRsp( byte[] address, byte status) {
+        Log.d(TAG," handleSetAddressedPlayerRsp status = " + status );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_SET_ADDRESSED_PLAYER_RSP, status, 0);
+        mHandler.sendMessage(msg);
+    }
+    private void handleChangePathRsp(byte[] address, byte status, int numItems) {
+        Log.d(TAG," handleChangePathRsp status = " + status + " numItems = " + numItems);
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.MESSAGE_PROCESS_PATH_CHANGED,
+                status, numItems);
+        mHandler.sendMessage(msg);
+    }
+    private void onNowPlayingListUpdate(byte[] address) {
+        Log.d(TAG," onNowPlayingListUpdate ");
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_PROCESS_NPL_LIST_UPDATE);
+    }
+    private void handleAddToNPLRsp(byte[] address, byte status) {
+        Log.d(TAG," handleAddToNPLRsp status = " + status );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+    }
+    private  void handlePlayItemRsp(byte[] address, byte status) {
+        Log.d(TAG," handlePlayItemRsp status = " + status );
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+    }
+    private void handleSearchRsp(byte[] address, byte status, int uidCounter, int numItems) {
+        Log.d(TAG," handleSearchRsp status = " + status + " numItems = " + numItems);
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        Bundle data = new Bundle();
+        data.putInt("uidCounter", uidCounter);
+        Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
+                MESSAGE_PROCESS_SEARCH_ITEM_RSP, status, numItems);
+        msg.setData(data);
+        mHandler.sendMessage(msg);
+    }
+    private void OnUidsChanged(byte[] address, int uidCounter) {
+        Log.d(TAG," handleSearchRsp ");
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
+                (Utils.getAddressStringFromByte(address));
+        if (!mConnectedDevices.contains(device))
+            return;
+        mHandler.sendEmptyMessage(AvrcpControllerConstants.MESSAGE_PROCESS_UIDS_CHANGED);
     }
 
     private byte[] getByteAddress(BluetoothDevice device) {
@@ -1073,4 +1968,15 @@ public class AvrcpControllerService extends ProfileService {
                                                     int label);
     private native void getElementAttributesNative(byte[] address, byte numAttributes,
             byte[] attribIds);
+    private native void getTotalNumberOfItemsNative(byte[] address, byte scope);
+    private native void browseFolderNative(byte[] address, byte scope, int startIndex, int endIndex,
+                                                   byte numAttributes, byte[] attribIds);
+    private native void setBrowsedPlayerNative(byte[] address, int playerId);
+    private native void setAddressedPlayerNative(byte[] address, int playerId);
+    private native void changePathNative(byte[] address, int uidCounter, byte direction, long uid);
+    private native void addToNowPlayingListNative(byte[] address, byte scope, long uid,
+                                                  int uidCounter);
+    private native void playItemNative(byte[] address, byte scope, int uidCounter, long uid);
+    private native void searchNative(byte[] address, int charSet, int strLen, String pattern);
+
 }

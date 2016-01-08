@@ -37,6 +37,9 @@ import java.util.HashMap;
 import android.util.Log;
 import java.nio.charset.Charset;
 import java.nio.ByteBuffer;
+import java.util.Stack;
+
+import android.os.Bundle;
 /**
  * Provides Bluetooth AVRCP Controller profile, as a service in the Bluetooth application.
  * @hide
@@ -44,11 +47,135 @@ import java.nio.ByteBuffer;
 public class RemoteFileSystem {
     private static final boolean DBG = true;
     private static final String TAG = "RemoteFileSystem";
+    public ArrayList<TrackInfo> mMediaItemList;
+    public ArrayList<TrackInfo> mSearchList;
+    public ArrayList<FolderItems> mFolderItemList;
+    public ArrayList<FolderStackInfo> mFolderStack;
 
     public void cleanup() {
-        /* TBD */
+        clearSearchList();
+        clearVFSList();
+        clearFolderStack();
     }
     public RemoteFileSystem () {
-        /* TBD */
+        mMediaItemList = new ArrayList<TrackInfo>();
+        mFolderItemList = new ArrayList<FolderItems>();
+        mSearchList = new ArrayList<TrackInfo>();
+        mFolderStack = new ArrayList<FolderStackInfo>();
+    }
+    public void clearVFSList() {
+        if(mMediaItemList != null) {
+            mMediaItemList.clear();
+        }
+        if (mFolderItemList != null) {
+            mFolderItemList.clear();
+        }
+    }
+    public void clearFolderStack() {
+        if(mFolderStack != null)
+            mFolderStack.clear();
+    }
+    public void clearSearchList() {
+        if (mSearchList != null) {
+            mSearchList.clear();
+        }
+    }
+    public int getVFSListSize() {
+        return (mFolderItemList.size() + mMediaItemList.size());
+    }
+    public int getSearchListSize() {
+        return mSearchList.size();
+    }
+    public int updateVFSList(Bundle data) {
+        int numItems = data.getInt("numItems");
+        byte[] itemType = data.getByteArray("itemType");
+        long[] uids = data.getLongArray("uids");
+        byte[] type = data.getByteArray("type");
+        byte[] playable = data.getByteArray("playable");
+        String[] itemName = data.getStringArray("itemName");
+        byte[] numAttrs = data.getByteArray("numAttrs");
+        int[] attributIds = data.getIntArray("attrs");
+        String[] attributes = data.getStringArray("attributes");
+        int index = 0;
+        int cumulativeAttribIndex = 0;
+        int[] currentAttribIds; String[] currentAttribVals;
+        for (index = 0; index < numItems; index++) {
+            if (itemType[index] == AvrcpControllerConstants.BTRC_TYPE_MEDIA_ELEMENT) {
+                currentAttribIds = Arrays.copyOfRange(attributIds, cumulativeAttribIndex,
+                        cumulativeAttribIndex + numAttrs[index]);
+                currentAttribVals = Arrays.copyOfRange(attributes, cumulativeAttribIndex,
+                        cumulativeAttribIndex + numAttrs[index]);
+                TrackInfo mTrack = new TrackInfo(uids[index], numAttrs[index], currentAttribIds,
+                        currentAttribVals);
+                mTrack.mediaType = type[index];
+                mMediaItemList.add(mTrack);
+                cumulativeAttribIndex += numAttrs[index];
+            }
+            else if (itemType[index] == AvrcpControllerConstants.BTRC_TYPE_FOLDER) {
+                FolderItems mFolderItem = new FolderItems(uids[index], itemName[index],
+                        playable[index], type[index]);
+                mFolderItemList.add(mFolderItem);
+            }
+        }
+        return (mFolderItemList.size() + mMediaItemList.size());
+    }
+    public int updateSearchList(Bundle data) {
+        Log.d(TAG, "udateNowPlayingList ");
+
+        int numItems = data.getInt("numItems");
+        byte[] itemType = data.getByteArray("itemType");
+        long[] uids = data.getLongArray("uids");
+        byte[] type = data.getByteArray("type");
+        byte[] numAttrs = data.getByteArray("numAttrs");
+        int[] attributIds = data.getIntArray("attrs");
+        String[] attributes = data.getStringArray("attributes");
+        int index = 0;
+        int cumulativeAttribIndex = 0;
+        int[] currentAttribIds; String[] currentAttribVals;
+        for (index = 0; index < numItems; index++) {
+            if (itemType[index] != AvrcpControllerConstants.BTRC_TYPE_MEDIA_ELEMENT)
+                continue;
+            currentAttribIds = Arrays.copyOfRange(attributIds, cumulativeAttribIndex,
+                    cumulativeAttribIndex + numAttrs[index]);
+            currentAttribVals = Arrays.copyOfRange(attributes, cumulativeAttribIndex,
+                    cumulativeAttribIndex + numAttrs[index]);
+            TrackInfo mTrack = new TrackInfo(uids[index], numAttrs[index], currentAttribIds,
+                    currentAttribVals);
+            mTrack.mediaType = type[index];
+            mSearchList.add(mTrack);
+            cumulativeAttribIndex += numAttrs[index];
+        }
+        return mSearchList.size();
+    }
+    public long isIdInVFSList(String id) {
+        if ((mFolderItemList == null) || (mFolderItemList.isEmpty())) {
+            Log.e(TAG," FolderItemList empty ");
+            return AvrcpControllerConstants.DEFAULT_FOLDER_ID;
+        }
+        for (FolderItems mItem: mFolderItemList) {
+            if (Long.toString(mItem.mItemUid).equals(id)) {
+                Log.d(TAG," isIdInVFSList item found ");
+                return mItem.mItemUid;
+            }
+        }
+        return AvrcpControllerConstants.DEFAULT_FOLDER_ID;
+    }
+    public boolean isIdInSearchList(long id) {
+        if ((mSearchList == null) || (mSearchList.isEmpty())) return false;
+        for (TrackInfo mTrackInfo: mSearchList) {
+            if (id == mTrackInfo.mItemUid)
+                return true;
+        }
+        return false;
+    }
+    public int isIdInFolderStack(String id) {
+        if ((mFolderStack == null) || (mFolderStack.isEmpty()))
+            return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
+        int index = mFolderStack.size() - 1;
+        for (;index > 0; index --) {
+            if (mFolderStack.get(index).folderUid.equals(id))
+                return (mFolderStack.size() - 1) - index;
+        }
+        return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
     }
 }

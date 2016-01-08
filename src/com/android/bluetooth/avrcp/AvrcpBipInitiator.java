@@ -125,7 +125,11 @@ public class AvrcpBipInitiator {
     public boolean isObexConnected() {
         return mIsObexConnected;
     }
-
+    public boolean isBipFetchInProgress () {
+        if (mPendingRequest == null)
+            return false;
+        return true;
+    }
     public boolean GetLinkedThumbnail(String imgHandle){
         String localPath = CheckCoverArtOnLocalPath(imgHandle, THUMB_PREFIX);
         Log.e(TAG, "localPath " + localPath);

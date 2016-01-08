@@ -37,6 +37,7 @@ import java.util.HashMap;
 import android.util.Log;
 import java.nio.charset.Charset;
 import java.nio.ByteBuffer;
+import android.os.Bundle;
 /**
  * Provides Bluetooth AVRCP Controller profile, as a service in the Bluetooth application.
  * @hide
@@ -48,7 +49,7 @@ public class NowPlaying {
     RemoteDevice mDevice;
     private TrackInfo mCurrTrack;
 
-    private ArrayList<TrackInfo> mNowPlayingList;
+    public ArrayList<TrackInfo> mNowPlayingList;
 
     public NowPlaying(RemoteDevice mRemoteDevice) {
         mDevice = mRemoteDevice;
@@ -64,9 +65,6 @@ public class NowPlaying {
         mCurrTrack = null;
     }
 
-    public RemoteDevice getDeviceRecords() {
-        return mDevice;
-    }
 
     public void addTrack (TrackInfo mTrack) {
         if(mNowPlayingList != null) {
@@ -97,7 +95,7 @@ public class NowPlaying {
         }
     }
 
-    public TrackInfo getTrackFromId(int mTrackId) {
+    public TrackInfo getTrackFromId(long mTrackId) {
         if(mTrackId == 0)
             return getCurrentTrack();
         else {
@@ -108,12 +106,14 @@ public class NowPlaying {
             return null;
         }
     }
-    public void fetchThumbNail() {
+    public int fetchThumbNail() {
         /*
          * Is BIP Fetch is in progress
          */
         if (!mDevice.isBipConnected())
-            return;
+            return AvrcpControllerConstants.ERROR_BIP_NOT_CONNECTED;
+        if (mDevice.isBipFetchInProgress())
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_IN_PROGRESS;
         /*
          * We will check which track has valid coverArtHandle but imageLcoation is empty
          */
@@ -124,9 +124,10 @@ public class NowPlaying {
                  COVER_ART_HANDLE_INVALID)) && (mTrackInfo.mThumbNailLocation.equals
                  (AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
                     mDevice.GetLinkedThumbnail(mTrackInfo.mCoverArtHandle);
-                    return;
+                    return AvrcpControllerConstants.FETCHING_THUMBNAIL;
             }
         }
+        return AvrcpControllerConstants.ALL_THUMBNAILS_FETCHED;
     }
     /*
      * Returns the error for which cover art is fetched, can be used to check if valid
@@ -138,6 +139,8 @@ public class NowPlaying {
          */
         if (!mDevice.isBipConnected())
             return AvrcpControllerConstants.ERROR_BIP_NOT_CONNECTED;
+        if (mDevice.isBipFetchInProgress())
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_IN_PROGRESS;
         /*
          * We will check which track has valid coverArtHandle but imageLcoation is empty
          */
@@ -150,8 +153,9 @@ public class NowPlaying {
                    pixel.append(height); pixel.append("*"); pixel.append(width);
                    mDevice.GetImage(mTrackInfo.mCoverArtHandle, encoding, pixel.toString(), 
                            maxSize);
+            return AvrcpControllerConstants.FETCHING_IMAGE;
         }
-        return AvrcpControllerConstants.NO_ERROR;
+        return AvrcpControllerConstants.IMAGE_FETCHED;
     }
     public void updateThumbNail(String mCoverArtHandle, String mImageLocation) {
         Log.d(TAG," updateCoverArt HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
@@ -162,10 +166,9 @@ public class NowPlaying {
     }
     public void updateImage(String mCoverArtHandle, String mImageLocation) {
         Log.d(TAG," updateImage HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
-        for (TrackInfo mTrackInfo: mNowPlayingList) {
-            if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
-                mTrackInfo.mImageLocation = mImageLocation;
-        }
+        TrackInfo mTrackInfo = getCurrentTrack();
+        if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
+            mTrackInfo.mImageLocation = mImageLocation;
     }
     public void clearCoverArtData() {
         Log.d(TAG," clearCoverArtData");
@@ -175,5 +178,38 @@ public class NowPlaying {
             mTrackInfo.mThumbNailLocation = AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
             mTrackInfo.mImageLocation = AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
         }
+    }
+    public void clearNowPlayingList() {
+        Log.d(TAG," clearNowPlayingList");
+        if (mNowPlayingList == null) return;
+        mNowPlayingList.clear();
+    }
+    public int updateNowPlayingList(Bundle data) {
+        Log.d(TAG, "udateNowPlayingList ");
+
+        int numItems = data.getInt("numItems");
+        byte[] itemType = data.getByteArray("itemType");
+        long[] uids = data.getLongArray("uids");
+        byte[] type = data.getByteArray("type");
+        byte[] numAttrs = data.getByteArray("numAttrs");
+        int[] attributIds = data.getIntArray("attrs");
+        String[] attributes = data.getStringArray("attributes");
+        int index = 0;
+        int cumulativeAttribIndex = 0;
+        int[] currentAttribIds; String[] currentAttribVals;
+        for (index = 0; index < numItems; index++) {
+            if (itemType[index] != AvrcpControllerConstants.BTRC_TYPE_MEDIA_ELEMENT)
+                continue;
+            currentAttribIds = Arrays.copyOfRange(attributIds, cumulativeAttribIndex,
+                    cumulativeAttribIndex + numAttrs[index]);
+            currentAttribVals = Arrays.copyOfRange(attributes, cumulativeAttribIndex,
+                    cumulativeAttribIndex + numAttrs[index]);
+            TrackInfo mTrack = new TrackInfo(uids[index], numAttrs[index], currentAttribIds,
+                    currentAttribVals);
+            mTrack.mediaType = type[index];
+            mNowPlayingList.add(mTrack);
+            cumulativeAttribIndex += numAttrs[index];
+        }
+        return mNowPlayingList.size();
     }
 }
