@@ -74,6 +74,8 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
     // The remote connected device
     private BluetoothDevice mRemoteDevice = null;
 
+    private BluetoothAdapter mAdapter;
+
     private Context mContext;
 
     private static final int MSG_INTERNAL_START_LISTENER = 1;
@@ -92,6 +94,7 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
 
     public AvrcpBipRsp (Context context) {
         mContext = context;
+        mAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
     private final BroadcastReceiver mAvrcpBipRspReceiver = new BroadcastReceiver() {
@@ -145,7 +148,12 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
                 case MSG_INTERNAL_START_LISTENER:
                     /* fall throught */
                 case MSG_OBEX_SESSION_CLOSED:
-                    startL2capListener();
+                    if (mAdapter != null && mAdapter.isEnabled()) {
+                        startL2capListener();
+                    } else {
+                        Log.w(TAG, "Received msg = " + msg.what + " when adapter is" +
+                            " disabled, ignoring..");
+                    }
                     break;
                 case MSG_OBEX_DISCONNECTED:
                     synchronized (this) {
@@ -280,10 +288,10 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
     @Override
     public synchronized void onAcceptFailed() {
         mServerSocket = null; // Will cause a new to be created when calling start.
-        if(mShutdown) {
-            Log.e(TAG,"Failed to accept incomming connection - " + "shutdown");
-        } else {
-            Log.e(TAG,"Failed to accept incomming connection - " + "restarting");
+        if (mShutdown) {
+            Log.e(TAG,"Failed to accept incoming connection - " + "shutdown");
+        } else if (mAdapter != null && mAdapter.isEnabled()) {
+            Log.e(TAG,"Failed to accept incoming connection - " + "restarting");
             startL2capListener();
         }
     }
