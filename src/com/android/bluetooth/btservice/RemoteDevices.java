@@ -291,8 +291,10 @@ final class RemoteDevices {
                             break;
                         case AbstractionLayer.BT_PROPERTY_UUIDS:
                             int numUuids = val.length/AbstractionLayer.BT_UUID_SIZE;
+                            int state = mAdapterService.getState();
                             device.mUuids = Utils.byteArrayToUuid(val);
-                            sendUuidIntent(bdDevice);
+                            if (state == BluetoothAdapter.STATE_ON)
+                                sendUuidIntent(bdDevice);
                             break;
                         case AbstractionLayer.BT_PROPERTY_TYPE_OF_DEVICE:
                             // The device type from hal layer, defined in bluetooth.h,
@@ -386,6 +388,15 @@ final class RemoteDevices {
 
         mAdapterService.getRemoteServicesNative(Utils.getBytesFromAddress(device.getAddress()));
     }
+
+    void updateUuids(BluetoothDevice device) {
+
+        Message message = mHandler.obtainMessage(MESSAGE_UUID_INTENT);
+        message.obj = device;
+        mHandler.sendMessage(message);
+
+    }
+
 
     private final Handler mHandler = new Handler() {
         @Override

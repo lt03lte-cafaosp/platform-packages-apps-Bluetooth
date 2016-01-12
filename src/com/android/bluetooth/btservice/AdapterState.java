@@ -231,6 +231,7 @@ final class AdapterState extends StateMachine {
                 errorLog("Entered OnState after cleanup");
                 return;
             }
+            adapterService.updateUuids();
             adapterService.autoConnect();
         }
 

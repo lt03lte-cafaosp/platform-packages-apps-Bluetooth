@@ -1570,6 +1570,16 @@ public class AdapterService extends Service {
             mHandler.sendMessageDelayed(m,AUTO_CONNECT_PROFILES_TIMEOUT);
         }
     }
+    public void updateUuids() {
+       debugLog( "update uuids for bonded devices");
+       BluetoothDevice[] bondedDevices = getBondedDevices();
+       if (bondedDevices == null) {
+           return ;
+       }
+       for (BluetoothDevice device : bondedDevices) {
+           mRemoteDevices.updateUuids(device);
+       }
+    }
 
     private void autoConnectProfilesDelayed(){
         if (getState() != BluetoothAdapter.STATE_ON){
