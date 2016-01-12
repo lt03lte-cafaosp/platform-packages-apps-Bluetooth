@@ -49,8 +49,8 @@ import com.google.protobuf.micro.CodedOutputStreamMicro;
 public class SapServer extends Thread implements Callback {
     private static final String TAG = "SapServer";
     private static final String TAG_HANDLER = "SapServerHandler";
-    public static final boolean DEBUG = Log.isLoggable(SapService.LOG_TAG, Log.DEBUG);
-    public static final boolean VERBOSE = Log.isLoggable(SapService.LOG_TAG, Log.VERBOSE);
+    public static final boolean DEBUG = SapService.DEBUG;
+    public static final boolean VERBOSE = SapService.VERBOSE;
 
     private enum SAP_STATE    {
         DISCONNECTED, CONNECTING, CONNECTING_CALL_ONGOING, CONNECTED,
@@ -217,8 +217,9 @@ public class SapServer extends Thread implements Callback {
         /* For PTS TC_SERVER_DCN_BV_03_I we need to expose the option to send immediate disconnect
          * without first sending a graceful disconnect.
          * To enable this option set
-         * bt.pts.certification="true" */
-        Boolean pts_test = SystemProperties.getBoolean("bt.pts.certification", false);
+         * bt.sap.pts="true" */
+        String pts_enabled = SystemProperties.get("bt.sap.pts");
+        Boolean pts_test = Boolean.parseBoolean(pts_enabled);
 
         /* put notification up for the user to be able to disconnect from the client*/
         Intent sapDisconnectIntent = new Intent(SapServer.SAP_DISCONNECT_ACTION);
@@ -843,13 +844,8 @@ public class SapServer extends Thread implements Callback {
         try {
             if(mRilBtOutStream != null) {
                 sapMsg.writeReqToStream(mRilBtOutStream);
-            } else {
-                // else we are in a shutdown race, and don't need to send the message.
-                // we need to inform the shutdown procedure that it shall not expect a reply.
-                // This should only happen if the ril-socket cannot be opened or it is closed
-                // from outside the BT code.
-                mDeinitSignal.countDown();
-            }
+            } /* Else SAP was enabled on a build that did not support SAP, which we will not
+               * handle. */
         } catch (IOException e) {
             Log.e(TAG_HANDLER, "Unable to send message to RIL", e);
             SapMessage errorReply = new SapMessage(SapMessage.ID_ERROR_RESP);
