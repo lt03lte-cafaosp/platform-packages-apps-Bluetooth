@@ -792,7 +792,11 @@ static bool initNative(JNIEnv* env, jobject obj) {
     ALOGV("%s:",__FUNCTION__);
 
     sJniAdapterServiceObj = env->NewGlobalRef(obj);
-    sJniCallbacksObj = env->NewGlobalRef(env->GetObjectField(obj, sJniCallbacksField));
+    if (sJniCallbacksField) {
+        sJniCallbacksObj = env->NewGlobalRef(env->GetObjectField(obj, sJniCallbacksField));
+    } else {
+        ALOGE("Error: sJniCallbacksField is null\n");
+    }
 
     if (sBluetoothInterface) {
         int ret = sBluetoothInterface->init(&sBluetoothCallbacks);
