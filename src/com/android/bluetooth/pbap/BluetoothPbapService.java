@@ -221,6 +221,7 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
 
     private ContentObserver contactChangeObserver;
     public static long primaryVersionCounter = 0;
+    public static long secondaryVersionCounter = 0;
 
     public BluetoothPbapService() {
         mState = BluetoothPbap.STATE_DISCONNECTED;
