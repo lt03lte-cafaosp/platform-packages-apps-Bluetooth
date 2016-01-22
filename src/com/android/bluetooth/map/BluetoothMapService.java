@@ -589,17 +589,11 @@ public class BluetoothMapService extends ProfileService {
         if (DEBUG) Log.d(TAG, "start()");
         if(!VERBOSE)
         VERBOSE = Log.isLoggable(LOG_TAG, Log.VERBOSE);
-
-        if (!Utils.checkCaller()) {
-            Log.w(TAG, "start received for non-active user, ignoring");
-            return false;
-        }
         //Start MapProfile if not already done.
         if (isMapStarted()) {
             Log.w(TAG, "start received for already started, ignoring");
             return false;
         }
-
 
         if (VERBOSE) Log.v(TAG, "verbose logging is enabled");
         HandlerThread thread = new HandlerThread("BluetoothMapHandler");

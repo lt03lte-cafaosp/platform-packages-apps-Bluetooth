@@ -243,11 +243,6 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
         mInterrupted = false;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        if (!Utils.checkCaller()) {
-            Log.d(TAG, "onCreate received for non-active user, ignoring");
-            return;
-        }
-
         if (!mHasStarted) {
             mHasStarted = true;
             if (VERBOSE) Log.v(TAG, "Starting PBAP service");
