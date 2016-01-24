@@ -110,8 +110,12 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
     @Override
     public void onDestroy() {
         Log.d(TAG, " onDestroy ");
+        mPendingResult = null;
         clearAvrcpControllerBrowseService();
-        mSession.release();
+        if (mSession != null) {
+            mSession.release();
+        }
+        stopSelf();
     }
     @Override
     public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle rootHints) {
@@ -126,24 +130,64 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
         /* make current scope as browsing */
         return new BrowserRoot(AvrcpControllerConstants.AVRCP_BROWSE_ROOT_FOLDER, null);
     }
+    /* onLoadChildren can only be used
+     * */
     @Override
     public void onLoadChildren(final String parentMediaId, final Result<List<MediaItem>> result) {
         Log.d(TAG," onLoadChildren parentId " + parentMediaId);
         mPendingResult = result;
         AvrcpControllerService ctrlService = AvrcpControllerService.getAvrcpControllerService();
-        if ((ctrlService == null) || (!ctrlService.loadChildren(parentMediaId))) {
+        if (ctrlService == null) {
+            Log.e(TAG," onLoadChildren ctrl service not up, return empty list ");
             result.sendResult(Collections.<MediaItem>emptyList());
             mPendingResult = null;
             return;
+        }
+        if(parentMediaId.contains(":")) {
+            /* check for up or down */
+            String[] feilds = parentMediaId.split(":");
+            Log.d(TAG,"onLoadChildren id =" + feilds[0] + " dir = " + feilds[1]);
+            if(feilds[1].equals(BluetoothAvrcpController.BROWSE_COMMAND_BROWSE_FOLDER_UP)) {
+                if (!ctrlService.loadFolderUp(feilds[0])) {
+                    Log.e(TAG," loadFolderUp folder_up Item not found, return empty list ");
+                    result.sendResult(Collections.<MediaItem>emptyList());
+                    mPendingResult = null;
+                    return;
+                }
+            }
+            else if (feilds[1].equals(BluetoothAvrcpController.BROWSE_COMMAND_BROWSE_FOLDER_DOWN)) {
+                if (!ctrlService.loadFolderDown(feilds[0])) {
+                    Log.e(TAG," loadFolderDown folder_up Item not found, return empty list ");
+                    result.sendResult(Collections.<MediaItem>emptyList());
+                    mPendingResult = null;
+                    return;
+                }
+            }
+            else {
+                if (!ctrlService.refreshCurrentFolder(feilds[0])) {
+                    Log.e(TAG," refreshCurrentFolder Item not found, return empty list ");
+                    result.sendResult(Collections.<MediaItem>emptyList());
+                    mPendingResult = null;
+                    return;
+                }
+            }
+        }
+        else {
+            /* This is for refresh */
+            if (!ctrlService.refreshCurrentFolder(parentMediaId)) {
+                Log.e(TAG," onLoadChildren Item not found, return empty list ");
+                result.sendResult(Collections.<MediaItem>emptyList());
+                mPendingResult = null;
+                return;
+            }
         }
         result.detach();
     }
     public static synchronized AvrcpControllerBrowseService getAvrcpControllerBrowseService(){
         if (sAvrcpControllerBrowseService != null) {
-            if (DBG) Log.d(TAG, "getAvrcpControllerBrowseService(): returning "
-                    + sAvrcpControllerBrowseService);
             return sAvrcpControllerBrowseService;
         }
+        Log.e(TAG, "getAvrcpControllerBrowseService(): returning  null");
         return null;
     }
 
@@ -240,7 +284,13 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
                     .setTitle(mTrackInfo.mTrackTitle).build(), mTrackInfo.mItemUid));
         }
         if (mSession.isActive()) {
-            mSession.setQueue(mPlayingQueue);
+            if (mPlayingQueue.isEmpty()) {
+                Log.d(TAG," NPL List empty ");
+                mSession.setQueue(Collections.<MediaSession.QueueItem>emptyList());
+            }
+            else {
+                mSession.setQueue(mPlayingQueue);
+            }
             mSession.setQueueTitle("Now Playing List");
         }
     }

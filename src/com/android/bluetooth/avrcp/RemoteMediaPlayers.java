@@ -139,12 +139,17 @@ public class RemoteMediaPlayers {
         else
             return AvrcpControllerConstants.PLAYING_TIME_INVALID;
     }
-
     public  void updatePlayerList (byte numPlayers, Bundle data) {
         Log.d(TAG," updatePlayerList numPlayers = " + numPlayers);
 
         byte []featureMask = data.getByteArray("featureMask");
         for (int i = 0; i < numPlayers; i++) {
+            int playerId = data.getIntArray("playerId")[i];
+            if (isPlayerInList(playerId)) {
+                Log.d(TAG," Player Already Present " + playerId);
+                continue;
+            }
+            Log.d(TAG," adding player id = " + playerId);
             PlayerInfo mPlayerInfo = new PlayerInfo();
             mPlayerInfo.subType = data.getIntArray("subtype")[i];
             mPlayerInfo.mPlayerId = data.getIntArray("playerId")[i];
@@ -154,37 +159,10 @@ public class RemoteMediaPlayers {
             for (int k = 0; k < AvrcpControllerConstants.PLAYER_FEATURE_MASK_SIZE; k++)
                 mPlayerInfo.mFeatureMask[k] = featureMask[(i*AvrcpControllerConstants.
                         PLAYER_FEATURE_MASK_SIZE) + k];
+            /* Add current addressed player setting and playtime */
+            mPlayerInfo.copyPlayerAppSetting(mAddressedPlayer.mPlayerAppSetting);
+            mPlayerInfo.mPlayTime = mAddressedPlayer.mPlayTime;
             mMediaPlayerList.add(mPlayerInfo);
-        }
-        /* Once update is done, check if there is any player with status as playing
-         * Assign that player as addressed player.
-         */
-        int index = 0; boolean matchFound = false;
-        for (PlayerInfo mPlayerInfo: mMediaPlayerList) {
-            if ((mPlayerInfo.mPlayStatus == AvrcpControllerConstants.PLAY_STATUS_PLAYING)&&
-                (mPlayerInfo.mPlayerId != AvrcpControllerConstants.DEFAULT_PLAYER_ID)){
-                /* shuffle the entries, ideally this can be only 1 entry with status playing
-                 * By this time, the one with default player ID would have updated values.
-                 * update default ID and remove the new entry
-                 */
-                if (mMediaPlayerList.get(0).mPlayerId != AvrcpControllerConstants.DEFAULT_PLAYER_ID) {
-                    Log.e(TAG," Player ID did not match, bail out");
-                    break;
-                }
-                Log.d(TAG," Shuffling player Data");
-                mMediaPlayerList.get(0).mPlayerId = mPlayerInfo.mPlayerId;
-                mMediaPlayerList.get(0).subType = mPlayerInfo.subType;
-                mMediaPlayerList.get(0).majorType = mPlayerInfo.majorType;
-                mMediaPlayerList.get(0).mFeatureMask = mPlayerInfo.mFeatureMask;
-                mMediaPlayerList.get(0).mPlayerName = mPlayerInfo.mPlayerName;
-                matchFound = true;
-                break;
-            }
-            index ++;
-        }
-        if (matchFound) {
-            mMediaPlayerList.remove(index);
-            Log.d(TAG," removed index = " + index + " curSize = " + mMediaPlayerList.size());
         }
     }
     /*
@@ -195,8 +173,7 @@ public class RemoteMediaPlayers {
             return null;
         BluetoothAvrcpRemoteMediaPlayers mRemoteMediaPlayers = new BluetoothAvrcpRemoteMediaPlayers();
         for (PlayerInfo mPlayerInfo: mMediaPlayerList) {
-            if (mPlayerInfo.mPlayerId == AvrcpControllerConstants.DEFAULT_PLAYER_ID)
-                continue;
+            if (mPlayerInfo.mPlayerId == AvrcpControllerConstants.DEFAULT_PLAYER_ID) continue;
             mRemoteMediaPlayers.addPlayer(mPlayerInfo.mPlayStatus, mPlayerInfo.subType,
                     mPlayerInfo.mPlayerId, mPlayerInfo.majorType, mPlayerInfo.mFeatureMask,
                     mPlayerInfo.mPlayerName);

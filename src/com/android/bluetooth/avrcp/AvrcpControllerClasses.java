@@ -428,10 +428,23 @@ class PlayerInfo {
     public PlayerInfo() {
         resetPlayer();
     }
+    public void copyPlayerAppSetting(ArrayList<PlayerApplicationSettings> mSrcPlAppSetting) {
+        mPlayerAppSetting.clear();
+        for(PlayerApplicationSettings mSetting: mSrcPlAppSetting) {
+            PlayerApplicationSettings plAppSetting = new PlayerApplicationSettings();
+            plAppSetting.attr_Id = mSetting.attr_Id;
+            plAppSetting.attr_val = mSetting.attr_val;
+            plAppSetting.supported_values = new byte[mSetting.supported_values.length];
+            plAppSetting.supported_values = Arrays.copyOfRange(mSetting.supported_values,
+                    0, mSetting.supported_values.length);
+            mPlayerAppSetting.add(plAppSetting);
+        }
+    }
     public void setSupportedPlayerAppSetting (ByteBuffer bb) {
         /* ByteBuffer has to be of the following format
          * id, num_values, values[]
          */
+        mPlayerAppSetting.clear();
         while(bb.hasRemaining()) {
             PlayerApplicationSettings plAppSetting = new PlayerApplicationSettings();
             plAppSetting.attr_Id = bb.get();
@@ -543,7 +556,7 @@ class PlayerInfo {
     public boolean isFeatureMaskBitSet (int featureBit) {
         int index = (featureBit)/8;
         int bit = (featureBit)%8;
-        if ((mFeatureMask[index]&(1<<(bit-1))) != 0) {
+        if ((mFeatureMask[index]&(1<<(bit))) != 0) {
             return true;
         }
         return false;
@@ -646,6 +659,7 @@ class AppProperties {
 }
 
 class PendingBrowsingCommands {
+    private static final String TAG = "AvrcpControllerClasses_PendingBrwsCmd";
     class cmdDetails {
         int commandId;
         int scope;

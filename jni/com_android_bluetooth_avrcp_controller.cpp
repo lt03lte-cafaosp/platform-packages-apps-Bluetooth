@@ -541,8 +541,9 @@ static void btavrcp_available_players_update_callback (bt_bdaddr_t *bd_addr,
                 (p_folder_entries->p_item_list[i].u.player.major_type));
         sCallbackEnv->SetByteArrayRegion(playStatus, i, 1, (jbyte*)&
                 (p_folder_entries->p_item_list[i].u.player.play_status));
-        sCallbackEnv->SetByteArrayRegion(featureMask, i, BTRC_FEATURE_MASK_SIZE, (jbyte*)
-                (p_folder_entries->p_item_list[i].u.player.features));
+        sCallbackEnv->SetByteArrayRegion(featureMask, i*BTRC_FEATURE_MASK_SIZE,
+                                         BTRC_FEATURE_MASK_SIZE,
+                                     (jbyte*)(p_folder_entries->p_item_list[i].u.player.features));
         str = sCallbackEnv->NewStringUTF((char*)
                                            (p_folder_entries->p_item_list[i].u.player.name.p_str));
         sCallbackEnv->SetObjectArrayElement(playerName, i,str);
@@ -696,8 +697,8 @@ static void btavrcp_browse_folder_rsp_callback (bt_bdaddr_t *bd_addr,
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
     if ((resultStatus != BTRC_STS_NO_ERROR) || (numItems == 0)) {
         /* Complete the response with empty values */
-        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleBrowseFolderResponse, addr, resultStatus,
-                                     uidCounter, 0, NULL, NULL, NULL, NULL, NULL,
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleBrowseFolderResponse, addr,
+                                     resultStatus, 0, 0, NULL, NULL, NULL, NULL, NULL,
                                      NULL, NULL, NULL);
         sCallbackEnv->DeleteLocalRef(addr);
         return;
@@ -761,9 +762,9 @@ static void btavrcp_browse_folder_rsp_callback (bt_bdaddr_t *bd_addr,
             }
         }
     }
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleBrowseFolderResponse, addr, resultStatus,
-                                 uidCounter, numItems, itemTtype, uids, type, playable, itemName,
-                                 numAattr, attribIds, attribVal);
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_handleBrowseFolderResponse, addr,
+                                 resultStatus, uidCounter, numItems, itemTtype, uids, type,
+                                 playable, itemName, numAattr, attribIds, attribVal);
     sCallbackEnv->DeleteLocalRef(addr);
     sCallbackEnv->DeleteLocalRef(itemTtype);
     sCallbackEnv->DeleteLocalRef(type);
@@ -1194,7 +1195,8 @@ static void getElementAttributesNative(JNIEnv *env, jobject object, jbyteArray a
     env->ReleaseByteArrayElements(address, addr, 0);
     env->ReleaseByteArrayElements(attrib_ids, attr, 0);
 }
-static void getTotalNumberOfItemsNative(JNIEnv *env, jobject object, jbyteArray address, jbyte scope) {
+static void getTotalNumberOfItemsNative(JNIEnv *env, jobject object, jbyteArray address,
+                                        jbyte scope) {
     ALOGI("%s: sBluetoothAvrcpInterface: %p", __FUNCTION__, sBluetoothAvrcpInterface);
     bt_status_t status;
     jbyte *addr;
