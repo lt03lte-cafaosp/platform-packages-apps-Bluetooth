@@ -752,6 +752,8 @@ static void btavrcp_browse_folder_rsp_callback (bt_bdaddr_t *bd_addr,
             attr_count = p_folder_entries->p_item_list[i].u.media.attr_count;
             sCallbackEnv->SetByteArrayRegion(numAattr, i, sizeof(uint8_t), (jbyte*)&(attr_count));
             for (k = 0; k < attr_count; k++) {
+                if (p_folder_entries->p_item_list[i].u.media.p_attr_list[k].name.str_len == 0)
+                    continue;
                 sCallbackEnv->SetIntArrayRegion(attribIds, attrib_index, 1, (jint*)&
                         (p_folder_entries->p_item_list[i].u.media.p_attr_list[k].attr_id));
                 str = sCallbackEnv->NewStringUTF((char*)
@@ -1160,11 +1162,11 @@ static void sendRegisterAbsVolRspNative(JNIEnv *env, jobject object, jbyteArray 
 }
 
 static void getElementAttributesNative(JNIEnv *env, jobject object, jbyteArray address,
-                                        jbyte num_attribs, jbyteArray attrib_ids) {
+                                        jbyte num_attribs, jintArray attrib_ids) {
     bt_status_t status;
     jbyte *addr;
     uint32_t *pAttrs = NULL;
-    jbyte *attr;
+    jint *attr;
     int i;
 
     if (!sBluetoothAvrcpInterface) return;
@@ -1181,7 +1183,7 @@ static void getElementAttributesNative(JNIEnv *env, jobject object, jbyteArray a
         return;
     }
     pAttrs = new uint32_t[num_attribs];
-    attr = env->GetByteArrayElements(attrib_ids, NULL);
+    attr = env->GetIntArrayElements(attrib_ids, NULL);
     for (i = 0; i < num_attribs; ++i) {
         pAttrs[i] = (uint32_t)attr[i];
     }
@@ -1193,7 +1195,7 @@ static void getElementAttributesNative(JNIEnv *env, jobject object, jbyteArray a
     }
     delete[] pAttrs;
     env->ReleaseByteArrayElements(address, addr, 0);
-    env->ReleaseByteArrayElements(attrib_ids, attr, 0);
+    env->ReleaseIntArrayElements(attrib_ids, attr, 0);
 }
 static void getTotalNumberOfItemsNative(JNIEnv *env, jobject object, jbyteArray address,
                                         jbyte scope) {
@@ -1361,7 +1363,7 @@ static JNINativeMethod sMethods[] = {
                                (void *) setPlayerApplicationSettingValuesNative},
     {"sendAbsVolRspNative", "([BII)V",(void *) sendAbsVolRspNative},
     {"sendRegisterAbsVolRspNative", "([BBII)V",(void *) sendRegisterAbsVolRspNative},
-    {"getElementAttributesNative", "([BB[B)V",(void *) getElementAttributesNative},
+    {"getElementAttributesNative", "([BB[I)V",(void *) getElementAttributesNative},
     {"getTotalNumberOfItemsNative", "([BB)V",(void *) getTotalNumberOfItemsNative},
     {"browseFolderNative", "([BBIIB[B)V",(void *) browseFolderNative},
     {"setBrowsedPlayerNative", "([BI)V",(void *) setBrowsedPlayerNative},
