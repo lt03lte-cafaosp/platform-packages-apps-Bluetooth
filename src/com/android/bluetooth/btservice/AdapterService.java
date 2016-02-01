@@ -246,6 +246,8 @@ public class AdapterService extends Service {
         A2dpService a2dpService = A2dpService.getA2dpService();
         A2dpSinkService a2dpSinkService = A2dpSinkService.getA2dpSinkService();
         HeadsetService headsetService = HeadsetService.getHeadsetService();
+        HeadsetClientService headsetClientService =
+                   HeadsetClientService.getHeadsetClientService();
 
         // Set profile priorities only for the profiles discovered on the remote device.
         // This avoids needless auto-connect attempts to profiles non-existent on the remote device
@@ -276,6 +278,13 @@ public class AdapterService extends Service {
                     BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.Handsfree)) &&
             (headsetService.getPriority(device) == BluetoothProfile.PRIORITY_UNDEFINED))){
             headsetService.setPriority(device,BluetoothProfile.PRIORITY_ON);
+        }
+
+        if ((headsetClientService != null) &&
+            ((BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.HSP_AG) ||
+                    BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.Handsfree_AG)) &&
+              (headsetClientService.getPriority(device) == BluetoothProfile.PRIORITY_UNDEFINED))) {
+              headsetClientService.setPriority(device,BluetoothProfile.PRIORITY_ON);
         }
     }
 
@@ -1651,13 +1660,6 @@ public class AdapterService extends Service {
      public void connectOtherProfile(BluetoothDevice device, int firstProfileStatus){
         if ((mHandler.hasMessages(MESSAGE_CONNECT_OTHER_PROFILES) == false) &&
             (isQuietModeEnabled()== false)){
-            ParcelUuid[] featureUuids = device.getUuids();
-            // Some Carkits disconnect just after pairing,Initiate SDP for missing UUID's support
-            if ((!(BluetoothUuid.containsAnyUuid(featureUuids, A2DP_SOURCE_SINK_UUIDS))) ||
-                    (!(BluetoothUuid.isUuidPresent(featureUuids, BluetoothUuid.Handsfree)))) {
-                Log.v(TAG,"Initiate SDP for Missing UUID's support in remote");
-                device.fetchUuidsWithSdp();
-            }
             Message m = mHandler.obtainMessage(MESSAGE_CONNECT_OTHER_PROFILES);
             m.obj = device;
             m.arg1 = (int)firstProfileStatus;
@@ -1697,8 +1699,16 @@ public class AdapterService extends Service {
         List<BluetoothDevice> a2dpConnDevList;
         List<BluetoothDevice> hfConnDevList;
 
-        a2dpConnDevList = a2dpSinkService.getConnectedDevices();
-        hfConnDevList = hsClientService.getConnectedDevices();
+        a2dpConnDevList = a2dpSinkService.getDevicesMatchingConnectionStates(
+             new int[] {BluetoothProfile.STATE_CONNECTED,
+                         BluetoothProfile.STATE_CONNECTING,
+                         BluetoothProfile.STATE_DISCONNECTING});
+        Log.i(TAG,"a2dpConnDevList: " +a2dpConnDevList.size());
+        hfConnDevList = hsClientService.getDevicesMatchingConnectionStates(
+             new int[] {BluetoothProfile.STATE_CONNECTED,
+                         BluetoothProfile.STATE_CONNECTING,
+                         BluetoothProfile.STATE_DISCONNECTING});
+        Log.i(TAG,"hfConnDevList: " +hfConnDevList.size());
 
         // Check if the device is in disconnected state and if so return
         // We ned to connect other profile only if one of the profile is still in connected state
