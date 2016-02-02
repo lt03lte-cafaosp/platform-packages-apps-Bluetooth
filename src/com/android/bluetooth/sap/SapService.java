@@ -151,9 +151,10 @@ public class SapService extends ProfileService {
                 //       for multiple connections.
                 mServerSocket = mAdapter.listenUsingRfcommOn(
                         BluetoothAdapter.SOCKET_CHANNEL_AUTO_STATIC_NO_SDP, true, true);
-                if (mSdpHandle >= 0) {
-                    SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
+                if (mSdpHandle >= 0 && SdpManager.getDefaultManager() != null) {
                     if (DEBUG) Log.d(TAG, "Removing SDP record");
+                    SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
+                    mSdpHandle = -1;
                 }
                 mSdpHandle = SdpManager.getDefaultManager().createSapsRecord(SDP_SAP_SERVICE_NAME,
                         mServerSocket.getChannel(), SDP_SAP_VERSION);
@@ -712,16 +713,26 @@ public class SapService extends ProfileService {
             mIsWaitingAuthorization = false;
             cancelUserTimeoutAlarm();
         }
-        mSessionStatusHandler.removeCallbacksAndMessages(null);
-        // Request release of all resources
-        Message msg = mSessionStatusHandler.obtainMessage(SHUTDOWN,latch);
-        if( mSessionStatusHandler.sendMessage(msg) == false) {
-            /* most likely caused by shutdown being called from multiple sources - e.g.BT off
-             * signaled through intent and a service shutdown simultaneously.
-             * Intended behavior not documented, hence we need to be able to handle all cases. */
-            Log.e(TAG, "mSessionStatusHandler.sendMessage() failed trigger latch locally");
-            if(latch != null) {
-                latch.countDown();
+        if (mSdpHandle >= 0 && SdpManager.getDefaultManager() != null) {
+            if (DEBUG) Log.d(TAG, "Removing SDP record");
+            SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
+            mSdpHandle = -1;
+        }
+        if (mSessionStatusHandler != null) {
+            mSessionStatusHandler.removeCallbacksAndMessages(null);
+            // Request release of all resources
+            Message msg = mSessionStatusHandler.obtainMessage(SHUTDOWN,latch);
+            if( mSessionStatusHandler.sendMessage(msg) == false) {
+                /* most likely caused by shutdown being called from multiple sources - e.g.BT off
+                 * signaled through intent and a service shutdown simultaneously.
+                 * Intended behavior not documented, hence we need to be able to handle all cases.
+                 */
+                Log.e(TAG, "mSessionStatusHandler.sendMessage() failed trigger latch locally");
+                if(latch != null) {
+                    latch.countDown();
+                }
+            } else {
+                if(DEBUG) Log.e(TAG, "mSessionStatusHandler.sendMessage() dispatched shutdown msg");
             }
         } else {
             if(DEBUG) Log.e(TAG, "mSessionStatusHandler.sendMessage() dispatched shutdown message");
