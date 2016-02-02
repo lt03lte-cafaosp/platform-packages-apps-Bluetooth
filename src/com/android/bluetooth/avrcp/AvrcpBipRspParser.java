@@ -782,13 +782,19 @@ public class AvrcpBipRspParser {
             + width + " height = " + height + " encoding = " +
                 imgDesc.mEncoding);
 
-        // supported encoding is only JPEG and PNG
-        if (imgDesc.mEncoding.toUpperCase().equals("JPEG"))
+        if (imgDesc.mEncoding.equals("")) {
+            // remote device is willing to accept any encoding, send
+            // the default encoding of image
             cmpFormat = Bitmap.CompressFormat.JPEG;
-        else if (imgDesc.mEncoding.toUpperCase().equals("PNG"))
-            cmpFormat = Bitmap.CompressFormat.PNG;
-        else
-            return retVal;
+        } else {
+            // supported encoding is only JPEG and PNG
+            if (imgDesc.mEncoding.toUpperCase().equals("JPEG"))
+                cmpFormat = Bitmap.CompressFormat.JPEG;
+            else if (imgDesc.mEncoding.toUpperCase().equals("PNG"))
+                cmpFormat = Bitmap.CompressFormat.PNG;
+            else
+                return retVal;
+        }
 
         long albumId = mCoverArtAttributesMap.get(imgHandle).getAlbumId();
         if (D) Log.d(TAG,"getImg: getScaledBitmap +");
