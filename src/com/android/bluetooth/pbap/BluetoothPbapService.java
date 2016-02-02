@@ -451,10 +451,11 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                 Log.e(TAG, "Failed to start the listeners");
                 return;
             }
-            if (mSdpHandle >= 0) {
-                SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
-                if (VERBOSE) Log.d(TAG, "Removing SDP record for PBAP with SDP handle: " +
+            if (mSdpHandle >= 0 && SdpManager.getDefaultManager() != null) {
+                Log.d(TAG, "Removing SDP record for PBAP with SDP handle: " +
                     mSdpHandle);
+                SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
+                mSdpHandle = -1;
             }
             mSdpHandle = SdpManager.getDefaultManager().createPbapPseRecord(
                 "OBEX Phonebook Access Server", mServerSockets.getRfcommChannel(),
@@ -572,7 +573,9 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
      */
     @Override
     public synchronized void onAcceptFailed() {
-        if (mAdapter.isEnabled()) {
+        //Force socket listener to restart
+        closeServerSocket();
+        if (!mInterrupted && mAdapter!= null && mAdapter.isEnabled()) {
             startSocketListeners();
         }
     }
@@ -633,16 +636,12 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
     }
 
     private final synchronized void closeServerSocket() {
-        // exit SocketAcceptThread early
-        if (mServerSocket != null) {
-            try {
-                // this will cause mServerSocket.accept() return early with IOException
-                mServerSocket.close();
-                mServerSocket = null;
-            } catch (IOException ex) {
-                Log.e(TAG, "Close Server Socket error: " + ex);
-            }
-        }
+
+       // exit SocketAcceptThread early
+       if (mServerSockets != null) {
+           mServerSockets.shutdown(false);
+           mServerSockets = null;
+       }
     }
 
     private final synchronized void closeConnectionSocket() {
@@ -657,11 +656,10 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
     }
 
     private final void closeService() {
-        if (VERBOSE) Log.v(TAG, "Pbap Service closeService in");
+        if (DEBUG) Log.v(TAG, "Pbap Service closeService in");
 
         // exit initSocket early
         mInterrupted = true;
-        closeServerSocket();
 
         if (mAcceptThread != null) {
             try {
@@ -683,14 +681,22 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
             mServerSession = null;
         }
 
+        if (mSdpHandle >= 0 && SdpManager.getDefaultManager() != null) {
+            Log.d(TAG, "Removing SDP record for PBAP with SDP handle: " +
+                mSdpHandle);
+            SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
+            mSdpHandle = -1;
+        }
+
         closeConnectionSocket();
+        closeServerSocket();
 
         mHasStarted = false;
         if (mStartId != -1 && stopSelfResult(mStartId)) {
             if (VERBOSE) Log.v(TAG, "successfully stopped pbap service");
             mStartId = -1;
         }
-        if (VERBOSE) Log.v(TAG, "Pbap Service closeService out");
+        if (DEBUG) Log.v(TAG, "Pbap Service closeService out");
     }
 
     private final void startObexServerSession() throws IOException {
@@ -747,8 +753,6 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
             mServerSession.close();
             mServerSession = null;
         }
-
-        mAcceptThread = null;
 
         closeConnectionSocket();
 

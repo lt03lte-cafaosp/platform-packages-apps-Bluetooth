@@ -194,6 +194,14 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
 
     }
 
+    private final synchronized void closeServerSocket() {
+        if(V) Log.d(TAG, "closeServerSocket");
+        if (mServerSocket != null) {
+            mServerSocket.shutdown(false);
+            mServerSocket = null;
+        }
+    }
+
     private final synchronized void closeConnectionSocket() {
         if(V) Log.d(TAG, "closeConnectionSock");
         if (mConnSocket != null) {
@@ -242,6 +250,7 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
             mServerSession = null;
         }
         closeConnectionSocket();
+        closeServerSocket();
         try {
             mContext.unregisterReceiver(mAvrcpBipRspReceiver);
         } catch (Exception e) {
@@ -287,7 +296,7 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
      */
     @Override
     public synchronized void onAcceptFailed() {
-        mServerSocket = null; // Will cause a new to be created when calling start.
+        closeServerSocket();
         if (mShutdown) {
             Log.e(TAG,"Failed to accept incoming connection - " + "shutdown");
         } else if (mAdapter != null && mAdapter.isEnabled()) {
