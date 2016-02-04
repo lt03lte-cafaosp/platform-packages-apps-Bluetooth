@@ -300,15 +300,6 @@ final class HeadsetClientStateMachine extends StateMachine {
         if (state == c.getState()) {
             return;
         }
-        //abandon focus here
-        if (state == BluetoothHeadsetClientCall.CALL_STATE_TERMINATED) {
-            if (mAudioManager.getMode() != AudioManager.MODE_NORMAL) {
-                mAudioManager.setMode(AudioManager.MODE_NORMAL);
-                Log.d(TAG, "abandonAudioFocus ");
-                // abandon audio focus after the mode has been set back to normal
-                mAudioManager.abandonAudioFocusForCall();
-            }
-        }
         c.setState(state);
         sendCallChangedIntent(c);
     }
