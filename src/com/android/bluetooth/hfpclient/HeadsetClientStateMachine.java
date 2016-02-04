@@ -1230,19 +1230,6 @@ final class HeadsetClientStateMachine extends StateMachine {
         mAudioState = BluetoothHeadsetClient.STATE_AUDIO_DISCONNECTED;
         mAudioWbs = false;
 
-        if(alert == null) {
-            // alert is null, using backup
-            alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-            if(alert == null) {
-                // alert backup is null, using 2nd backup
-                 alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-            }
-        }
-        if (alert != null) {
-            mRingtone = RingtoneManager.getRingtone(mService, alert);
-        } else {
-            Log.e(TAG,"alert is NULL no ringtone");
-        }
         mIndicatorNetworkState = HeadsetClientHalConstants.NETWORK_STATE_NOT_AVAILABLE;
         mIndicatorNetworkType = HeadsetClientHalConstants.SERVICE_TYPE_HOME;
         mIndicatorNetworkSignal = 0;
@@ -1576,6 +1563,22 @@ final class HeadsetClientStateMachine extends StateMachine {
             Log.d(TAG, "Enter Connected: " + getCurrentMessage().what);
 
             mAudioWbs = false;
+            if(mRingtone == null)
+            {
+               if(alert == null) {
+                  // alert is null, using backup
+                  alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                  if(alert == null) {
+                     // alert backup is null, using 2nd backup
+                     alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                  }
+               }
+               if (alert != null) {
+                   mRingtone = RingtoneManager.getRingtone(mService, alert);
+               } else {
+                   Log.e(TAG,"alert is NULL no ringtone");
+               }
+            }
         }
 
         @Override
