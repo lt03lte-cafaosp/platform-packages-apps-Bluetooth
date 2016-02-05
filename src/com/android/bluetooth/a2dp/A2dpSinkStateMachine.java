@@ -303,6 +303,11 @@ final class A2dpSinkStateMachine extends StateMachine {
          * remove cleanup of resources
          * not acquired in AudioTrack approach
          */
+        if(mAudioFocusAcquired != AUDIO_FOCUS_LOSS) {
+            log(" Cleanup Called focus state = " + mAudioFocusAcquired);
+            if((mAudioManager != null) && (mAudioFocusListener != null))
+                mAudioManager.abandonAudioFocus(mAudioFocusListener);
+        }
         if(!USE_AUDIOTRACK)
             releasePatch();
         cleanupNative();
