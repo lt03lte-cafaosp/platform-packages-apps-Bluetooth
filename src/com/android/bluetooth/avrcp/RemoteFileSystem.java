@@ -51,17 +51,20 @@ public class RemoteFileSystem {
     public ArrayList<TrackInfo> mSearchList;
     public ArrayList<FolderItems> mFolderItemList;
     public ArrayList<FolderStackInfo> mFolderStack;
+    private RemoteDevice mDevice;
 
     public void cleanup() {
         clearSearchList();
         clearVFSList();
         clearFolderStack();
+        mDevice = null;
     }
-    public RemoteFileSystem () {
+    public RemoteFileSystem (RemoteDevice mRemoteDevice) {
         mMediaItemList = new ArrayList<TrackInfo>();
         mFolderItemList = new ArrayList<FolderItems>();
         mSearchList = new ArrayList<TrackInfo>();
         mFolderStack = new ArrayList<FolderStackInfo>();
+        mDevice = mRemoteDevice;
     }
     public void clearVFSList() {
         if(mMediaItemList != null) {
@@ -193,5 +196,71 @@ public class RemoteFileSystem {
                 return (mFolderStack.size() - 1) - index;
         }
         return AvrcpControllerConstants.DEFAULT_LIST_INDEX;
+    }
+    public int fetchVFSThumbNail() {
+        /*
+         * Is BIP Fetch is in progress
+         */
+        if (!mDevice.isBipConnected())
+            return AvrcpControllerConstants.ERROR_BIP_NOT_CONNECTED;
+        if (mDevice.isBipFetchInProgress())
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_IN_PROGRESS;
+        if ((mMediaItemList == null) || (mMediaItemList.isEmpty()))
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_LIST_EMPTY;
+        /*
+         * We will check which track has valid coverArtHandle but imageLcoation is empty
+         */
+        for (TrackInfo mTrackInfo: mMediaItemList) {
+            Log.d(TAG,"HNDL: " + mTrackInfo.mCoverArtHandle + " Loc: " +
+                    mTrackInfo.mThumbNailLocation);
+            if ((!mTrackInfo.mCoverArtHandle.equals(AvrcpControllerConstants.
+                    COVER_ART_HANDLE_INVALID)) && (mTrackInfo.mThumbNailLocation.equals
+                    (AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
+                mDevice.GetLinkedThumbnail(mTrackInfo.mCoverArtHandle);
+                return AvrcpControllerConstants.FETCHING_THUMBNAIL;
+            }
+        }
+        return AvrcpControllerConstants.ALL_THUMBNAILS_FETCHED;
+    }
+    public void updateVFSThumbNail(String mCoverArtHandle, String mImageLocation) {
+        Log.d(TAG," updateVFSThumbNail HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
+        if ((mMediaItemList == null) || (mMediaItemList.isEmpty())) return;
+        for (TrackInfo mTrackInfo: mMediaItemList) {
+            if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
+                mTrackInfo.mThumbNailLocation = mImageLocation;
+        }
+    }
+    public int fetchSearchThumbNail() {
+        /*
+         * Is BIP Fetch is in progress
+         */
+        if (!mDevice.isBipConnected())
+            return AvrcpControllerConstants.ERROR_BIP_NOT_CONNECTED;
+        if (mDevice.isBipFetchInProgress())
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_IN_PROGRESS;
+        if ((mSearchList == null) || (mSearchList.isEmpty()))
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_LIST_EMPTY;
+        /*
+         * We will check which track has valid coverArtHandle but imageLcoation is empty
+         */
+        for (TrackInfo mTrackInfo: mSearchList) {
+            Log.d(TAG,"HNDL: " + mTrackInfo.mCoverArtHandle + " Loc: " +
+                    mTrackInfo.mThumbNailLocation);
+            if ((!mTrackInfo.mCoverArtHandle.equals(AvrcpControllerConstants.
+                    COVER_ART_HANDLE_INVALID)) && (mTrackInfo.mThumbNailLocation.equals
+                    (AvrcpControllerConstants.COVER_ART_LOCATION_INVALID))) {
+                mDevice.GetLinkedThumbnail(mTrackInfo.mCoverArtHandle);
+                return AvrcpControllerConstants.FETCHING_THUMBNAIL;
+            }
+        }
+        return AvrcpControllerConstants.ALL_THUMBNAILS_FETCHED;
+    }
+    public void updateSearchListThumbNail(String mCoverArtHandle, String mImageLocation) {
+        Log.d(TAG," updateSearchListThumbNail HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
+        if ((mSearchList == null) || (mSearchList.isEmpty())) return;
+        for (TrackInfo mTrackInfo: mSearchList) {
+            if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
+                mTrackInfo.mThumbNailLocation = mImageLocation;
+        }
     }
 }

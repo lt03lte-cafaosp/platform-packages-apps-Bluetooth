@@ -315,7 +315,13 @@ public class AvrcpBipInitiator {
             } else {
                 mIsRequestProcessing = true;
                 mRequest = req;
-                return mObexSession.makeRequest(mRequest);
+                if (mObexSession != null) {
+                    return mObexSession.makeRequest(mRequest);
+                }
+                else {
+                    Log.e(TAG," obexSession already disconnected ");
+                    return false;
+                }
             }
         }
         return false;
@@ -345,7 +351,10 @@ public class AvrcpBipInitiator {
             mIsRequestProcessing = true;
             mRequest = mPendingRequest;
             mPendingRequest = null;
-            mObexSession.makeRequest(mRequest);
+            if (mObexSession != null)
+                mObexSession.makeRequest(mRequest);
+            else
+                Log.e(TAG," ObexSession already disconnected ");
         }
     }
 

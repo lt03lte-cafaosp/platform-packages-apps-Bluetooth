@@ -170,6 +170,8 @@ final class AvrcpControllerConstants {
     public static final int MESSAGE_SET_ADDRESSED_PLAYER = 55;
     public static final int MESSAGE_SEND_CHANGE_PATH = 56;
     public static final int MESSAGE_GET_NUM_ITEMS_SEARCH = 57;
+    public static final int MESSAGE_BROWSE_DISCONNECT_OBEX = 58;
+    public static final int MESSAGE_BROWSE_CONNECT_OBEX = 59;
 
 
     public static final int MESSAGE_PROCESS_SUPPORTED_PLAYER_APP_SETTING = 101;
@@ -232,6 +234,8 @@ final class AvrcpControllerConstants {
             case MESSAGE_SET_ADDRESSED_PLAYER: str = " REQ_SET_ADDRESSED_PLAYER"; break;
             case MESSAGE_SEND_CHANGE_PATH: str = " REQ_CHANGE_PATH"; break;
             case MESSAGE_GET_NUM_ITEMS_SEARCH: str = " GET_NUM_ITEMS_SEARCH"; break;
+            case MESSAGE_BROWSE_DISCONNECT_OBEX: str = " MESSAGE_BROWSE_DISCONNECT_OBEX"; break;
+            case MESSAGE_BROWSE_CONNECT_OBEX: str = " MESSAGE_BROWSE_CONNECT_OBEX"; break;
             case MESSAGE_PROCESS_GET_TOTAL_NUM_ITEMS: str = " CB_GET_NUM_ITEMS"; break;
             case MESSAGE_PROCESS_BROWSE_FOLDER_RESPONSE: str = " CB_BROWSE_FOLDER_RSP"; break;
             case MESSAGE_PROCESS_PENDING_BROWSING_COMMANDS: str="PROCESS_PENDING_BROWSE_CMDS"; break;
@@ -264,6 +268,9 @@ final class AvrcpControllerConstants {
 
     public static final int PTS_GET_ELEMENT_ATTRIBUTE_ID = 0x71;
     public static final int PTS_GET_PLAY_STATUS_ID = 0x72;
+    public static final int PTS_VFS_CA_ID = 0x73;
+    public static final int PTS_GET_ITEM_VFS_ID = 0x51;
+    //public static final int PTS_GET_IMG    = 0x74;
 
     /*
      * image Type
@@ -282,6 +289,7 @@ final class AvrcpControllerConstants {
     public static final int FETCHING_IMAGE = 0x05;
     public static final int FETCHING_THUMBNAIL = 0x06;
     public static final int ERROR_BIP_FETCH_IN_PROGRESS = 0x07;
+    public static final int ERROR_BIP_FETCH_LIST_EMPTY = 0x08;
     /*
      * Default Player ID
      */
@@ -296,6 +304,7 @@ final class AvrcpControllerConstants {
     public static final String AVRCP_BROWSE_ROOT_FOLDER = "__VFS_ROOT__";
     public static final byte DIRECTION_UP   = 0x00;
     public static final byte DIRECTION_DOWN = 0x01;
+    public static final int UIDS_PERSISTENT = 66;
 
     /*
      * Media Type. Folder Type, Item Type

@@ -114,6 +114,8 @@ public class NowPlaying {
             return AvrcpControllerConstants.ERROR_BIP_NOT_CONNECTED;
         if (mDevice.isBipFetchInProgress())
             return AvrcpControllerConstants.ERROR_BIP_FETCH_IN_PROGRESS;
+        if ((mNowPlayingList == null) || (mNowPlayingList.size() <= 1 ))
+            return AvrcpControllerConstants.ERROR_BIP_FETCH_LIST_EMPTY;
         /*
          * We will check which track has valid coverArtHandle but imageLcoation is empty
          */
@@ -160,6 +162,7 @@ public class NowPlaying {
     }
     public void updateThumbNail(String mCoverArtHandle, String mImageLocation) {
         Log.d(TAG," updateCoverArt HNDL" + mCoverArtHandle + " Loc: "+ mImageLocation);
+        if ((mNowPlayingList == null) || (mNowPlayingList.isEmpty())) return;
         for (TrackInfo mTrackInfo: mNowPlayingList) {
             if((mTrackInfo.mCoverArtHandle.equals(mCoverArtHandle) && (mImageLocation != null)))
                 mTrackInfo.mThumbNailLocation = mImageLocation;

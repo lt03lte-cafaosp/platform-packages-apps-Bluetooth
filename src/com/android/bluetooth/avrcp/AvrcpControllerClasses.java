@@ -343,6 +343,16 @@ class RemoteDevice {
             mAvrcpBipInitiator.connect();
     }
 
+    public void disconnectBip() {
+        if (mBTDevice == null)
+            return;
+        Log.d(TAG," disconnectBip");
+        if(mAvrcpBipInitiator == null) return;
+        if(mAvrcpBipInitiator.isObexConnected())
+            mAvrcpBipInitiator.cleanup();
+        mAvrcpBipInitiator = null;
+    }
+
     public void GetLinkedThumbnail(String imgHandle) {
 
         if ((mAvrcpBipInitiator != null) && (mAvrcpBipInitiator.isObexConnected())) {
@@ -600,6 +610,7 @@ class TrackInfo extends MediaItem {
     public TrackInfo(long mTrackId, byte mNumAttributes, int[] mAttribIds, String[] mAttribs) {
         mItemUid = mTrackId;
         resetTrackInfo();
+        String numericRegex = "\\d+";
         for (int i = 0; i < mNumAttributes; i++) {
             switch(mAttribIds[i]) {
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_TITLE:
@@ -612,18 +623,18 @@ class TrackInfo extends MediaItem {
                 mAlbumTitle = mAttribs[i];
                 break;
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_TRACK_NUMBER:
-                if(!mAttribs[i].isEmpty())
+                if((!mAttribs[i].isEmpty()) && (mAttribs[i].matches(numericRegex)))
                     mTrackNum = Long.valueOf(mAttribs[i]);
                 break;
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_TOTAL_TRACK_NUMBER:
-                if(!mAttribs[i].isEmpty())
+                if((!mAttribs[i].isEmpty()) && (mAttribs[i].matches(numericRegex)))
                     mTotalTracks = Long.valueOf(mAttribs[i]);
                 break;
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_GENRE:
                 mGenre = mAttribs[i];
                 break;
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_PLAYING_TIME:
-                if(!mAttribs[i].isEmpty())
+                if((!mAttribs[i].isEmpty()) && (mAttribs[i].matches(numericRegex)))
                     mTrackLen = Long.valueOf(mAttribs[i]);
                 break;
             case AvrcpControllerConstants.MEDIA_ATTRIBUTE_COVER_ART_HANDLE:
@@ -706,7 +717,7 @@ class PendingBrowsingCommands {
             return false;
         }
         /* If scope does not match, remove all commands with diff scope from starting */
-        for (int i = mPendingCmdList.size(); i >= 0; i--) {
+        for (int i = mPendingCmdList.size() - 1; i >= 0; i--) {
             if (mPendingCmdList.get(i).scope == currentScope)
                 continue;
             while (i >= 0) {

@@ -271,4 +271,22 @@ public class RemoteMediaPlayers {
         }
         return false;
     }
+    public boolean isPlayerDatabaseAware(int playerId) {
+        if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty())) {
+            Log.e(TAG," player database aware, list empty");
+            return false;
+        }
+        for ( PlayerInfo mPlayerInfo :mMediaPlayerList) {
+            if (mPlayerInfo.mPlayerId == playerId) {
+                if (!mPlayerInfo.isFeatureMaskBitSet(AvrcpControllerConstants.
+                        UIDS_PERSISTENT)) {
+                    Log.d(TAG," player database aware, bit not set");
+                    return false;
+                }
+                Log.d(TAG," player database aware, bit set");
+                return true;
+            }
+        }
+        return false;
+    }
 }
