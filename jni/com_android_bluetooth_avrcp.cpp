@@ -1436,7 +1436,7 @@ static jboolean getItemAttrRspNative(JNIEnv *env, jobject object, jbyte numAttr,
             ALOGE("get_item_attr_rsp: string length exceed maximum");
             strlcpy((char *)pAttrs[i].text, textStr, BTRC_MAX_ATTR_STR_LEN-1);
             pAttrs[i].text[BTRC_MAX_ATTR_STR_LEN-1] = 0;
-        } else {
+        } else if(utfStringLength > 0) {
             strlcpy((char *)pAttrs[i].text, textStr, utfStringLength);
         }
         strlcpy((char *)pAttrs[i].text, textStr, BTRC_MAX_ATTR_STR_LEN);
