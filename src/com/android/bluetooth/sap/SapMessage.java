@@ -26,7 +26,7 @@ import android.util.Log;
 public class SapMessage {
 
     public static final String TAG = "SapMessage";
-    public static final boolean DEBUG = SapService.DEBUG;
+    public static final boolean DEBUG = true;
     public static final boolean VERBOSE = SapService.VERBOSE;
     public static final boolean TEST = false;
 
@@ -723,6 +723,7 @@ public class SapMessage {
         msg.setType(SapApi.REQUEST);
         msg.setError(SapApi.RIL_E_UNUSED);
 
+        if(DEBUG) Log.d(TAG, "Writing request, message type:" + mMsgType);
         switch(mMsgType) {
         case ID_CONNECT_REQ:
         {
