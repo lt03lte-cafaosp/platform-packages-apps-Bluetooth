@@ -1516,6 +1516,7 @@ public class AvrcpControllerService extends ProfileService {
                 checkAndProcessBrowsingCommand(0);
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_ADDRESSED_PLAYER_CHANGED:
+                if (mRemoteNowPlayingList == null) break;
                 mAvrcpRemoteDevice.muidCounter  = msg.arg2;
                 if (mRemoteMediaPlayers.setAddressedPlayerFromList((char)msg.arg1)) {
                     mRemoteNowPlayingList.clearNowPlayingList();
@@ -1618,9 +1619,13 @@ public class AvrcpControllerService extends ProfileService {
                 }
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_UIDS_CHANGED:
-                mRemoteFileSystem.clearSearchList();
-                mRemoteFileSystem.clearVFSList();
-                mRemoteNowPlayingList.clearNowPlayingList();
+                if (mRemoteFileSystem != null) {
+                    mRemoteFileSystem.clearSearchList();
+                    mRemoteFileSystem.clearVFSList();
+                }
+                if(mRemoteNowPlayingList != null) {
+                    mRemoteNowPlayingList.clearNowPlayingList();
+                }
                 mAvrcpRemoteDevice.disconnectBip();
                 avrcpBrowseService = AvrcpControllerBrowseService.
                         getAvrcpControllerBrowseService();
