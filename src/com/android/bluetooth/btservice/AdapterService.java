@@ -1589,6 +1589,16 @@ public class AdapterService extends Service {
             mHandler.sendMessageDelayed(m,AUTO_CONNECT_PROFILES_TIMEOUT);
         }
     }
+    public void updateUuids() {
+       debugLog( "update uuids for bonded devices");
+       BluetoothDevice[] bondedDevices = getBondedDevices();
+       if (bondedDevices == null) {
+           return ;
+       }
+       for (BluetoothDevice device : bondedDevices) {
+           mRemoteDevices.updateUuids(device);
+       }
+    }
 
     private void autoConnectProfilesDelayed(){
         if (getState() != BluetoothAdapter.STATE_ON){
@@ -1721,6 +1731,11 @@ public class AdapterService extends Service {
         HeadsetService hsService = null;
         A2dpSinkService a2dpSinkService = null;
         HeadsetClientService hsClientService = null;
+
+        if ((isA2dpSink && !isHfpClient) || (!isA2dpSink && isHfpClient)) {
+            Log.i(TAG, "no auto connect, A2DP src + HF client or A2DP sink + AG role are enabled");
+            return;
+        }
 
         if (isA2dpSink) {
             a2dpSinkService = A2dpSinkService.getA2dpSinkService();

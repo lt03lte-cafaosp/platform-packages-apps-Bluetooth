@@ -830,7 +830,8 @@ final class HeadsetStateMachine extends StateMachine {
     private class Connected extends State {
         @Override
         public void enter() {
-            Log.d(TAG, "Enter Connected: " + getCurrentMessage().what +
+
+            log("Enter Connected: " + getCurrentMessage().what +
                            ", size: " + mConnectedDevicesList.size());
             // start phone state listener here so that the CIND response as part of SLC can be
             // responded to, correctly.
@@ -2426,7 +2427,7 @@ final class HeadsetStateMachine extends StateMachine {
             sco disconnect issued in AudioOn state. This was causing a mismatch in the
             Incall screen UI. */
 
-            if (getCurrentState() == mAudioOn && mCurrentDevice.equals(device)
+            if (mActiveScoDevice != null && mActiveScoDevice.equals(device)
                 && mAudioState != BluetoothHeadset.STATE_AUDIO_DISCONNECTED)
             {
                 return true;
@@ -3118,6 +3119,7 @@ final class HeadsetStateMachine extends StateMachine {
                 }
                 atResponseCodeNative(HeadsetHalConstants.AT_RESPONSE_OK,
                                                        0, getByteAddress(device));
+                removeMessages(DIALING_OUT_TIMEOUT);
         }
 
         /* Set ActiveScoDevice to null when call ends */
@@ -3203,6 +3205,11 @@ final class HeadsetStateMachine extends StateMachine {
                     AudioParamNrec.get("NREC"));
         } else {
             Log.e(TAG,"processNoiceReductionEvent: AudioParamNrec is null ");
+        }
+
+        if (mActiveScoDevice != null && mActiveScoDevice.equals(device)
+                && mAudioState == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
+            setAudioParameters(device);
         }
     }
 

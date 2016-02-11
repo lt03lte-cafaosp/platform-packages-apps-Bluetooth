@@ -204,19 +204,15 @@ final public class Utils {
         int callingUser = UserHandle.getCallingUserId();
         int callingUid = Binder.getCallingUid();
         long ident = Binder.clearCallingIdentity();
-        Log.d(TAG,"callingUid =" + callingUid);
 
         try {
             // With calling identity cleared the current user is the foreground user.
             int foregroundUser = ActivityManager.getCurrentUser();
             ok = (foregroundUser == callingUser);
-            Log.e(TAG, "foregroundUser =" + foregroundUser);
-            Log.e(TAG, "callingUser =" + callingUser);
             if (!ok) {
                 // Always allow SystemUI/System access.
                 int systemUiUid = ActivityThread.getPackageManager().getPackageUid(
                         "com.android.systemui", UserHandle.USER_OWNER);
-                Log.d(TAG," systemUiUid :" + systemUiUid);
                 ok = (systemUiUid == callingUid) || (Process.SYSTEM_UID == callingUid);
             }
         } catch (Exception ex) {
@@ -292,14 +288,7 @@ final public class Utils {
             return true;
         }
         // Enforce location permission for apps targeting M and later versions
-        boolean enforceLocationPermission = true;
-        try {
-            enforceLocationPermission = context.getPackageManager().getApplicationInfo(
-                    callingPackage, 0).targetSdkVersion >= Build.VERSION_CODES.M;
-        } catch (PackageManager.NameNotFoundException e) {
-            // In case of exception, enforce permission anyway
-        }
-        if (enforceLocationPermission) {
+        if (isMApp(context, callingPackage)) {
             throw new SecurityException("Need ACCESS_COARSE_LOCATION or "
                     + "ACCESS_FINE_LOCATION permission to get scan results");
         } else {
@@ -319,6 +308,20 @@ final public class Utils {
     public static boolean checkCallerHasPeersMacAddressPermission(Context context) {
         return context.checkCallingOrSelfPermission(
                 android.Manifest.permission.PEERS_MAC_ADDRESS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public static boolean isLegacyForegroundApp(Context context, String pkgName) {
+        return !isMApp(context, pkgName) && isForegroundApp(context, pkgName);
+    }
+
+    private static boolean isMApp(Context context, String pkgName) {
+        try {
+            return context.getPackageManager().getApplicationInfo(pkgName, 0)
+                    .targetSdkVersion >= Build.VERSION_CODES.M;
+        } catch (PackageManager.NameNotFoundException e) {
+            // In case of exception, assume M app
+        }
+        return true;
     }
 
     /**

@@ -700,7 +700,11 @@ static bool initNative(JNIEnv* env, jobject obj) {
     ALOGV("%s:",__FUNCTION__);
 
     sJniAdapterServiceObj = env->NewGlobalRef(obj);
-    sJniCallbacksObj = env->NewGlobalRef(env->GetObjectField(obj, sJniCallbacksField));
+    if (sJniCallbacksField) {
+        sJniCallbacksObj = env->NewGlobalRef(env->GetObjectField(obj, sJniCallbacksField));
+    } else {
+        ALOGE("Error: sJniCallbacksField is null\n");
+    }
 
     if (sBluetoothInterface) {
         int ret = sBluetoothInterface->init(&sBluetoothCallbacks);
@@ -736,7 +740,10 @@ static bool cleanupNative(JNIEnv *env, jobject obj) {
     sBluetoothInterface->cleanup();
     ALOGI("%s: return from cleanup",__FUNCTION__);
 
-    env->DeleteGlobalRef(sJniAdapterServiceObj);
+    if (sJniAdapterServiceObj) {
+        env->DeleteGlobalRef(sJniAdapterServiceObj);
+        sJniAdapterServiceObj = NULL;
+    }
 
     if (sJniCallbacksObj) {
         env->DeleteGlobalRef(sJniCallbacksObj);
