@@ -63,6 +63,8 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
 
     private volatile boolean mShutdown = false; // Used to interrupt socket accept thread
 
+    private boolean mIsRegistered = false;
+
     // The handle to the socket registration with SDP
     private ObexServerSockets mServerSocket = null;
 
@@ -194,6 +196,14 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
 
     }
 
+    private final synchronized void closeServerSocket() {
+        if(V) Log.d(TAG, "closeServerSocket");
+        if (mServerSocket != null) {
+            mServerSocket.shutdown(false);
+            mServerSocket = null;
+        }
+    }
+
     private final synchronized void closeConnectionSocket() {
         if(V) Log.d(TAG, "closeConnectionSock");
         if (mConnSocket != null) {
@@ -226,15 +236,31 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
         if (V) Log.v(TAG, "Verbose logging enabled");
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        try {
-            mContext.registerReceiver(mAvrcpBipRspReceiver, filter);
-        } catch (Exception e) {
-            Log.w(TAG,"Unable to register avrcpbip receiver",e);
+        if (!mIsRegistered) {
+            try {
+                mContext.registerReceiver(mAvrcpBipRspReceiver, filter);
+                mIsRegistered = true;
+            } catch (Exception e) {
+                Log.w(TAG,"Unable to register avrcpbip receiver",e);
+            }
+        } else {
+            Log.w(TAG, "receiver already registered!!");
         }
     }
 
-    public boolean stop() {
+    public synchronized boolean stop() {
         if (D) Log.d(TAG, "stop()");
+        if (mIsRegistered) {
+            try {
+                mIsRegistered = false;
+                mContext.unregisterReceiver(mAvrcpBipRspReceiver);
+            } catch (Exception e) {
+                Log.w(TAG,"Unable to unregister avrcpbip receiver", e);
+            }
+        } else {
+            if (D) Log.d(TAG, "already stopped, returning");
+            return true;
+        }
         mShutdown = true;
         if (mServerSession != null) {
             if (D) Log.d(TAG, "mServerSession exists - shutting it down...");
@@ -242,12 +268,9 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
             mServerSession = null;
         }
         closeConnectionSocket();
-        try {
-            mContext.unregisterReceiver(mAvrcpBipRspReceiver);
-        } catch (Exception e) {
-            Log.w(TAG,"Unable to unregister avrcpbip receiver", e);
-        }
+        closeServerSocket();
 
+        if (D) Log.d(TAG, "returning from stop()");
         return true;
     }
 
@@ -287,7 +310,7 @@ public class AvrcpBipRsp implements IObexConnectionHandler {
      */
     @Override
     public synchronized void onAcceptFailed() {
-        mServerSocket = null; // Will cause a new to be created when calling start.
+        mServerSocket = null;
         if (mShutdown) {
             Log.e(TAG,"Failed to accept incoming connection - " + "shutdown");
         } else if (mAdapter != null && mAdapter.isEnabled()) {

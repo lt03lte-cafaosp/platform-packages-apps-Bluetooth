@@ -681,6 +681,7 @@ public final class Avrcp {
         for (int i = 0; i < maxAvrcpConnections; i++) {
             cleanupDeviceFeaturesIndex(i);
         }
+        mAvrcpBipRsp.stop();
         try {
             mContext.unregisterReceiver(mIntentReceiver);
         }catch (Exception e) {

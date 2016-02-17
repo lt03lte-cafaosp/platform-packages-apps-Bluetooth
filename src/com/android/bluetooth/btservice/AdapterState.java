@@ -233,6 +233,7 @@ final class AdapterState extends StateMachine {
                 errorLog("Entered OnState after cleanup");
                 return;
             }
+            adapterService.updateUuids();
             adapterService.autoConnect();
         }
 
@@ -479,6 +480,8 @@ final class AdapterState extends StateMachine {
                     setBleTurningOff(false);
                     transitionTo(mOffState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
+                    errorLog("Killing the process to force a restart as part cleanup");
+                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 default:
