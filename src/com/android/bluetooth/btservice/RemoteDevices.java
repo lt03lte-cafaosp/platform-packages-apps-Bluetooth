@@ -44,7 +44,7 @@ final class RemoteDevices {
     private static ArrayList<BluetoothDevice> mSdpTracker;
     private Object mObject = new Object();
 
-    private static final int UUID_INTENT_DELAY = 6000;
+    private static final int UUID_INTENT_DELAY = 10000;
     private static final int MESSAGE_UUID_INTENT = 1;
 
     private HashMap<BluetoothDevice, DeviceProperties> mDevices;
@@ -293,8 +293,10 @@ final class RemoteDevices {
                             int numUuids = val.length/AbstractionLayer.BT_UUID_SIZE;
                             int state = mAdapterService.getState();
                             device.mUuids = Utils.byteArrayToUuid(val);
-                            if (state == BluetoothAdapter.STATE_ON)
+                            if (state == BluetoothAdapter.STATE_ON) {
+                                mHandler.removeMessages(MESSAGE_UUID_INTENT);
                                 sendUuidIntent(bdDevice);
+                            }
                             break;
                         case AbstractionLayer.BT_PROPERTY_TYPE_OF_DEVICE:
                             // The device type from hal layer, defined in bluetooth.h,
