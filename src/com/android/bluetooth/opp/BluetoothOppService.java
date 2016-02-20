@@ -444,6 +444,7 @@ public class BluetoothOppService extends Service {
             mPendingUpdate = true;
             if ((mUpdateThread == null) && (mAdapter != null)
                 && mAdapter.isEnabled()) {
+                mPowerManager = (PowerManager)getSystemService(POWER_SERVICE);
                 if (V) Log.v(TAG, "Starting a new thread");
                 mUpdateThread = new UpdateThread();
                 mUpdateThread.start();
@@ -479,6 +480,13 @@ public class BluetoothOppService extends Service {
                         if (V) Log.v(TAG, "***returning from updatethread***");
                         return;
                     }
+                    try {
+                        if (!mPowerManager.isInteractive())
+                            Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                            Log.e(TAG, "Interrupted", e);
+                    }
+
                     mPendingUpdate = false;
                 }
                 Cursor cursor;
