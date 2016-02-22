@@ -841,6 +841,16 @@ final class A2dpSinkStateMachine extends StateMachine {
                     patchPorts();
                 }
                 else {
+                    int currMode = mAudioManager.getMode();
+                    log(" Current Audio Mode = " + currMode);
+                    if ((currMode == AudioManager.MODE_RINGTONE)||
+                       (currMode == AudioManager.MODE_IN_CALL)||
+                       (currMode == AudioManager.MODE_IN_COMMUNICATION)) {
+                        SendPassThruPause(device);
+                        if(USE_AUDIOTRACK)
+                            informAudioFocusStateNative(STATE_FOCUS_LOST);
+                        return;
+                    }
                     log("Can't acquire Focus, request with delay");
                     requestAudioFocus(true, device, AUDIO_FOCUS_REQUEST_MESSAGE_DELAYED);
                 }
