@@ -80,6 +80,7 @@ import java.util.Map;
 import java.util.Set;
 import android.os.SystemProperties;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import android.telecom.TelecomManager;
 
 final class HeadsetStateMachine extends StateMachine {
     private static final String TAG = "HeadsetStateMachine";
@@ -117,6 +118,7 @@ final class HeadsetStateMachine extends StateMachine {
     static final int UPDATE_A2DP_PLAY_STATE = 18;
     static final int UPDATE_A2DP_CONN_STATE = 19;
     static final int QUERY_PHONE_STATE_AT_SLC = 20;
+    static final int UPDATE_CALL_TYPE = 21;
 
     private static final int STACK_EVENT = 101;
     private static final int DIALING_OUT_TIMEOUT = 102;
@@ -192,6 +194,7 @@ final class HeadsetStateMachine extends StateMachine {
     private int mA2dpPlayState;
     private int mA2dpState;
     private boolean mPendingCiev;
+    private boolean mIsCsCall = true;
     //ConcurrentLinkeQueue is used so that it is threadsafe
     private ConcurrentLinkedQueue<HeadsetCallState> mPendingCallStates = new ConcurrentLinkedQueue<HeadsetCallState>();
 
@@ -302,6 +305,9 @@ final class HeadsetStateMachine extends StateMachine {
 
     public void doQuit() {
         log("quit");
+        if (mActiveScoDevice != null && !mPhoneState.getIsCsCall()) {
+            sendVoipConnectivityNetworktype(false);
+        }
         quitNow();
     }
 
@@ -332,6 +338,9 @@ final class HeadsetStateMachine extends StateMachine {
         }
         if (mConnectedDevicesList != null) {
             mConnectedDevicesList.clear();
+        }
+        if (mActiveScoDevice != null && !mPhoneState.getIsCsCall()) {
+            sendVoipConnectivityNetworktype(false);
         }
         if (mNativeAvailable) {
             cleanupNative();
@@ -442,6 +451,9 @@ final class HeadsetStateMachine extends StateMachine {
                     break;
                 case UPDATE_A2DP_CONN_STATE:
                     processIntentA2dpStateChanged((Intent) message.obj);
+                    break;
+                case UPDATE_CALL_TYPE:
+                    processIntentUpdateCallType((Intent) message.obj);
                     break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
@@ -1032,6 +1044,9 @@ final class HeadsetStateMachine extends StateMachine {
                 case UPDATE_A2DP_CONN_STATE:
                     processIntentA2dpStateChanged((Intent) message.obj);
                     break;
+                case UPDATE_CALL_TYPE:
+                    processIntentUpdateCallType((Intent) message.obj);
+                    break;
                 case START_VR_TIMEOUT:
                 {
                     BluetoothDevice device = (BluetoothDevice) message.obj;
@@ -1230,6 +1245,12 @@ final class HeadsetStateMachine extends StateMachine {
                     broadcastAudioState(device, BluetoothHeadset.STATE_AUDIO_CONNECTED,
                                         BluetoothHeadset.STATE_AUDIO_CONNECTING);
                     mActiveScoDevice = device;
+                    if (!mPhoneState.getIsCsCall()) {
+                        log("Sco connected for call other than CS, check network type");
+                        sendVoipConnectivityNetworktype(true);
+                    } else {
+                        log("Sco connected for CS call, do not check network type");
+                    }
                     transitionTo(mAudioOn);
                     break;
                 case HeadsetHalConstants.AUDIO_STATE_CONNECTING:
@@ -1502,6 +1523,9 @@ final class HeadsetStateMachine extends StateMachine {
                 case UPDATE_A2DP_CONN_STATE:
                     processIntentA2dpStateChanged((Intent) message.obj);
                     break;
+                case UPDATE_CALL_TYPE:
+                    processIntentUpdateCallType((Intent) message.obj);
+                    break;
                 case DIALING_OUT_TIMEOUT:
                 {
                     Log.d(TAG, "mDialingOut is " + mDialingOut);
@@ -1729,6 +1753,13 @@ final class HeadsetStateMachine extends StateMachine {
                         }
                         broadcastAudioState(device, BluetoothHeadset.STATE_AUDIO_DISCONNECTED,
                                            BluetoothHeadset.STATE_AUDIO_CONNECTED);
+                        if (!mPhoneState.getIsCsCall()) {
+                            log("Sco disconnected for call other than CS, check network type");
+                            sendVoipConnectivityNetworktype(false);
+                            mPhoneState.setIsCsCall(true);
+                        } else {
+                            log("Sco disconnected for CS call, do not check network type");
+                        }
                     }
                     transitionTo(mConnected);
                     break;
@@ -1888,6 +1919,9 @@ final class HeadsetStateMachine extends StateMachine {
                     break;
                 case UPDATE_A2DP_CONN_STATE:
                     processIntentA2dpStateChanged((Intent) message.obj);
+                    break;
+                case UPDATE_CALL_TYPE:
+                    processIntentUpdateCallType((Intent) message.obj);
                     break;
                 case DIALING_OUT_TIMEOUT:
                     Log.d(TAG, "mDialingOut is " + mDialingOut);
@@ -2233,6 +2267,12 @@ final class HeadsetStateMachine extends StateMachine {
                     mActiveScoDevice = device;
                     broadcastAudioState(device, BluetoothHeadset.STATE_AUDIO_CONNECTED,
                             BluetoothHeadset.STATE_AUDIO_CONNECTING);
+                    if (!mPhoneState.getIsCsCall()) {
+                        log("Sco connected for call other than CS, check network type");
+                        sendVoipConnectivityNetworktype(true);
+                    } else {
+                        log("Sco connected for CS call, do not check network type");
+                    }
                     /* The state should be still in MultiHFPending state when
                        audio connected since other device is still connecting/
                        disconnecting */
@@ -2262,6 +2302,13 @@ final class HeadsetStateMachine extends StateMachine {
                         }
                         broadcastAudioState(device, BluetoothHeadset.STATE_AUDIO_DISCONNECTED,
                                             BluetoothHeadset.STATE_AUDIO_CONNECTED);
+                        if (!mPhoneState.getIsCsCall()) {
+                            log("Sco disconnected for call other than CS, check network type");
+                            sendVoipConnectivityNetworktype(false);
+                            mPhoneState.setIsCsCall(true);
+                        } else {
+                            log("Sco disconnected for CS call, do not check network type");
+                        }
                     }
                     /* The state should be still in MultiHFPending state when audio
                        disconnected since other device is still connecting/
@@ -2897,6 +2944,22 @@ final class HeadsetStateMachine extends StateMachine {
         Log.d(TAG, "A2dp State Changed: Current State: " + state +
                   "Prev State: " + oldState + "A2pSuspend: " + mA2dpSuspend);
         mA2dpState = state;
+    }
+
+    private void processIntentUpdateCallType(Intent intent) {
+        mIsCsCall = intent.getBooleanExtra(TelecomManager.EXTRA_CALL_TYPE_CS, true);
+        Log.d(TAG, "processIntentUpdateCallType " + mIsCsCall);
+        mPhoneState.setIsCsCall(mIsCsCall);
+        if (mActiveScoDevice != null) {
+            if (!mPhoneState.getIsCsCall()) {
+                log("processIntentUpdateCallType, Non CS call, check for network type");
+                sendVoipConnectivityNetworktype(true);
+            } else {
+                log("processIntentUpdateCallType, CS call, do not check for network type");
+            }
+        } else {
+            log("processIntentUpdateCallType: Sco not yet connected");
+        }
     }
 
     private void processIntentA2dpPlayStateChanged(Intent intent) {
@@ -3900,12 +3963,12 @@ final class HeadsetStateMachine extends StateMachine {
         }
 
         if (networkInfo.getType() == ConnectivityManager.TYPE_MOBILE) {
-            log("Voip started/stopped on n/w TYPE_MOBILE, don't update to soc");
+            log("Voip/VoLTE started/stopped on n/w TYPE_MOBILE, don't update to soc");
         } else if (networkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
-            log("Voip started/stopped on n/w TYPE_WIFI, update n/w type & start/stop to soc");
+            log("Voip/VoLTE started/stopped on n/w TYPE_WIFI, update n/w type & start/stop to soc");
             voipNetworkWifiInfoNative(isVoipStarted, true);
         } else {
-            log("Voip started/stopped on some other n/w, don't update to soc");
+            log("Voip/VoLTE started/stopped on some other n/w, don't update to soc");
         }
     }
 
