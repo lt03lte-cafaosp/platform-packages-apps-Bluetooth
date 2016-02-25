@@ -158,7 +158,7 @@ public class BluetoothOppService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (V) Log.v(TAG, "onCreate");
+        if (D) Log.d(TAG, "onCreate");
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mSocketListener = new BluetoothOppRfcommListener(mAdapter);
         mL2cSocketListener = new BluetoothOppL2capListener(mAdapter);
@@ -376,7 +376,7 @@ public class BluetoothOppService extends Service {
 
     @Override
     public void onDestroy() {
-        if (V) Log.v(TAG, "onDestroy");
+        if (D) Log.v(TAG, "onDestroy");
         super.onDestroy();
         mOppManager.isOPPServiceUp = false;
         getContentResolver().unregisterContentObserver(mObserver);
@@ -629,9 +629,9 @@ public class BluetoothOppService extends Service {
                 cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.VISIBILITY)),
                 cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.USER_CONFIRMATION)),
                 cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.STATUS)),
-                cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.TOTAL_BYTES)),
-                cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.CURRENT_BYTES)),
-                cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.TIMESTAMP)),
+                cursor.getLong(cursor.getColumnIndexOrThrow(BluetoothShare.TOTAL_BYTES)),
+                cursor.getLong(cursor.getColumnIndexOrThrow(BluetoothShare.CURRENT_BYTES)),
+                cursor.getLong(cursor.getColumnIndexOrThrow(BluetoothShare.TIMESTAMP)),
                 cursor.getInt(cursor.getColumnIndexOrThrow(Constants.MEDIA_SCANNED)) != Constants.MEDIA_SCANNED_NOT_SCANNED);
 
         if (V) {
@@ -779,10 +779,10 @@ public class BluetoothOppService extends Service {
         }
 
         info.mStatus = newStatus;
-        info.mTotalBytes = cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.TOTAL_BYTES));
-        info.mCurrentBytes = cursor.getInt(cursor
+        info.mTotalBytes = cursor.getLong(cursor.getColumnIndexOrThrow(BluetoothShare.TOTAL_BYTES));
+        info.mCurrentBytes = cursor.getLong(cursor
                 .getColumnIndexOrThrow(BluetoothShare.CURRENT_BYTES));
-        info.mTimestamp = cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare.TIMESTAMP));
+        info.mTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow(BluetoothShare.TIMESTAMP));
         info.mMediaScanned = (cursor.getInt(cursor.getColumnIndexOrThrow(Constants.MEDIA_SCANNED)) != Constants.MEDIA_SCANNED_NOT_SCANNED);
 
         if (confirmUpdated) {

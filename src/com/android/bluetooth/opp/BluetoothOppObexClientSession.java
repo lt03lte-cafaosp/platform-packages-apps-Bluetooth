@@ -77,7 +77,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
     private final int MIN_FILE_LEN_FOR_TPUT_MEASUREMENT = 500000;
 
-    private int position;
+    private long  position;
 
     public BluetoothOppObexClientSession(Context context, ObexTransport transport) {
         if (transport == null) {
@@ -543,9 +543,11 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
 
                     if (uiUpdateThread != null) {
                         try {
+                            if (V) Log.v(TAG, "Worker for Updation : Destroying");
                             uiUpdateThread.interrupt ();
                             uiUpdateThread.join ();
                             uiUpdateThread = null;
+                            if (V) Log.v(TAG, "Worker for Updation : Destroyed");
 
                                 updateValues = new ContentValues();
                                 updateValues.put(BluetoothShare.CURRENT_BYTES, position);
