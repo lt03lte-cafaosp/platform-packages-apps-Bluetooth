@@ -62,6 +62,7 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
+        if (D) Log.d(TAG, "Action :" + action);
 
         if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
             if (BluetoothAdapter.STATE_ON == intent.getIntExtra(
@@ -99,8 +100,6 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
 
             BluetoothDevice remoteDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-            if (V) Log.v(TAG, "Received BT device selected intent, bt device: " + remoteDevice);
-
             // Insert transfer session record to database
             mOppManager.startTransfer(remoteDevice);
 
@@ -114,6 +113,7 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
             } else {
                 toastMsg = context.getString(R.string.bt_toast_4, deviceName);
             }
+            if (V) Log.v(TAG, "Device: " + remoteDevice + " Msg :" + toastMsg);
             Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show();
         } else if (action.equals(Constants.ACTION_INCOMING_FILE_CONFIRM)) {
             if (V) Log.v(TAG, "Receiver ACTION_INCOMING_FILE_CONFIRM");
