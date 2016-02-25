@@ -385,8 +385,14 @@ public class BluetoothOppService extends Service {
         mOppManager.isOPPServiceUp = false;
         getContentResolver().unregisterContentObserver(mObserver);
         unregisterReceiver(mBluetoothReceiver);
-        mSocketListener.stop();
-        mL2cSocketListener.stop();
+        if(mSocketListener != null) {
+            mSocketListener.stop();
+            mSocketListener = null;
+        }
+        if(mL2cSocketListener != null) {
+            mL2cSocketListener.stop();
+            mL2cSocketListener = null;
+        }
 
         if(mBatchs != null) {
             mBatchs.clear();
