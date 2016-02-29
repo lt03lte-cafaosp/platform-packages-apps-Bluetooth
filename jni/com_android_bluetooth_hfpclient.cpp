@@ -18,6 +18,8 @@
 #define LOG_TAG "BluetoothHeadsetClientServiceJni"
 #define LOG_NDEBUG 0
 
+#include <pthread.h>
+
 #include "com_android_bluetooth.h"
 #include "hardware/bt_hf_client.h"
 #include "utils/Log.h"
@@ -34,6 +36,7 @@ namespace android {
 static bthf_client_interface_t *sBluetoothHfpClientInterface = NULL;
 static jobject mCallbacksObj = NULL;
 static JNIEnv *sCallbackEnv = NULL;
+static pthread_mutex_t mMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static jmethodID method_onConnectionStateChanged;
 static jmethodID method_onAudioStateChanged;
@@ -83,9 +86,15 @@ static void connection_state_cb(bthf_client_connection_state_t state, unsigned i
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onConnectionStateChanged, (jint) state,
                                      (jint) peer_feat, (jint) chld_feat, addr);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -103,44 +112,80 @@ static void audio_state_cb(bthf_client_audio_state_t state, bt_bdaddr_t *bd_addr
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onAudioStateChanged, (jint) state, addr);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
 
 static void vr_cmd_cb(bthf_client_vr_state_t state) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onVrStateChanged, (jint) state);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+
+    pthread_mutex_unlock(&mMutex);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void network_state_cb (bthf_client_network_state_t state) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onNetworkState, (jint) state);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void network_roaming_cb (bthf_client_service_type_t type) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onNetworkRoaming, (jint) type);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void network_signal_cb (int signal) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onNetworkSignal, (jint) signal);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void battery_level_cb (int level) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onBatteryLevel, (jint) level);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -150,37 +195,67 @@ static void current_operator_cb (const char *name) {
     CHECK_CALLBACK_ENV
 
     js_name = sCallbackEnv->NewStringUTF(name);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCurrentOperator, js_name);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_name);
 }
 
 static void call_cb (bthf_client_call_t call) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCall, (jint) call);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void callsetup_cb (bthf_client_callsetup_t callsetup) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCallSetup, (jint) callsetup);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void callheld_cb (bthf_client_callheld_t callheld) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCallHeld, (jint) callheld);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void resp_and_hold_cb (bthf_client_resp_and_hold_t resp_and_hold) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onRespAndHold, (jint) resp_and_hold);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -190,8 +265,14 @@ static void clip_cb (const char *number) {
     CHECK_CALLBACK_ENV
 
     js_number = sCallbackEnv->NewStringUTF(number);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onClip, js_number);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_number);
 }
@@ -202,8 +283,14 @@ static void call_waiting_cb (const char *number) {
     CHECK_CALLBACK_ENV
 
     js_number = sCallbackEnv->NewStringUTF(number);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCallWaiting, js_number);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_number);
 }
@@ -217,25 +304,43 @@ static void current_calls_cb (int index, bthf_client_call_direction_t dir,
     CHECK_CALLBACK_ENV
 
     js_number = sCallbackEnv->NewStringUTF(number);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCurrentCalls, index, dir,
                                      state, mpty, js_number);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_number);
 }
 
 static void volume_change_cb (bthf_client_volume_type_t type, int volume) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onVolumeChange, (jint) type,
                                      (jint) volume);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
 static void cmd_complete_cb (bthf_client_cmd_complete_t type, int cme) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCmdResult, (jint) type, (jint) cme);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -245,16 +350,28 @@ static void subscriber_info_cb (const char *name, bthf_client_subscriber_service
     CHECK_CALLBACK_ENV
 
     js_name = sCallbackEnv->NewStringUTF(name);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onSubscriberInfo, js_name, (jint) type);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_name);
 }
 
 static void in_band_ring_cb (bthf_client_in_band_ring_state_t in_band) {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onInBandRing, (jint) in_band);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -264,16 +381,28 @@ static void last_voice_tag_number_cb (const char *number) {
     CHECK_CALLBACK_ENV
 
     js_number = sCallbackEnv->NewStringUTF(number);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onLastVoiceTagNumber, js_number);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_number);
 }
 
 static void ring_indication_cb () {
     CHECK_CALLBACK_ENV
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onRingIndication);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
@@ -283,8 +412,14 @@ static void cgmi_cb (const char *str) {
     CHECK_CALLBACK_ENV
 
     js_manf_id = sCallbackEnv->NewStringUTF(str);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCgmi, js_manf_id);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_manf_id);
 }
@@ -295,8 +430,14 @@ static void cgmm_cb (const char *str) {
     CHECK_CALLBACK_ENV
 
     js_manf_model = sCallbackEnv->NewStringUTF(str);
+
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL)
         sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onCgmm, js_manf_model);
+    else
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(js_manf_model);
 }
@@ -373,11 +514,13 @@ static void initializeNative(JNIEnv *env, jobject object) {
         sBluetoothHfpClientInterface = NULL;
     }
 
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL) {
         ALOGW("Cleaning up Bluetooth HFP Client callback object");
         env->DeleteGlobalRef(mCallbacksObj);
         mCallbacksObj = NULL;
     }
+    pthread_mutex_unlock(&mMutex);
 
     sBluetoothHfpClientInterface = (bthf_client_interface_t *)
             btInf->get_profile_interface(BT_PROFILE_HANDSFREE_CLIENT_ID);
@@ -393,7 +536,9 @@ static void initializeNative(JNIEnv *env, jobject object) {
         return;
     }
 
+    pthread_mutex_lock(&mMutex);
     mCallbacksObj = env->NewGlobalRef(object);
+    pthread_mutex_unlock(&mMutex);
 }
 
 static void cleanupNative(JNIEnv *env, jobject object) {
@@ -411,11 +556,13 @@ static void cleanupNative(JNIEnv *env, jobject object) {
         sBluetoothHfpClientInterface = NULL;
     }
 
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL) {
         ALOGW("Cleaning up Bluetooth HFP Client callback object");
         env->DeleteGlobalRef(mCallbacksObj);
         mCallbacksObj = NULL;
     }
+    pthread_mutex_unlock(&mMutex);
 }
 
 static jboolean connectNative(JNIEnv *env, jobject object, jbyteArray address) {
