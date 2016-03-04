@@ -1797,7 +1797,6 @@ public final class Avrcp {
 
         setBrowsedPlayerRspNative((byte)status, 0x0, numOfItems, 0x0, CHAR_SET_UTF8,
                                    folderNames, getByteAddress(device));
-        mBrowserDevice = null;
     }
 
     void updateNowPlayingContentChanged() {
@@ -1816,9 +1815,14 @@ public final class Avrcp {
 
     void updatePlayItemResponse(boolean success) {
         Log.v(TAG, "updatePlayItemResponse: success: " + success);
-        BluetoothDevice device = mBrowserDevice;
         if (mBrowserDevice == null) {
-            Log.e(TAG, "mBrowserDevice is null for music app called API");
+            Log.e(TAG,"mBrowserDevice is null for music player called api");
+        }
+        BluetoothDevice device = mBrowserDevice;
+        int deviceIndex = getIndexForDevice(device);
+        if (deviceIndex == INVALID_DEVICE_INDEX) {
+            Log.e(TAG,"invalid index for device");
+            return;
         }
         /* add member for getting current setting get play item pending rsp
          * and clear it when this is recieved */
@@ -1830,7 +1834,6 @@ public final class Avrcp {
             playItemRspNative(INTERNAL_ERROR ,
                     getByteAddress(device));
         }
-        mBrowserDevice = null;
     }
 
     void updateNowPlayingEntriesReceived(long[] playList) {
@@ -1865,7 +1868,6 @@ public final class Avrcp {
             Log.v(TAG, "getTotalNumberOfItemsRspNative for NowPlaying List");
             getTotalNumberOfItemsRspNative((byte)OPERATION_SUCCESSFUL, playList.length,
                     0x0000, getByteAddress(device));
-            mBrowserDevice = null;
             return;
         }
 
@@ -1948,7 +1950,6 @@ public final class Avrcp {
                 numItems, itemType, uid, type,
                 playable, displayName, numAtt, attValues, attIds, mCachedRequest.mSize,
                 getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
-        mBrowserDevice = null;
     }
 
     class CachedRequest {
@@ -2826,9 +2827,6 @@ public final class Avrcp {
             return;
         }
 
-        mBrowserDevice = device;
-        Log.v(TAG, "mBrowserDevice is set to -> " + device);
-
         if (mMediaPlayers.size() > 0) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
             while (rccIterator.hasNext()) {
@@ -2864,7 +2862,6 @@ public final class Avrcp {
         if (DEBUG)
             Log.v(TAG, "processPlayItem: scope: " + scope + " uid:" + uid);
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
-        mBrowserDevice = device;
         int deviceIndex = getIndexForDevice(device);
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
@@ -3320,7 +3317,6 @@ public final class Avrcp {
         String[] attValues = new String[MAX_BROWSE_ITEM_TO_SEND * 8];
         int[] attIds = new int[MAX_BROWSE_ITEM_TO_SEND * 8];
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
-        mBrowserDevice = device;
 
         int deviceIndex = getIndexForDevice(device);
         if (deviceIndex == INVALID_DEVICE_INDEX) {
