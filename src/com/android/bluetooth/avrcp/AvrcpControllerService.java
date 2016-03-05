@@ -1685,7 +1685,7 @@ public class AvrcpControllerService extends ProfileService {
         Log.d(TAG," numCommandsToRemove = " + numcommandsToRemove);
         if(numcommandsToRemove == 0) return;
         for (index = 0; index < numcommandsToRemove; index++) {
-            mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(index);
+            mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
         }
         switch (scope) {
             case AvrcpControllerConstants.AVRCP_SCOPE_NOW_PLAYING:
