@@ -174,15 +174,11 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         private static final int sSleepTime = 1000;
         private Uri contentUri;
         private Context mContext1;
-        private long position;
 
         public ContentResolverUpdateThread(Context context, Uri cntUri) {
             super("BtOpp Server ContentResolverUpdateThread");
             mContext1 = context;
             contentUri = cntUri;
-        }
-        public void updateProgress (long pos) {
-            position = pos;
         }
 
         @Override
@@ -198,7 +194,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                 updateValues.put(BluetoothShare.CURRENT_BYTES, position);
                 mContext1.getContentResolver().update(contentUri, updateValues,
                         null, null);
-
+                if (V) Log.v(TAG, "Updated Current Bytes : " + position);
                 try {
                     Thread.sleep(sSleepTime);
                 } catch (InterruptedException e1) {
