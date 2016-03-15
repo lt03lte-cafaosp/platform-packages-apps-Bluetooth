@@ -2036,6 +2036,11 @@ public class AdapterService extends Service {
             mAlarmManager.cancel(mPendingAlarm);
         }
 
+        if (delayMillis == 0) {
+            Log.d(TAG,"processSetWakeAlarm stopping alarm");
+            return;
+        }
+
         long wakeupTime = SystemClock.elapsedRealtime() + delayMillis;
 
         Intent intent = new Intent(ACTION_ALARM_WAKEUP);
