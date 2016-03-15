@@ -63,10 +63,6 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
 
-        if (!Utils.checkCaller()) {
-            Log.w(TAG, action + " received for non-active user, ignoring!!");
-            return;
-        }
 
         if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
             if (BluetoothAdapter.STATE_ON == intent.getIntExtra(
