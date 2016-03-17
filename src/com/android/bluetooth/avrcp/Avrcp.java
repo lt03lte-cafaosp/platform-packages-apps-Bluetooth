@@ -169,6 +169,7 @@ public final class Avrcp {
     private static final int MSG_NOW_PLAYING_ENTRIES_RECEIVED = 207;
 
     private MediaPlayerInfo mediaPlayerInfo1;
+    private MediaPlayerInfo mediaPlayerInfo2;
 
     private static final int BUTTON_TIMEOUT_TIME = 2000;
     private static final int BASE_SKIP_AMOUNT = 2000;
@@ -613,8 +614,10 @@ public final class Avrcp {
             Log.v(TAG, "registerMediaPlayers");
         int[] featureMasks = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
+        int[] featureMasks2 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
         byte[] playerName1 = {0x4d, 0x75, 0x73, 0x69, 0x63}/*Music*/;
+        byte[] playerName2 = {0x4d, 0x75, 0x73, 0x69, 0x63, 0x32}/*Music2*/;
 
         featureMasks[FEATURE_MASK_PLAY_OFFSET] =
             featureMasks[FEATURE_MASK_PLAY_OFFSET] | FEATURE_MASK_PLAY_MASK;
@@ -645,6 +648,22 @@ public final class Avrcp {
         featureMasks[FEATURE_MASK_COVER_ART_OFFSET] =
             featureMasks[FEATURE_MASK_COVER_ART_OFFSET] | FEATURE_MASK_COVER_ART_MASK;
 
+/*Player2 does not support browsing and now playing,
+            hence updated the masks properly*/
+        featureMasks2[FEATURE_MASK_PLAY_OFFSET] =
+            featureMasks2[FEATURE_MASK_PLAY_OFFSET] | FEATURE_MASK_PLAY_MASK;
+        featureMasks2[FEATURE_MASK_PAUSE_OFFSET] =
+            featureMasks2[FEATURE_MASK_PAUSE_OFFSET] | FEATURE_MASK_PAUSE_MASK;
+        featureMasks2[FEATURE_MASK_STOP_OFFSET] =
+            featureMasks2[FEATURE_MASK_STOP_OFFSET] | FEATURE_MASK_STOP_MASK;
+        featureMasks2[FEATURE_MASK_PAGE_UP_OFFSET] =
+            featureMasks2[FEATURE_MASK_PAGE_UP_OFFSET] | FEATURE_MASK_PAGE_UP_MASK;
+        featureMasks2[FEATURE_MASK_PAGE_DOWN_OFFSET] =
+            featureMasks2[FEATURE_MASK_PAGE_DOWN_OFFSET] | FEATURE_MASK_PAGE_DOWN_MASK;
+        featureMasks2[FEATURE_MASK_REWIND_OFFSET] =
+            featureMasks2[FEATURE_MASK_REWIND_OFFSET] | FEATURE_MASK_REWIND_MASK;
+        featureMasks2[FEATURE_MASK_FAST_FWD_OFFSET] =
+            featureMasks2[FEATURE_MASK_FAST_FWD_OFFSET] | FEATURE_MASK_FAST_FWD_MASK;
         mediaPlayerInfo1 = new MediaPlayerInfo ((short)0x0001,
                     MAJOR_TYPE_AUDIO,
                     SUB_TYPE_NONE,
@@ -655,8 +674,18 @@ public final class Avrcp {
                     "com.android.music",
                     true,
                     featureMasks);
-
+        mediaPlayerInfo2 = new MediaPlayerInfo ((short)0x0000,
+                    MAJOR_TYPE_AUDIO,
+                    SUB_TYPE_NONE,
+                    (byte)RemoteControlClient.PLAYSTATE_PAUSED,
+                    CHAR_SET_UTF8,
+                    (short)0x06,
+                    playerName2,
+                    "com.google.android.music",
+                    true,
+                    featureMasks2);
         mMediaPlayers.add(mediaPlayerInfo1);
+        mMediaPlayers.add(mediaPlayerInfo2);
     }
 
     public static Avrcp make(Context context, A2dpService svc,
@@ -1797,7 +1826,6 @@ public final class Avrcp {
 
         setBrowsedPlayerRspNative((byte)status, 0x0, numOfItems, 0x0, CHAR_SET_UTF8,
                                    folderNames, getByteAddress(device));
-        mBrowserDevice = null;
     }
 
     void updateNowPlayingContentChanged() {
@@ -1816,9 +1844,14 @@ public final class Avrcp {
 
     void updatePlayItemResponse(boolean success) {
         Log.v(TAG, "updatePlayItemResponse: success: " + success);
-        BluetoothDevice device = mBrowserDevice;
         if (mBrowserDevice == null) {
-            Log.e(TAG, "mBrowserDevice is null for music app called API");
+            Log.e(TAG,"mBrowserDevice is null for music player called api");
+        }
+        BluetoothDevice device = mBrowserDevice;
+        int deviceIndex = getIndexForDevice(device);
+        if (deviceIndex == INVALID_DEVICE_INDEX) {
+            Log.e(TAG,"invalid index for device");
+            return;
         }
         /* add member for getting current setting get play item pending rsp
          * and clear it when this is recieved */
@@ -1830,7 +1863,6 @@ public final class Avrcp {
             playItemRspNative(INTERNAL_ERROR ,
                     getByteAddress(device));
         }
-        mBrowserDevice = null;
     }
 
     void updateNowPlayingEntriesReceived(long[] playList) {
@@ -1865,7 +1897,6 @@ public final class Avrcp {
             Log.v(TAG, "getTotalNumberOfItemsRspNative for NowPlaying List");
             getTotalNumberOfItemsRspNative((byte)OPERATION_SUCCESSFUL, playList.length,
                     0x0000, getByteAddress(device));
-            mBrowserDevice = null;
             return;
         }
 
@@ -1948,7 +1979,6 @@ public final class Avrcp {
                 numItems, itemType, uid, type,
                 playable, displayName, numAtt, attValues, attIds, mCachedRequest.mSize,
                 getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
-        mBrowserDevice = null;
     }
 
     class CachedRequest {
@@ -2826,9 +2856,6 @@ public final class Avrcp {
             return;
         }
 
-        mBrowserDevice = device;
-        Log.v(TAG, "mBrowserDevice is set to -> " + device);
-
         if (mMediaPlayers.size() > 0) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
             while (rccIterator.hasNext()) {
@@ -2864,7 +2891,6 @@ public final class Avrcp {
         if (DEBUG)
             Log.v(TAG, "processPlayItem: scope: " + scope + " uid:" + uid);
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
-        mBrowserDevice = device;
         int deviceIndex = getIndexForDevice(device);
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
@@ -3320,7 +3346,6 @@ public final class Avrcp {
         String[] attValues = new String[MAX_BROWSE_ITEM_TO_SEND * 8];
         int[] attIds = new int[MAX_BROWSE_ITEM_TO_SEND * 8];
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
-        mBrowserDevice = device;
 
         int deviceIndex = getIndexForDevice(device);
         if (deviceIndex == INVALID_DEVICE_INDEX) {
