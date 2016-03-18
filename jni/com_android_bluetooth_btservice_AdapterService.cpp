@@ -36,6 +36,7 @@
 namespace android {
 
 #define ADDITIONAL_NREFS 50
+#define UNUSED(x) (void)(x)
 static jmethodID method_stateChangeCallback;
 static jmethodID method_adapterPropertyChangedCallback;
 static jmethodID method_devicePropertyChangedCallback;
@@ -872,13 +873,13 @@ static bool ssrcleanupNative(JNIEnv *env, jobject obj, jboolean cleanup) {
     return JNI_TRUE;
 }
 
-static jboolean enableNative(JNIEnv* env, jobject obj) {
+static jboolean enableNative(JNIEnv* env, jobject obj, jboolean isGuest) {
     ALOGV("%s:",__FUNCTION__);
 
     jboolean result = JNI_FALSE;
     if (!sBluetoothInterface) return result;
 
-    int ret = sBluetoothInterface->enable();
+    int ret = sBluetoothInterface->enable(isGuest == JNI_TRUE ? 1 : 0);
     result = (ret == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
     return result;
 }
@@ -1362,7 +1363,7 @@ static JNINativeMethod sMethods[] = {
     {"initNative", "()Z", (void *) initNative},
     {"cleanupNative", "()V", (void*) cleanupNative},
     {"ssrcleanupNative", "(Z)V", (void*) ssrcleanupNative},
-    {"enableNative", "()Z",  (void*) enableNative},
+    {"enableNative", "(Z)Z",  (void*) enableNative},
     {"disableNative", "()Z",  (void*) disableNative},
     {"setAdapterPropertyNative", "(I[B)Z", (void*) setAdapterPropertyNative},
     {"getAdapterPropertiesNative", "()Z", (void*) getAdapterPropertiesNative},
@@ -1403,6 +1404,7 @@ int register_com_android_bluetooth_btservice_AdapterService(JNIEnv* env)
  */
 jint JNI_OnLoad(JavaVM *jvm, void *reserved)
 {
+    UNUSED(reserved);
     JNIEnv *e;
     int status;
 
