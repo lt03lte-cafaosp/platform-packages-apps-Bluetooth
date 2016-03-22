@@ -500,6 +500,10 @@ public class AdapterService extends Service {
         mAdapterStateMachine.sendMessage(mAdapterStateMachine.obtainMessage(AdapterState.BEGIN_DISABLE));
     }
 
+    void startBrEdrCleanup(){
+         mAdapterStateMachine.sendMessage(mAdapterStateMachine.obtainMessage(AdapterState.BEGIN_BREDR_CLEANUP));
+    }
+
     boolean stopProfileServices() {
         Class[] supportedProfileServices = Config.getSupportedProfiles();
         if (mProfilesStarted && supportedProfileServices.length>0) {
