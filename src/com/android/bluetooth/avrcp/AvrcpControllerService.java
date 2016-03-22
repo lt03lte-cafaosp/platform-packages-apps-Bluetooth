@@ -1226,13 +1226,18 @@ public class AvrcpControllerService extends ProfileService {
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_PLAY_POS_CHANGED:
                 if(mRemoteMediaPlayers != null) {
-                    mRemoteMediaPlayers.getAddressedPlayer().mPlayTime = msg.arg2;
+                    data = msg.getData();
+                    mRemoteMediaPlayers.getAddressedPlayer().mPlayTime =
+                                                   data.getInt("curposition");
+                    mRemoteMediaPlayers.getAddressedPlayer().mPlayStatus =
+                                                        data.getByte("Playstatus");
                     broadcastPlayBackStateChanged(AvrcpUtils.mapBtPlayStatustoPlayBackState
                             (mRemoteMediaPlayers.getAddressedPlayer().mPlayStatus,
                                     mRemoteMediaPlayers.getAddressedPlayer().mPlayTime));
                 }
                 if(mRemoteNowPlayingList != null) {
-                    mRemoteNowPlayingList.getCurrentTrack().mTrackLen = msg.arg1;
+                    mRemoteNowPlayingList.getCurrentTrack().mTrackLen =
+                                                     data.getInt("songlen");
                 }
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_PLAY_STATUS_CHANGED:
@@ -2091,14 +2096,20 @@ public class AvrcpControllerService extends ProfileService {
         mHandler.sendMessage(msg);
      }
 
-    private void onPlayPositionChanged(byte[] address, int songLen, int currSongPosition) {
+    private void onPlayPositionChanged(byte[] address, int songLen, int currSongPosition, byte playStatus) {
         Log.d(TAG,"onPlayPositionChanged ");
         BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
                 (Utils.getAddressStringFromByte(address));
         if (!mConnectedDevices.contains(device))
             return;
+        Bundle data = new Bundle();
+
+        data.putByte("Playstatus", playStatus);
+        data.putInt("songlen", songLen);
+        data.putInt("curposition", currSongPosition);
         Message msg = mHandler.obtainMessage(AvrcpControllerConstants.
-                MESSAGE_PROCESS_PLAY_POS_CHANGED, songLen, currSongPosition);
+                               MESSAGE_PROCESS_PLAY_POS_CHANGED);
+        msg.setData(data);
         mHandler.sendMessage(msg);
     }
 
