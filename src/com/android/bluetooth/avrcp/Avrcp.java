@@ -1205,7 +1205,7 @@ public final class Avrcp {
                         int setVol = Math.min(AVRCP_MAX_VOL,
                                      Math.max(0, deviceFeatures[deviceIndex].mAbsoluteVolume +
                                      msg.arg1*mVolumeStep));
-                        boolean isSetVol = setVolumeNative(setVol ,
+                        boolean isSetVol = setVolumeNative(convertAvrcpVolumeToCorrectAvrcpVolume(setVol) ,
                                 getByteAddress(playingDevice.get(i)));
                         if (isSetVol) {
                             sendMessageDelayed(obtainMessage(MESSAGE_ABS_VOL_TIMEOUT,
@@ -4659,6 +4659,31 @@ public final class Avrcp {
 
     private int convertToAvrcpVolume(int volume) {
         return (int) Math.ceil((double) volume*AVRCP_MAX_VOL/mAudioStreamMax);
+    }
+
+    private int convertAvrcpVolumeToCorrectAvrcpVolume(int volume) {
+        // There are 15 volume level in Audio and 127 volume level in AVRCP. Avrcp Volume step should be 127 / 15 = 8.46666
+        // But AvrcpVolume step is rounded to a integer, 8.
+        // Here we map the 15 Audio volume to correct Avrcp Volume.
+        // This method convert Avrcp volume to correct value.
+        int[] anchorAvrcpVolume = new int []{0, 8, 17, 25, 34, 42, 51, 59, 68, 76, 85, 93, 102, 110, 119, 127};
+        if (volume == 0 || volume == 127) {
+            Log.d(TAG, "avrcp volume adjust: 0 -> 0");
+            return volume;
+        }
+
+        int level = 0;
+        int distance = Integer.MAX_VALUE;
+        for (int i = 1; i< anchorAvrcpVolume.length - 1; ++i) {
+            int tmpDist = Math.abs(volume - anchorAvrcpVolume[i]);
+            if (tmpDist < distance) {
+                level = i;
+                distance = tmpDist;
+            }
+        }
+
+        Log.d(TAG, "avrcp volume adjust: " + volume + " -> " + anchorAvrcpVolume[level]);
+        return anchorAvrcpVolume[level];
     }
 
     private void updateLocalPlayerSettings( byte[] data) {
