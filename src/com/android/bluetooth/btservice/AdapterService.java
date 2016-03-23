@@ -626,7 +626,6 @@ public class AdapterService extends Service {
     private static final int CONNECT_OTHER_PROFILES_TIMEOUT_DELAYED = 10000;
     private static final int CONNECT_OTHER_PROFILES_TIMEOUT_AUTO = 2000;
     private static final int MESSAGE_AUTO_CONNECT_PROFILES = 50;
-    private static final int AUTO_CONNECT_PROFILES_TIMEOUT = 500;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -1563,11 +1562,11 @@ public class AdapterService extends Service {
     // Delaying Auto Connect to make sure that all clients
     // are up and running, specially BluetoothHeadset.
     public void autoConnect() {
-        debugLog( "delay auto connect by 500 ms");
+        debugLog( "attempt auto connect ");
         if ((mHandler.hasMessages(MESSAGE_AUTO_CONNECT_PROFILES) == false) &&
             (isQuietModeEnabled()== false)) {
             Message m = mHandler.obtainMessage(MESSAGE_AUTO_CONNECT_PROFILES);
-            mHandler.sendMessageDelayed(m,AUTO_CONNECT_PROFILES_TIMEOUT);
+            mHandler.sendMessage(m);
         }
     }
     public void updateUuids() {
@@ -1588,8 +1587,6 @@ public class AdapterService extends Service {
         }
         if (isQuietModeEnabled() == false) {
             debugLog("Initiate auto connection on BT on...");
-            autoConnectHeadset();
-            autoConnectA2dp();
             autoConnectHandsfree();
             autoConnectA2dpSink();
         }
