@@ -93,7 +93,7 @@ public class AvrcpBipRspParser {
     private static int MAX_SUPPORTED_WIDTH = 1280;
     private static int MAX_SUPPORTED_HEIGHT = 1080;
     private static int MAX_IMG_HANDLE = 10000000;
-    private static int COMPRESSION_QUALITY_HIGH = 100;
+    private static int COMPRESSION_QUALITY_HIGH = 75;
     /* Constants used for converting RGB -> YUV */
     private static final int COEFF1 = 19595;
     private static final int COEFF2 = 38470;
@@ -802,23 +802,44 @@ public class AvrcpBipRspParser {
         if (D) Log.d(TAG,"getImg: getScaledBitmap -");
         if (bm != null) {
             try {
-                if (D) Log.d(TAG,"getImg: compress +");
                 // Use temp file as ExifInterface requires absolute path of storage
                 // file to update headers
                 try {
                     tmp = new FileOutputStream(mTmpFilePath);
                 } catch (FileNotFoundException e) {
-                    Log.w(TAG,"getImgThumb: unable to open tmp File for writing");
+                    Log.w(TAG,"getImg: unable to open tmp File for writing");
                     return retVal;
                 }
+                if (D) Log.d(TAG,"getImg: compress +");
                 bm.compress(cmpFormat, COMPRESSION_QUALITY_HIGH, tmp);
                 if (D) Log.d(TAG,"getImg: compress -");
-                tmp.flush();
+                try {
+                    if (tmp != null) {
+                        tmp.flush();
+                        tmp.close();
+                    }
+                } catch (IOException e) {
+                     Log.e(TAG,"getImg: exception in closing file");
+                     return retVal;
+                }
+                File f = new File(mTmpFilePath);
+                if (f != null && f.isFile() && f.exists()) {
+                    if (D) Log.d(TAG, "File Size = " + f.length());
+                    /* check if the size of compressed file is within range of maxsize */
+                    if (imgDesc.mMaxSize != null &&
+                        f.length() > Long.valueOf(imgDesc.mMaxSize)) {
+                        Log.w(TAG, "Image size using compression is " +
+                            f.length() + " more than maxsize = " +
+                            imgDesc.mMaxSize + " deleting the file");
+                        f.delete();
+                        return retVal;
+                    }
+                }
                 /* Copy the new updated header file to OutputStream */
                 try {
                     tmp1 = new FileInputStream(mTmpFilePath);
                 } catch (FileNotFoundException e) {
-                    Log.w(TAG,"getImgThumb: unable to open tmp File for reading");
+                    Log.w(TAG,"getImg: unable to open tmp File for reading");
                     return retVal;
                 }
                 byte[] buffer = new byte[4096]; // To hold file contents
@@ -852,16 +873,6 @@ public class AvrcpBipRspParser {
                     /* Delete the tmp file now */
                     File f = new File(mTmpFilePath);
                     if (f != null && f.isFile() && f.exists()) {
-                        if (D) Log.d(TAG, "getImg: File Size = " + f.length());
-                        /* check if the size of compressed file is within range of maxsize */
-                        if (imgDesc.mMaxSize != null &&
-                            f.length() > Long.valueOf(imgDesc.mMaxSize)) {
-                            Log.w(TAG, "getImg: Image can't be compressed into  " +
-                                Long.valueOf(imgDesc.mMaxSize) +
-                                " bytes. Minimum size using current values is" +
-                                f.length());
-                            retVal = false;
-                        }
                         f.delete();
                     }
                 } catch (IOException e) {
