@@ -4613,7 +4613,7 @@ public final class Avrcp {
                 }
             }
         }
-        return !absVolumeSupported.contains((byte)0);
+        return !(absVolumeSupported.contains((byte)0) || absVolumeSupported.isEmpty());
     }
 
     /**
