@@ -601,6 +601,7 @@ public class AvrcpControllerService extends ProfileService {
         if(mAdrPlayer == null) return;
         if (!mRemoteMediaPlayers.isPlayerSupportNowPlaying(mAdrPlayer.mPlayerId)) {
             Log.e(TAG," remote player does not support Now Playing id = " + mAdrPlayer.mPlayerId);
+            completeBrowseFolderRequest(AvrcpControllerConstants.MESSAGE_FETCH_NOW_PLAYING_LIST);
             return;
         }
         mRemoteFileSystem.clearVFSList();
@@ -655,6 +656,7 @@ public class AvrcpControllerService extends ProfileService {
         if(mBrowsedPlayer == null) return;
         if (!mRemoteMediaPlayers.isPlayerSearchable(mBrowsedPlayer.mPlayerId)) {
             Log.e(TAG," remote player does not support search");
+            completeBrowseFolderRequest(AvrcpControllerConstants.MESSAGE_FETCH_SEARCH_LIST);
             return;
         }
         mRemoteFileSystem.clearVFSList();
@@ -1436,7 +1438,8 @@ public class AvrcpControllerService extends ProfileService {
                  */
                 Log.d(TAG, " Last command = "+ commandId + " status = " + status);
                 if ((status == AvrcpControllerConstants.AVRC_RET_BAD_RANGE) ||
-                    (status == AvrcpControllerConstants.AVRC_RET_NO_AVAL_PLAYER)){
+                    (status == AvrcpControllerConstants.AVRC_RET_NO_AVAL_PLAYER) ||
+                    (status == AvrcpControllerConstants.AVRC_RET_STS_TIMEOUT)) {
                     mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
                     completeBrowseFolderRequest(commandId);
                     checkAndProcessBrowsingCommand(0);
@@ -1463,7 +1466,6 @@ public class AvrcpControllerService extends ProfileService {
                 checkAndProcessBrowsingCommand(0);
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_SET_BROWSED_PLAYER_RSP:
-                mAvrcpRemoteDevice.muidCounter  = msg.arg2;
                 if (mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0) != AvrcpControllerConstants.
                         MESSAGE_SET_BROWSED_PLAYER) {
                     Log.e(TAG," UnExpected Command, process pending ones");
@@ -1474,6 +1476,7 @@ public class AvrcpControllerService extends ProfileService {
                 boolean browsedPlayerSet = false;
                 mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
                 if (msg.arg1 == AvrcpControllerConstants.AVRC_RET_NO_ERROR) {
+                    mAvrcpRemoteDevice.muidCounter  = msg.arg2;
                     browsedPlayerSet = mRemoteMediaPlayers.setBrowsedPlayerFromList(playerId);
                     Log.d(TAG," browsedPlayerSet = " + browsedPlayerSet + " playerId = " + playerId);
                     if (browsedPlayerSet) {
@@ -1509,10 +1512,10 @@ public class AvrcpControllerService extends ProfileService {
                                 (AvrcpControllerConstants.DEFAULT_PLAYER_ID);
                         Log.d(TAG," Default player id Set " + addressedPlayerSet);
                     }
+                    broadcastAddressedPlayerChanged(addressedPlayerSet, mRemoteMediaPlayers.
+                            getAddressedMediaPlayerList());
                 }
                 mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
-                broadcastAddressedPlayerChanged(addressedPlayerSet, mRemoteMediaPlayers.
-                        getAddressedMediaPlayerList());
                 checkAndProcessBrowsingCommand(0);
                 break;
             case AvrcpControllerConstants.MESSAGE_PROCESS_ADDRESSED_PLAYER_CHANGED:
@@ -1538,7 +1541,8 @@ public class AvrcpControllerService extends ProfileService {
                 if ((returnStatus == AvrcpControllerConstants.AVRC_RET_BAD_DIR) ||
                    (returnStatus == AvrcpControllerConstants.AVRC_RET_NOT_EXIST) ||
                    (returnStatus == AvrcpControllerConstants.AVRC_RET_NO_AVAL_PLAYER) ||
-                   (returnStatus == AvrcpControllerConstants.AVRC_RET_NOT_DIR)) {
+                   (returnStatus == AvrcpControllerConstants.AVRC_RET_NOT_DIR) ||
+                   (returnStatus == AvrcpControllerConstants.AVRC_RET_STS_TIMEOUT)) {
                     Log.e(TAG, " Change Path Error = " + returnStatus);
                     mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
                     int pendingCommandId = mAvrcpRemoteDevice.mPendingBrwCmds.getCmdId(0);

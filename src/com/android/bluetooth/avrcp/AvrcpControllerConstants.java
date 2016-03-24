@@ -351,5 +351,6 @@ final class AvrcpControllerConstants {
     public static final int  AVRC_RET_BAD_SEARCH_RES = 0x14;
     public static final int  AVRC_RET_NO_AVAL_PLAYER = 0x15;
     public static final int  AVRC_RET_ADDR_PLAYER_CHG = 0x16;
+    public static final int  AVRC_RET_STS_TIMEOUT    = 0x5E;
     public static final int  AVRC_CHARSET_UTF8 = 0x006A;
 }
