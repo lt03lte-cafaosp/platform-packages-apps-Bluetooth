@@ -1423,8 +1423,6 @@ public class AvrcpControllerService extends ProfileService {
                     (commandId == AvrcpControllerConstants.MESSAGE_FETCH_VFS_LIST))) {
                     Log.e(TAG," Unexpected Command cmdID " + commandId);
                     // something wrong happened, drop this Callback.
-                    mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
-                    checkAndProcessBrowsingCommand(0);
                     break;
                 }
                 /* If there is diff in scope */
