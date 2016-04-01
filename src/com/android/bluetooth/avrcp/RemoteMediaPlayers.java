@@ -101,12 +101,15 @@ public class RemoteMediaPlayers {
         return false;
     }
     public boolean setAddressedPlayerFromList(int playerId) {
+        byte playStatus;
         if ((mMediaPlayerList == null) || (mMediaPlayerList.isEmpty()))
             return false;
         for (PlayerInfo mPlayerInfo : mMediaPlayerList) {
             if (mPlayerInfo.mPlayerId != playerId)
                 continue;
+            playStatus = getPlayStatus();
             setAddressedPlayer(mPlayerInfo);
+            getAddressedPlayer().mPlayStatus = playStatus;
             return true;
         }
         return false;
