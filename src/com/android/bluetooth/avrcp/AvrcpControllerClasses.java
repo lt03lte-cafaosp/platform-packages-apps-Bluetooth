@@ -597,7 +597,7 @@ class TrackInfo extends MediaItem {
         mAlbumTitle = AvrcpControllerConstants.ALBUM_NAME_INVALID;
         mGenre      = AvrcpControllerConstants.GENRE_INVALID;
         mTrackNum   = AvrcpControllerConstants.TRACK_NUM_INVALID;
-        mTotalTracks = AvrcpControllerConstants.TOTAL_TRACK_TIME_INVALID;
+        mTotalTracks = AvrcpControllerConstants.TOTAL_TRACKS_INVALID;
         mTrackLen = AvrcpControllerConstants.TOTAL_TRACK_TIME_INVALID;
         mCoverArtHandle = AvrcpControllerConstants.COVER_ART_HANDLE_INVALID;
         mThumbNailLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
