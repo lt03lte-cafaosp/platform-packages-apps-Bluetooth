@@ -458,10 +458,12 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                 Log.d(TAG, "RemoveSDPrecord returns " + status);
                 mSdpHandle = -1;
             }
-            mSdpHandle = SdpManager.getDefaultManager().createPbapPseRecord(
-                "OBEX Phonebook Access Server", mServerSockets.getRfcommChannel(),
-                    mServerSockets.getL2capPsm(), SDP_PBAP_SERVER_VERSION,
-                        SDP_PBAP_SUPPORTED_REPOSITORIES, SDP_PBAP_SUPPORTED_FEATURES);
+            if (SdpManager.getDefaultManager() != null) {
+                mSdpHandle = SdpManager.getDefaultManager().createPbapPseRecord(
+                    "OBEX Phonebook Access Server", mServerSockets.getRfcommChannel(),
+                        mServerSockets.getL2capPsm(), SDP_PBAP_SERVER_VERSION,
+                            SDP_PBAP_SUPPORTED_REPOSITORIES, SDP_PBAP_SUPPORTED_FEATURES);
+            }
 
             // Here we might have changed crucial data, hence reset DB identifier
             updateDbIdentifier();
