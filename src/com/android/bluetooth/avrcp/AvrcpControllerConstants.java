@@ -81,17 +81,17 @@ final class AvrcpControllerConstants {
     /*
      * Default values for each of the items
     */
-    public static final int TRACK_NUM_INVALID = 0xFF;
+    public static final long TRACK_NUM_INVALID = 0xFFFFFFFF;
     public static final int STATUS_INVALID = 0xFF;
     public static final String TITLE_INVALID = "NOT_SUPPORTED";
     public static final String ARTIST_NAME_INVALID = "NOT_SUPPORTED";
     public static final String COVER_ART_HANDLE_INVALID = "NOT_SUPPORTED";
     public static final String COVER_ART_LOCATION_INVALID = "EMPTY";
     public static final String ALBUM_NAME_INVALID = "NOT_SUPPORTED";
-    public static final int TOTAL_TRACKS_INVALID = 0xFFFFFFFF;
+    public static final long TOTAL_TRACKS_INVALID = 0xFFFFFFFF;
     public static final String GENRE_INVALID = "NOT_SUPPORTED";
     public static final int PLAYING_TIME_INVALID = 0xFF;
-    public static final int TOTAL_TRACK_TIME_INVALID = 0xFF;
+    public static final long TOTAL_TRACK_TIME_INVALID = 0xFFFFFFFF;
     public static final String REPEAT_STATUS_INVALID = "NOT_SUPPORTED";
     public static final String SHUFFLE_STATUS_INVALID = "NOT_SUPPORTED";
     public static final String SCAN_STATUS_INVALID = "NOT_SUPPORTED";
