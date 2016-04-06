@@ -474,9 +474,10 @@ class PlayerInfo {
             return;
         while(bb.hasRemaining()) {
             byte attribId = bb.get();
+            byte val =  bb.get();
             for(PlayerApplicationSettings plAppSetting: mPlayerAppSetting) {
                 if(plAppSetting.attr_Id == attribId)
-                    plAppSetting.attr_val = bb.get();
+                    plAppSetting.attr_val = val;
             }
         }
     }
