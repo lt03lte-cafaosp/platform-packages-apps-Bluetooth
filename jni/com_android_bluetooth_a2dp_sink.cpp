@@ -97,7 +97,7 @@ static void bta2dp_audio_state_callback(btav_audio_state_t state, bt_bdaddr_t* b
     sCallbackEnv->DeleteLocalRef(addr);
 }
 
-static void bta2dp_audio_config_callback(bt_bdaddr_t *bd_addr, uint32_t sample_rate, uint8_t channel_count) {
+static void bta2dp_audio_config_callback(bt_bdaddr_t *bd_addr, uint32_t sample_rate, uint8_t channel_count, uint8_t codec_type) {
     jbyteArray addr;
 
     ALOGI("%s", __FUNCTION__);
@@ -114,7 +114,7 @@ static void bta2dp_audio_config_callback(bt_bdaddr_t *bd_addr, uint32_t sample_r
     }
 
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onAudioConfigChanged, addr, (jint)sample_rate, (jint)channel_count);
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onAudioConfigChanged, addr, (jint)sample_rate, (jint)channel_count, (jint)codec_type);
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -161,7 +161,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
         env->GetMethodID(clazz, "onAudioStateChanged", "(I[B)V");
 
     method_onAudioConfigChanged =
-        env->GetMethodID(clazz, "onAudioConfigChanged", "([BII)V");
+        env->GetMethodID(clazz, "onAudioConfigChanged", "([BIII)V");
 
     method_onAudioFocusRequested =
         env->GetMethodID(clazz, "onAudioFocusRequested", "([B)V");
