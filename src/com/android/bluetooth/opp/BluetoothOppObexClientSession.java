@@ -533,6 +533,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                             uiUpdateThread.interrupt ();
                             uiUpdateThread.join ();
                             uiUpdateThread = null;
+                            if (V) Log.v(TAG, "Worker for Updation : Destroyed");
 
                                 updateValues = new ContentValues();
                                 updateValues.put(BluetoothShare.CURRENT_BYTES, position);
