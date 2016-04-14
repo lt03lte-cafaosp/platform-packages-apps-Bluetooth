@@ -435,8 +435,11 @@ final class AdapterState extends StateMachine {
                 case BREDR_START_TIMEOUT:
                     errorLog("Error enabling Bluetooth (start timeout)");
                     mPendingCommandState.setTurningOn(false);
+                    adapterService.stopProfileServices();
                     transitionTo(mBleOnState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_ON);
+                    errorLog("ENABLE_TIMEOUT:Killing the process to force a restart as part cleanup");
+                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 case ENABLE_TIMEOUT:
@@ -446,13 +449,15 @@ final class AdapterState extends StateMachine {
                     transitionTo(mOffState);
                     adapterService.stopProfileServices();
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
+                    errorLog("ENABLE_TIMEOUT:Killing the process to force a restart as part cleanup");
+                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 case BREDR_STOP_TIMEOUT:
                     errorLog("Error stopping Bluetooth profiles (stop timeout)");
                     mPendingCommandState.setTurningOff(false);
                     transitionTo(mBleOnState);
-                    notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_ON);
+                    notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
                     errorLog("BREDR_STOP_TIMEOUT:Killing the process to force a restart as part cleanup");
                     android.os.Process.killProcess(android.os.Process.myPid());
                     break;
@@ -462,6 +467,8 @@ final class AdapterState extends StateMachine {
                     mPendingCommandState.setTurningOff(false);
                     transitionTo(mOffState);
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
+                    errorLog("BLE_STOP_TIMEOUT:Killing the process to force a restart as part cleanup");
+                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 case DISABLE_TIMEOUT:
