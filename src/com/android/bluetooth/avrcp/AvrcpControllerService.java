@@ -367,6 +367,13 @@ public class AvrcpControllerService extends ProfileService {
 
     protected boolean stop() {
          try {
+             if (mHandler != null) {
+                 mHandler.removeCallbacksAndMessages(null);
+                 Looper looper = mHandler.getLooper();
+                 if (looper != null) {
+                     looper.quit();
+                 }
+             }
              deinitDatabase();
              if (mRemoteData != null) {
                  mRemoteData.mCompanyIDSupported.clear();
@@ -426,7 +433,6 @@ public class AvrcpControllerService extends ProfileService {
         if (mHandler != null) {
             mHandler.removeCallbacksAndMessages(null);
             Looper looper = mHandler.getLooper();
-            if (looper != null) looper.quit();
             if (looper != null) {
                 looper.quit();
             }
