@@ -90,7 +90,7 @@ final class AvrcpControllerConstants {
     public static final String ALBUM_NAME_INVALID = "NOT_SUPPORTED";
     public static final long TOTAL_TRACKS_INVALID = -1;
     public static final String GENRE_INVALID = "NOT_SUPPORTED";
-    public static final int PLAYING_TIME_INVALID = 0xFF;
+    public static final int PLAYING_TIME_INVALID = -1;
     public static final long TOTAL_TRACK_TIME_INVALID = -1;
     public static final String REPEAT_STATUS_INVALID = "NOT_SUPPORTED";
     public static final String SHUFFLE_STATUS_INVALID = "NOT_SUPPORTED";
