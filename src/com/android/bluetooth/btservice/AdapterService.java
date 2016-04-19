@@ -1667,6 +1667,22 @@ public class AdapterService extends Service {
      public void connectOtherProfile(BluetoothDevice device, int firstProfileStatus){
         if ((mHandler.hasMessages(MESSAGE_CONNECT_OTHER_PROFILES) == false) &&
             (isQuietModeEnabled()== false)){
+            Log.d(TAG," connectOtherProfile profileStatus = " + firstProfileStatus);
+
+            A2dpSinkService a2dpSinkService = A2dpSinkService.getA2dpSinkService();;
+            HeadsetClientService hsClientService = HeadsetClientService.getHeadsetClientService();
+
+            if ((a2dpSinkService == null) || (hsClientService == null)) {
+                return;
+            }
+            List<BluetoothDevice> a2dpConnDevList = a2dpSinkService.getConnectedDevices();;
+            List<BluetoothDevice> hfConnDevList = hsClientService.getConnectedDevices();;
+            Log.i(TAG, "a2dpConnListSize: " +a2dpConnDevList.size() + " hfConnListSize " +
+                    hfConnDevList.size());
+            if (!a2dpConnDevList.isEmpty() && !hfConnDevList.isEmpty()) {
+                Log.d(TAG," Both profiles are connected, don't que ");
+                return;
+            }
             Message m = mHandler.obtainMessage(MESSAGE_CONNECT_OTHER_PROFILES);
             m.obj = device;
             m.arg1 = (int)firstProfileStatus;
