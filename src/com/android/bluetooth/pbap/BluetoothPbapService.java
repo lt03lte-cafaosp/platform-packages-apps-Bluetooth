@@ -138,6 +138,8 @@ public class BluetoothPbapService extends Service {
 
     private static final int AUTH_TIMEOUT = 3;
 
+    private static final int SHUTDOWN = 4;
+
 
     private static final int USER_CONFIRM_TIMEOUT_VALUE = 30000;
 
@@ -222,7 +224,11 @@ public class BluetoothPbapService extends Service {
                 Log.w(TAG, "Stopping BluetoothPbapService: "
                         + "device does not have BT or device is not ready");
                 // Release all resources
-                closeService();
+                 if (mSessionStatusHandler != null){
+                     Log.d(TAG, " onStartCommand, Shutting down");
+                     mSessionStatusHandler.sendMessage(mSessionStatusHandler.obtainMessage(SHUTDOWN));
+                 }
+
             } else {
                 // No need to handle the null intent case, because we have
                 // all restart work done in onCreate()
@@ -247,16 +253,19 @@ public class BluetoothPbapService extends Service {
         if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
             if (state == BluetoothAdapter.STATE_TURNING_OFF) {
                 // Send any pending timeout now, as this service will be destroyed.
-                if (mSessionStatusHandler.hasMessages(USER_TIMEOUT)) {
-                    Intent timeoutIntent =
-                        new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
-                    timeoutIntent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
-                    timeoutIntent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                if (mSessionStatusHandler != null) {
+                    if (mSessionStatusHandler.hasMessages(USER_TIMEOUT)) {
+                        Intent timeoutIntent =
+                            new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
+                        timeoutIntent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
+                        timeoutIntent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                                      BluetoothDevice.REQUEST_TYPE_PHONEBOOK_ACCESS);
-                    sendBroadcast(timeoutIntent, BLUETOOTH_ADMIN_PERM);
+                        sendBroadcast(timeoutIntent, BLUETOOTH_ADMIN_PERM);
+                    }
+                    Log.d(TAG, "Adapter turning off, SHUTDOWN..");
+                    mSessionStatusHandler.sendMessage(mSessionStatusHandler.
+                        obtainMessage(SHUTDOWN));
                 }
-                // Release all resources
-                closeService();
             } else {
                 removeTimeoutMsg = false;
             }
@@ -719,6 +728,11 @@ public class BluetoothPbapService extends Service {
                     mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
                             .obtainMessage(AUTH_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
                     break;
+                case SHUTDOWN:
+                     Log.d(TAG, "Closing PBAP service");
+                     closeService();
+                     break;
+
                 case MSG_ACQUIRE_WAKE_LOCK:
                     if (mWakeLock == null) {
                         PowerManager pm = (PowerManager)getSystemService(
