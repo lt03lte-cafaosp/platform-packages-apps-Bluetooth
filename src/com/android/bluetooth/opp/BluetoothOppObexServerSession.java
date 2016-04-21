@@ -173,11 +173,13 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         private static final int sSleepTime = 1000;
         private Uri contentUri;
         private Context mContext1;
+        private volatile boolean interrupted = false;
 
         public ContentResolverUpdateThread(Context context, Uri cntUri) {
             super("BtOpp Server ContentResolverUpdateThread");
             mContext1 = context;
             contentUri = cntUri;
+            interrupted = false;
         }
 
         @Override
@@ -186,9 +188,9 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
             ContentValues updateValues;
 
-            if (V) Log.v(TAG, "Is ContentResolverUpdateThread Interrupted :" + isInterrupted());
+            if (V) Log.v(TAG, "Is ContentResolverUpdateThread Interrupted :" + interrupted);
             /*  Check if the Operation is interrupted before entering into loop */
-            while ( !isInterrupted() ) {
+            while (!interrupted) {
 
                 updateValues = new ContentValues();
                 updateValues.put(BluetoothShare.CURRENT_BYTES, position);
@@ -205,10 +207,17 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                 } catch (InterruptedException e1) {
                     if (V) Log.v(TAG, "Server ContentResolverUpdateThread was interrupted (1),"+
                                      " exiting");
+                   interrupted = true;
                    return ;
               }
            }
        }
+
+        @Override
+        public void interrupt() {
+            interrupted = true;
+            super.interrupt();
+        }
     }
     /*
     * Called when a ABORT request is received.
