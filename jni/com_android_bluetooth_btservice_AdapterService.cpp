@@ -25,6 +25,8 @@
 #include "android_runtime/AndroidRuntime.h"
 #include "android_runtime/Log.h"
 
+#include <cutils/log.h>
+#include <cutils/klog.h>
 #include <string.h>
 #include <pthread.h>
 
@@ -779,7 +781,7 @@ static jboolean enableNative(JNIEnv* env, jobject obj) {
 
     jboolean result = JNI_FALSE;
     if (!sBluetoothInterface) return result;
-
+    printMarker("BT:Native-Enable");
     int ret = sBluetoothInterface->enable();
     result = (ret == BT_STATUS_SUCCESS || ret == BT_STATUS_DONE) ? JNI_TRUE : JNI_FALSE;
     return result;
