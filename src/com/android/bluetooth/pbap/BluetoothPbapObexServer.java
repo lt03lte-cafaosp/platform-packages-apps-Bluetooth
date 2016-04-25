@@ -211,6 +211,7 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
     public int onConnect(final HeaderSet request, HeaderSet reply) {
         if (V) logHeader(request);
         notifyUpdateWakeLock();
+        resetFolderVersionCounters();
         try {
             byte[] uuid = (byte[])request.getHeader(HeaderSet.TARGET);
             if (uuid == null) {
@@ -517,7 +518,6 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
         updatePBSecondaryFolderVersion(
             BluetoothPbapService.primaryVersionCounter);
         pvc.putLong(BluetoothPbapService.primaryVersionCounter);
-        BluetoothPbapService.primaryVersionCounter = 0;
         return pvc.array();
     }
 
@@ -540,8 +540,13 @@ public class BluetoothPbapObexServer extends ServerRequestHandler {
             BluetoothPbapService.secondaryVersionCounter);
 
         svc.putLong(BluetoothPbapService.secondaryVersionCounter);
-        BluetoothPbapService.secondaryVersionCounter = 0;
         return svc.array();
+    }
+
+    private void resetFolderVersionCounters(){
+        Log.d(TAG,"Resetting Folder version counters on new connection");
+        BluetoothPbapService.primaryVersionCounter = 0;
+        BluetoothPbapService.secondaryVersionCounter = 0;
     }
 
     private boolean checkPbapFeatureSupport(long featureBit) {
