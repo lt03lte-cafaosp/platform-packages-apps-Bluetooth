@@ -1311,7 +1311,9 @@ public class BluetoothMapObexServer extends ServerRequestHandler {
                 maxListCount = 1024;
             try {
                 if ( (mAccount != null && mAccount.getType() == TYPE.EMAIL) &&
-                    (mOutContent instanceof BluetoothMapContentEmail)) {
+                    (mOutContent instanceof BluetoothMapContentEmail) &&
+                        !mCurrentFolder.getName().equals("telecom") &&
+                            !mCurrentFolder.getName().equals("root")) {
                     if (D) Log.d(TAG, "RefreshFolderStructure(): " +  mCurrentFolder.getName());
                     ((BluetoothMapContentEmail)mOutContent).addEmailFolders(mCurrentFolder);
                 }

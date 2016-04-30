@@ -282,6 +282,7 @@ public final class BluetoothMapEmailContract {
     public interface MailBoxColumns extends FolderColumns {
         public static final String DISPLAY_NAME = "displayName";
         public static final String SERVER_ID = "serverId";
+        public static final String PARENT_KEY = "parentKey";
         public static final String PARENT_SERVER_ID = "parentServerId";
         public static final String ACCOUNT_KEY = "accountKey";
         public static final String FOLDER_TYPE = "type";

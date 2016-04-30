@@ -1028,13 +1028,15 @@ public class BluetoothMapContentEmail extends BluetoothMapContent {
         long accountId = mAccount.getAccountId();
         String where = BluetoothMapEmailContract.MailBoxColumns.ACCOUNT_KEY + "=" + accountId;
         if(parentFolder.getFolderId() == -1) {
-            where += " AND (" + BluetoothMapEmailContract.MailBoxColumns.PARENT_SERVER_ID +
+            where += " AND (" + BluetoothMapEmailContract.MailBoxColumns.PARENT_KEY +
                     " = " + parentFolder.getFolderId() + " OR "+
                     BluetoothMapEmailContract.MailBoxColumns.PARENT_SERVER_ID + " ISNULL )";
          } else {
-           where += " AND " + BluetoothMapEmailContract.MailBoxColumns.PARENT_SERVER_ID +
+           where += " AND " + BluetoothMapEmailContract.MailBoxColumns.PARENT_KEY +
                     " = " + parentFolder.getFolderId();
          }
+         if (V) Log.v(TAG, "addEmailFolders(): parentFolder: "+ parentFolder.getName() +
+            "accountId: "+accountId+ " where: " + where);
         Cursor c = mResolver.query(emailFolderUri,
                 BluetoothMapEmailContract.BT_EMAIL_MAILBOX_PROJECTION, where, null, null);
         try {
