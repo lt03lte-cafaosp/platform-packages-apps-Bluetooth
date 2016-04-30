@@ -899,7 +899,6 @@ public class BluetoothMapContentObserverEmail extends BluetoothMapContentObserve
                         values.put(BluetoothMapContract.MessageColumns.SUBJECT, "");
                     }
                     values.put("syncServerTimeStamp", 0);
-                    values.put("syncServerId", "5:65");
                     values.put("timeStamp", timeObj.toMillis(false));
                     values.put("flagLoaded", "1");
                     values.put("flagFavorite", "0");
