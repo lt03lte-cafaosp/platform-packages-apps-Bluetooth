@@ -55,6 +55,8 @@ final class AdapterState extends StateMachine {
     static final int BLE_STOPPED=25;
     static final int BREDR_STOPPED = 26;
 
+    static final int BEGIN_BREDR_CLEANUP = 27;
+
     static final int BREDR_START_TIMEOUT = 100;
     static final int ENABLE_TIMEOUT = 101;
     static final int DISABLE_TIMEOUT = 103;
@@ -62,6 +64,8 @@ final class AdapterState extends StateMachine {
     static final int SET_SCAN_MODE_TIMEOUT = 105;
     static final int BLE_START_TIMEOUT = 106;
     static final int BREDR_STOP_TIMEOUT = 107;
+
+    static final int BREDR_CLEANUP_TIMEOUT = 108;
 
     static final int USER_TURN_OFF_DELAY_MS=500;
 
@@ -388,8 +392,16 @@ final class AdapterState extends StateMachine {
                 case SET_SCAN_MODE_TIMEOUT:
                      warningLog("Timeout while setting scan mode. Continuing with disable...");
                      //Fall through
+
+                case BEGIN_BREDR_CLEANUP:
+                     removeMessages(SET_SCAN_MODE_TIMEOUT);
+                     sendMessageDelayed(BREDR_CLEANUP_TIMEOUT, PROPERTY_OP_DELAY);
+                     Log.w(TAG,"Calling BREDR cleanup");
+                     adapterProperties.brEdrCleanup();
+                     break;
+
                 case BEGIN_DISABLE:
-                    removeMessages(SET_SCAN_MODE_TIMEOUT);
+                    removeMessages(BREDR_CLEANUP_TIMEOUT);
                     sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
                     adapterService.stopProfileServices();
                     break;
@@ -451,6 +463,15 @@ final class AdapterState extends StateMachine {
                     notifyAdapterStateChange(BluetoothAdapter.STATE_OFF);
                     transitionTo(mOffState);
                     errorLog("ENABLE_TIMEOUT:Killing the process to force a restart as part cleanup");
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                    break;
+
+                case BREDR_CLEANUP_TIMEOUT:
+                    errorLog("Error cleaningup Bluetooth profiles (cleanup timeout)");
+                    mPendingCommandState.setTurningOff(false);
+                    transitionTo(mBleOnState);
+                    notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_ON);
+                    errorLog("BREDR_CLEANUP_TIMEOUT:Killing the process to force a restart as part cleanup");
                     android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
