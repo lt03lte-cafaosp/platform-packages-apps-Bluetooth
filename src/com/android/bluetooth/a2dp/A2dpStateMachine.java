@@ -804,6 +804,9 @@ final class A2dpStateMachine extends StateMachine {
                         case EVENT_TYPE_AUDIO_STATE_CHANGED:
                             processAudioStateEvent(event.valueInt, event.device);
                             break;
+                        case EVENT_TYPE_RECONFIGURE_A2DP:
+                            processReconfigA2dp(event.valueInt, event.device);
+                            break;
                         default:
                             loge("Unexpected stack event: " + event.type);
                             break;
@@ -1085,6 +1088,17 @@ final class A2dpStateMachine extends StateMachine {
                   break;
             }
         }
+        private void processReconfigA2dp(int state, BluetoothDevice device){
+            log("processReconfigA2dp state" + state);
+            switch (state) {
+                case SOFT_HANDOFF:
+                    broadcastReconfigureA2dp(device);
+                    break;
+                default:
+                    loge("Unknown reconfigure state");
+                    break;
+            }
+        }
     }
     /* Add MultiConnectionPending state when atleast 1 HS is connected
         and disconnect/connect is initiated for new HS */
@@ -1142,6 +1156,9 @@ final class A2dpStateMachine extends StateMachine {
                             break;
                         case EVENT_TYPE_AUDIO_STATE_CHANGED:
                             processAudioStateEvent(event.valueInt, event.device);
+                            break;
+                        case EVENT_TYPE_RECONFIGURE_A2DP:
+                            processReconfigA2dp(event.valueInt, event.device);
                             break;
                         default:
                             loge("Unexpected stack event: " + event.type);
@@ -1476,6 +1493,18 @@ final class A2dpStateMachine extends StateMachine {
             }
         }
 
+        private void processReconfigA2dp(int state, BluetoothDevice device){
+            log("processReconfigA2dp state" + state);
+            switch (state) {
+                case SOFT_HANDOFF:
+                    broadcastReconfigureA2dp(device);
+                    break;
+                default:
+                    loge("Unknown reconfigure state");
+                    break;
+            }
+        }
+
         private void processMultiA2dpDisconnected(BluetoothDevice device) {
             log("processMultiA2dpDisconnected state: processMultiA2dpDisconnected");
 
@@ -1672,6 +1701,11 @@ final class A2dpStateMachine extends StateMachine {
         log("A2DP Playing state : device: " + device + " State:" + prevState + "->" + state);
     }
 
+    private void broadcastReconfigureA2dp(BluetoothDevice device) {
+        log("broadcastReconfigureA2dp");
+        mAudioManager.setParameters("reconfigA2dp=true");
+    }
+
     private byte[] getByteAddress(BluetoothDevice device) {
         return Utils.getBytesFromAddress(device.getAddress());
     }
@@ -1710,6 +1744,15 @@ final class A2dpStateMachine extends StateMachine {
             Log.i(TAG,"A2dp Multicast is Disabled");
             isMultiCastEnabled = false;
         }
+    }
+
+    private void onReconfigA2dpTriggered(int reason, byte[] address) {
+        BluetoothDevice device = getDevice(address);
+        Log.i(TAG,"onSoftHandoffTriggered to device " + device);
+        StackEvent event = new StackEvent(EVENT_TYPE_RECONFIGURE_A2DP);
+        event.valueInt = reason;//SOFT_HANDOFF;
+        event.device = device;
+        sendMessage(STACK_EVENT,event);
     }
 
     private BluetoothDevice getDevice(byte[] address) {
@@ -1762,6 +1805,10 @@ final class A2dpStateMachine extends StateMachine {
     final private static int EVENT_TYPE_NONE = 0;
     final private static int EVENT_TYPE_CONNECTION_STATE_CHANGED = 1;
     final private static int EVENT_TYPE_AUDIO_STATE_CHANGED = 2;
+    final private static int EVENT_TYPE_RECONFIGURE_A2DP = 3;
+
+    // Reason to Reconfig A2dp
+    final private static int SOFT_HANDOFF = 1;
 
    // Do not modify without updating the HAL bt_av.h files.
 

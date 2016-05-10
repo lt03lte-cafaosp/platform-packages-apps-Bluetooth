@@ -33,6 +33,7 @@ static jmethodID method_onConnectionStateChanged;
 static jmethodID method_onAudioStateChanged;
 static jmethodID method_onCheckConnectionPriority;
 static jmethodID method_onMulticastStateChanged;
+static jmethodID method_onReconfigA2dpTriggered;
 
 
 static const btav_interface_t *sBluetoothA2dpInterface = NULL;
@@ -134,6 +135,22 @@ static void bta2dp_multicast_enabled_callback(int state) {
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
+static void bta2dp_reconfig_a2dp_trigger_callback(int reason, bt_bdaddr_t* bd_addr) {
+    jbyteArray addr;
+    ALOGI("%s",__FUNCTION__);
+
+    addr = sCallbackEnv->NewByteArray(sizeof(bt_bdaddr_t));
+    if (!addr) {
+        ALOGE("Fail to new jbyteArray bd addr for connection state");
+        checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+        return;
+    }
+
+    sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte*) bd_addr);
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onReconfigA2dpTriggered, reason, addr);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(addr);
+}
 static btav_callbacks_t sBluetoothA2dpCallbacks = {
     sizeof(sBluetoothA2dpCallbacks),
     bta2dp_connection_state_callback,
@@ -141,7 +158,8 @@ static btav_callbacks_t sBluetoothA2dpCallbacks = {
     NULL,
     bta2dp_connection_priority_callback,
     bta2dp_multicast_enabled_callback,
-    NULL
+    NULL,
+    bta2dp_reconfig_a2dp_trigger_callback
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
@@ -160,6 +178,9 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_onMulticastStateChanged =
         env->GetMethodID(clazz, "onMulticastStateChanged", "(I)V");
+
+    method_onReconfigA2dpTriggered =
+        env->GetMethodID(clazz, "onReconfigA2dpTriggered", "(I[B)V");
     /*
     if ( (btInf = getBluetoothInterface()) == NULL) {
         ALOGE("Bluetooth module is not loaded");
