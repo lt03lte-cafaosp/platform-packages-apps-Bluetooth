@@ -782,7 +782,8 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         private void markConnectionFailed(Socket s) {
             try {
-                s.close();
+                if (s != null)
+                    s.close();
             } catch (IOException e) {
                 Log.e(TAG, "TCP socket close error");
             }
@@ -791,7 +792,8 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         private void markConnectionFailed(BluetoothSocket s) {
             try {
-                s.close();
+                if (s != null)
+                    s.close();
             } catch (IOException e) {
                 if (V) Log.e(TAG, "Error when close socket");
             }
