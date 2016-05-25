@@ -71,7 +71,7 @@
     <application
         android:name=".btservice.AdapterApp"
         android:icon="@mipmap/bt_share"
-        android:persistent="false"
+        android:persistent="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false">
