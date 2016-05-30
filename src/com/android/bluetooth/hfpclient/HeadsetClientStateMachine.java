@@ -1499,6 +1499,15 @@ final class HeadsetClientStateMachine extends StateMachine {
                             Log.e(TAG, "Failed to send NREC");
                         }
                     }
+                    if (mIndicatorCall == -1) {
+                        mIndicatorCall = 0;
+                    }
+                    if (mIndicatorCallSetup == -1) {
+                        mIndicatorCallSetup = 0;
+                    }
+                    if (mIndicatorCallHeld == -1) {
+                        mIndicatorCallHeld = 0;
+                    }
                     transitionTo(mConnected);
                     // the other profile connection should be initiated
                     AdapterService adapterService = AdapterService.getAdapterService();
