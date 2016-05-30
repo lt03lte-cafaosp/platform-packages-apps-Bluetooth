@@ -3078,6 +3078,12 @@ public class BluetoothMapContentObserver {
                         return;
                     }
                     status = message.getStatus();
+
+                    /* For CDMA SMS, retrieve the status by right shift 24 bits */
+                    if ("3gpp2".equals(format)) {
+                        status = status >> 24;
+                    }
+
                     if(status != 0/*0 is success*/) {
                         msgInfo.statusDelivered = status;
                         if(D) Log.d(TAG, "msgInfo.statusDelivered = " + status);
