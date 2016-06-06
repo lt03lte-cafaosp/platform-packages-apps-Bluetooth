@@ -309,17 +309,6 @@ final class AvrcpControllerConstants {
     /*
      * Media Type. Folder Type, Item Type
      */
-    public static final int MEDIA_TYPE_AUDIO   = 0x00;
-    public static final int MEDIA_TYPE_VIDEO   = 0x01;
-    public static final int MEDIA_TYPE_ERROR   = 0xFF;
-    public static final int FOLDER_TYPE_MIXED  = 0x00;
-    public static final int FOLDER_TYPE_TITLES = 0x01;
-    public static final int FOLDER_TYPE_ALBUMS = 0x02;
-    public static final int FOLDER_TYPE_ARTISTS = 0x03;
-    public static final int FOLDER_TYPE_GENRES = 0x04;
-    public static final int FOLDER_TYPE_PLAYLISTS = 0x05;
-    public static final int FOLDER_TYPE_YEARS = 0x06;
-    public static final int FOLDER_TYPE_ERROR = 0xFF;
     public static final int BTRC_TYPE_MEDIA_PLAYER = 0x01;
     public static final int BTRC_TYPE_FOLDER = 0x02;
     public static final int BTRC_TYPE_MEDIA_ELEMENT = 0x03;

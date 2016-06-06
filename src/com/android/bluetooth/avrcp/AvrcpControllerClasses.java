@@ -31,6 +31,7 @@ package com.android.bluetooth.avrcp;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAvrcpPlayerSettings;
+import android.bluetooth.BluetoothAvrcpController;
 import com.android.bluetooth.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -603,7 +604,7 @@ class TrackInfo extends MediaItem {
         mCoverArtHandle = AvrcpControllerConstants.COVER_ART_HANDLE_INVALID;
         mThumbNailLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
         mImageLocation =  AvrcpControllerConstants.COVER_ART_LOCATION_INVALID;
-        mediaType = AvrcpControllerConstants.MEDIA_TYPE_AUDIO;
+        mediaType = (byte)BluetoothAvrcpController.MEDIA_TYPE_ERROR;
     }
     public TrackInfo() {
         resetTrackInfo();
@@ -786,7 +787,7 @@ class FolderItems extends MediaItem {
     public void resetFolderItems() {
         folderName = AvrcpControllerConstants.DEFAULT_NAME;
         isPlayable = AvrcpControllerConstants.FOLDER_TYPE_NOT_PLAYABLE;
-        folderType = (byte)AvrcpControllerConstants.FOLDER_TYPE_ERROR;
+        folderType = (byte)BluetoothAvrcpController.FOLDER_TYPE_ERROR;
     }
     public FolderItems() {
         resetFolderItems();

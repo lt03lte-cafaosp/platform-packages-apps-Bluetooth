@@ -231,17 +231,21 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
         List<MediaItem> mediaItems = new ArrayList<MediaItem>();
         for (FolderItems mFolderItem: mRemoteFileSystem.mFolderItemList) {
             String folderName = mFolderItem.folderName;
+            Bundle folderData =  new Bundle();
+            folderData.putByte(BluetoothAvrcpController.EXTRA_FOLDER_TYPE, mFolderItem.folderType);
             int flag = MediaItem.FLAG_BROWSABLE;
             if (mFolderItem.isPlayable == 1 )
                 flag = flag | MediaItem.FLAG_PLAYABLE;
             String folderId = Long.toString(mFolderItem.mItemUid);
             mediaItems.add(new MediaItem(new MediaDescription.Builder().setMediaId(folderId)
-                    .setTitle(folderName).build(), flag));
+                    .setTitle(folderName).setExtras(folderData).build(), flag));
         }
         for (TrackInfo mTrackInfo: mRemoteFileSystem.mMediaItemList) {
             String mediaId = Long.toString(mTrackInfo.mItemUid);
+            Bundle mediaData =  new Bundle();
+            mediaData.putByte(BluetoothAvrcpController.EXTRA_MEDIA_TYPE, mTrackInfo.mediaType);
             mediaItems.add(new MediaItem(new MediaDescription.Builder().setMediaId(mediaId)
-                    .setTitle(mTrackInfo.mTrackTitle).build(), MediaItem.FLAG_PLAYABLE));
+                    .setTitle(mTrackInfo.mTrackTitle).setExtras(mediaData).build(), MediaItem.FLAG_PLAYABLE));
         }
         if (mPendingResult != null) {
             Log.d(TAG," updating VFS Result, size = " + mediaItems.size());
@@ -255,9 +259,11 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
         List<MediaSession.QueueItem> mPlayingQueue = new ArrayList<>();
         for (TrackInfo mTrackInfo: mRemoteFileSystem.mSearchList ) {
             String mediaId = Long.toString(mTrackInfo.mItemUid);
+            Bundle mediaData =  new Bundle();
+            mediaData.putByte(BluetoothAvrcpController.EXTRA_MEDIA_TYPE, mTrackInfo.mediaType);
             mPlayingQueue.add(new MediaSession.QueueItem(new MediaDescription.Builder()
                     .setMediaId(mediaId)
-                    .setTitle(mTrackInfo.mTrackTitle).build(), mTrackInfo.mItemUid));
+                    .setTitle(mTrackInfo.mTrackTitle).setExtras(mediaData).build(), mTrackInfo.mItemUid));
         }
         if (mSession.isActive()) {
             mSession.setQueue(mPlayingQueue);
@@ -278,6 +284,7 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
             data.putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, mTrackInfo.mTrackNum);
             data.putLong(MediaMetadata.METADATA_KEY_NUM_TRACKS, mTrackInfo.mTotalTracks);
             data.putLong(MediaMetadata.METADATA_KEY_DURATION, mTrackInfo.mTrackLen);
+            data.putByte(BluetoothAvrcpController.EXTRA_MEDIA_TYPE, mTrackInfo.mediaType);
             mPlayingQueue.add(new MediaSession.QueueItem(new MediaDescription.Builder()
                     .setMediaId(mediaId)
                     .setExtras(data)
