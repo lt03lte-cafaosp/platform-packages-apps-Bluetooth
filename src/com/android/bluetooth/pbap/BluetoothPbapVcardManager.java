@@ -90,8 +90,6 @@ public class BluetoothPbapVcardManager {
 
     private final String SIM_URI = "content://icc/adn";
 
-    private final int CONN_TYPE_1_2 = 3;
-
     static final String[] SIM_PROJECTION = new String[] {
             Contacts.DISPLAY_NAME,
             CommonDataKinds.Phone.NUMBER,
@@ -124,7 +122,6 @@ public class BluetoothPbapVcardManager {
     static final String CALLLOG_SORT_ORDER = Calls._ID + " DESC";
 
     private static final String CLAUSE_ONLY_VISIBLE = null;
-
     private static final int NEED_SEND_BODY = -1;
 
     public BluetoothPbapVcardManager(final Context context) {
@@ -138,8 +135,7 @@ public class BluetoothPbapVcardManager {
      * @param vcardType21
      * @return
      */
-    private final String getOwnerPhoneNumberVcardFromProfile(final boolean vcardType21, final byte[] filter,
-        int connType) {
+    private final String getOwnerPhoneNumberVcardFromProfile(final boolean vcardType21, final byte[] filter) {
         // Currently only support Generic Vcard 2.1 and 3.0
         int vcardType;
         if (vcardType21) {
@@ -148,17 +144,17 @@ public class BluetoothPbapVcardManager {
             vcardType = VCardConfig.VCARD_TYPE_V30_GENERIC;
         }
 
-        if (!BluetoothPbapConfig.includePhotosInVcard() || connType != CONN_TYPE_1_2) {
+        if (!BluetoothPbapConfig.includePhotosInVcard()) {
             vcardType |= VCardConfig.FLAG_REFRAIN_IMAGE_EXPORT;
         }
 
         return BluetoothPbapUtils.createProfileVCard(mContext, vcardType,filter);
     }
 
-    public final String getOwnerPhoneNumberVcard(final boolean vcardType21, final byte[] filter, int connType) {
+    public final String getOwnerPhoneNumberVcard(final boolean vcardType21, final byte[] filter) {
         //Owner vCard enhancement: Use "ME" profile if configured
         if (BluetoothPbapConfig.useProfileForOwnerVcard()) {
-            String vcard = getOwnerPhoneNumberVcardFromProfile(vcardType21, filter, connType);
+            String vcard = getOwnerPhoneNumberVcardFromProfile(vcardType21, filter);
             if (vcard != null && vcard.length() != 0) {
                 return vcard;
             }
@@ -741,7 +737,7 @@ public class BluetoothPbapVcardManager {
     public final int composeAndSendPhonebookVcards(Operation op, final int startPoint,
             final int endPoint, final boolean vcardType21, String ownerVCard, int needSendBody,
             int pbSize, boolean ignorefilter, byte[] filter, byte[] vcardselector,
-            String vcardselectorop, boolean vcardselect, int connType) {
+            String vcardselectorop, boolean vcardselect) {
         if (startPoint < 1 || startPoint > endPoint) {
             Log.e(TAG, "internal error: startPoint or endPoint is not correct.");
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
@@ -770,10 +766,10 @@ public class BluetoothPbapVcardManager {
         if (vcardselect)
             return composeContactsAndSendSelectedVCards(op, contactIdCursor, vcardType21,
                 ownerVCard, needSendBody, pbSize, ignorefilter, filter, vcardselector,
-                    vcardselectorop, connType);
+                    vcardselectorop);
         else
             return composeContactsAndSendVCards(op, contactIdCursor, vcardType21, ownerVCard,
-                ignorefilter, filter, connType);
+                ignorefilter, filter);
     }
     public final int composeAndSendSIMPhonebookVcards(Operation op, final int startPoint,
             final int endPoint, final boolean vcardType21, String ownerVCard) {
@@ -821,7 +817,7 @@ public class BluetoothPbapVcardManager {
 
     public final int composeAndSendPhonebookOneVcard(Operation op, final int offset,
             final boolean vcardType21, String ownerVCard, int orderByWhat, boolean ignorefilter,
-                byte[] filter, int connType) {
+                byte[] filter) {
         if (offset < 1) {
             Log.e(TAG, "Internal error: offset is not correct.");
             return ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
@@ -861,7 +857,7 @@ public class BluetoothPbapVcardManager {
             }
         }
         return composeContactsAndSendVCards(op, contactIdCursor, vcardType21, ownerVCard,
-                ignorefilter, filter, connType);
+                ignorefilter, filter);
     }
 
     /**
@@ -986,8 +982,7 @@ public class BluetoothPbapVcardManager {
     }
 
     public final int composeContactsAndSendVCards(Operation op, final Cursor contactIdCursor,
-            final boolean vcardType21, String ownerVCard, boolean ignorefilter, byte[] filter,
-                int connType) {
+            final boolean vcardType21, String ownerVCard, boolean ignorefilter, byte[] filter) {
         long timestamp = 0;
         if (V) timestamp = System.currentTimeMillis();
 
@@ -1003,7 +998,7 @@ public class BluetoothPbapVcardManager {
             } else {
                 vcardType = VCardConfig.VCARD_TYPE_V30_GENERIC;
             }
-            if (!vcardfilter.isPhotoEnabled() || connType != CONN_TYPE_1_2) {
+            if (!vcardfilter.isPhotoEnabled()) {
                 vcardType |= VCardConfig.FLAG_REFRAIN_IMAGE_EXPORT;
             }
 
@@ -1077,8 +1072,7 @@ public class BluetoothPbapVcardManager {
 
     public final int composeContactsAndSendSelectedVCards(Operation op, final Cursor
         contactIdCursor, final boolean vcardType21, String ownerVCard, int needSendBody, int pbSize,
-            boolean ignorefilter, byte[] filter, byte[] selector, String vcardselectorop,
-                int connType) {
+            boolean ignorefilter, byte[] filter, byte[] selector, String vcardselectorop) {
         long timestamp = 0;
         if (V) timestamp = System.currentTimeMillis();
 
@@ -1096,7 +1090,7 @@ public class BluetoothPbapVcardManager {
             } else {
                 vcardType = VCardConfig.VCARD_TYPE_V30_GENERIC;
             }
-            if (!vcardfilter.isPhotoEnabled() || connType != CONN_TYPE_1_2) {
+            if (!vcardfilter.isPhotoEnabled()) {
                 vcardType |= VCardConfig.FLAG_REFRAIN_IMAGE_EXPORT;
             }
 
