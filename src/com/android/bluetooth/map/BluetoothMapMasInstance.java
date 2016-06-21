@@ -408,11 +408,6 @@ public class BluetoothMapMasInstance implements IObexConnectionHandler {
             mObserver.deinit();
             mObserver = null;
         }
-        if (mSdpHandle >= 0) {
-            SdpManager.getDefaultManager().removeSdpRecord(mSdpHandle);
-            if(V) Log.d(TAG, "Removing SDP record for MAS instance: " + mMasInstanceId +
-                " Object reference: " + this + "SDP handle: " + mSdpHandle);
-        }
 
         closeConnectionSocket();
         //Donot block for Accept thread cleanup.
