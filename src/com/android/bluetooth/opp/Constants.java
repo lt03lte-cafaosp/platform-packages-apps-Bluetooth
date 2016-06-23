@@ -280,6 +280,7 @@ public class Constants {
 
     public static void updateShareStatus(Context context, int id, int status) {
         Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + id);
+        Log.i(TAG, "updateShareStatus:" + contentUri+" Status :" + status);
         ContentValues updateValues = new ContentValues();
         updateValues.put(BluetoothShare.STATUS, status);
         context.getContentResolver().update(contentUri, updateValues, null, null);
@@ -291,7 +292,8 @@ public class Constants {
      * completed.
      */
     public static void sendIntentIfCompleted(Context context, Uri contentUri, int status) {
-        if (BluetoothShare.isStatusCompleted(status)) {
+        if (BluetoothShare.isStatusCompleted(status))  {
+            Log.i(TAG, "sendIntentIfCompleted success ");
             Intent intent = new Intent(BluetoothShare.TRANSFER_COMPLETED_ACTION);
             intent.setClassName(THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             intent.setDataAndNormalize(contentUri);

@@ -231,8 +231,7 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
             context.getContentResolver().update(BluetoothShare.CONTENT_URI, updateValues,
                     BluetoothOppNotification.WHERE_COMPLETED, null);
         } else if (action.equals(BluetoothShare.TRANSFER_COMPLETED_ACTION)) {
-            if (V) Log.v(TAG, "Receiver Transfer Complete Intent for " + intent.getData());
-
+            if (D) Log.d(TAG, "Receiver Transfer Complete Intent for " + intent.getData());
             String toastMsg = null;
             BluetoothOppTransferInfo transInfo = new BluetoothOppTransferInfo();
             transInfo = BluetoothOppUtility.queryRecord(context, intent.getData());
@@ -264,10 +263,12 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
                 } else {
                     handoverIntent.putExtra(Constants.EXTRA_BT_OPP_TRANSFER_STATUS,
                             Constants.HANDOVER_TRANSFER_STATUS_FAILURE);
-                }
+                 }
+                if(D) Log.d(TAG, " HandoverIntent BR  sent ");
                 context.sendBroadcast(handoverIntent, Constants.HANDOVER_STATUS_PERMISSION);
                 return;
             }
+
 
             if (BluetoothShare.isStatusSuccess(transInfo.mStatus)) {
                 if (transInfo.mDirection == BluetoothShare.DIRECTION_OUTBOUND) {
