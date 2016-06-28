@@ -954,6 +954,11 @@ final class HeadsetStateMachine extends StateMachine {
                     BluetoothDevice device = mCurrentDevice;
                     // TODO(BT) when failure, broadcast audio connecting to disconnected intent
                     //          check if device matches mCurrentDevice
+                    if (!mA2dpSuspend) {
+                        log("Suspending a2dp stream");
+                        mAudioManager.setParameters("A2dpSuspended=true");
+                        mA2dpSuspend = true;
+                    }
                     if (mActiveScoDevice != null) {
                         log("connectAudioNative in Connected; mActiveScoDevice is not null");
                         device = mActiveScoDevice;
