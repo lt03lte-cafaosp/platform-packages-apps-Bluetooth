@@ -137,7 +137,8 @@ public class BluetoothMapMasInstance implements IObexConnectionHandler {
 
     @Override
     public String toString() {
-        return "MasId: " + mMasInstanceId + " Uri:" + mBaseUri + " SMS/MMS:" + mEnableSmsMms;
+        return "MasId: " + mMasInstanceId + " Uri:" + mBaseUri + " Is Enable SMS/MMS? :"
+                + mEnableSmsMms;
     }
 
     private void init() {
@@ -414,10 +415,9 @@ public class BluetoothMapMasInstance implements IObexConnectionHandler {
         }
 
         closeConnectionSocket();
-
-        if(V) Log.v(TAG, "Block acceptThreads: TRUE");
-        // Block to clean acceptThreads and avoid garbage collection
-        closeServerSockets(true);
+        //Donot block for Accept thread cleanup.
+        //Fix Handler Thread block during BT Turn OFF.
+        closeServerSockets(false);
     }
 
     /**
