@@ -627,7 +627,7 @@ public class BluetoothOppObexClientSession implements BluetoothOppObexSession {
                             status = BluetoothShare.STATUS_CONNECTION_ERROR;
                         }
                     }
-
+                    if (D) Log.d(TAG, " status:" + status + " id:" + mInfo.mId);
                     Constants.updateShareStatus(mContext1, mInfo.mId, status);
 
                     if (BluetoothOppManager.getInstance(mContext1).zero_length_file) {

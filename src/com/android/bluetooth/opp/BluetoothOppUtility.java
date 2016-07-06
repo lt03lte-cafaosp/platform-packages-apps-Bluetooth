@@ -126,8 +126,8 @@ public class BluetoothOppUtility {
                 info.mHandoverInitiated =
                         confirmationType == BluetoothShare.USER_CONFIRMATION_HANDOVER_CONFIRMED;
 
-                if (V) Log.v(TAG, "Get data from db:" + info.mFileName + info.mFileType
-                            + info.mDestAddr);
+                if (D) Log.d(TAG, "data from db:" + info.mFileName + info.mFileType
+                            + info.mDestAddr + " confirmationType" + confirmationType);
             }
             cursor.close();
             cursor = null;

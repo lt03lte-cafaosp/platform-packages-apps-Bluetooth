@@ -450,6 +450,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                 if (status != BluetoothShare.STATUS_SUCCESS) {
                     obexResponse = ResponseCodes.OBEX_HTTP_INTERNAL_ERROR;
                 }
+                if (D) Log.d(TAG, "status:" + status + " id:" + mInfo.mId);
                 Constants.updateShareStatus(mContext, mInfo.mId, status);
             }
 
