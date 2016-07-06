@@ -109,7 +109,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
     boolean mTransferInProgress = false;
 
-    private int position;
+    private long  position;
 
     public BluetoothOppObexServerSession(Context context, ObexTransport transport) {
         mContext = context;
@@ -572,7 +572,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
                         uiUpdateThread.interrupt ();
                         uiUpdateThread.join ();
                         uiUpdateThread = null;
-
+                        if (V) Log.v(TAG, "Worker for Updation : Destroyed");
                     ContentValues updateValues = new ContentValues();
                     updateValues.put(BluetoothShare.CURRENT_BYTES, position);
                         mContext.getContentResolver().update(contentUri, updateValues,
