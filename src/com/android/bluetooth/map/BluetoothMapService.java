@@ -114,7 +114,8 @@ public class BluetoothMapService extends ProfileService {
 
     private PowerManager.WakeLock mWakeLock = null;
 
-    private static final int UPDATE_MAS_INSTANCES = 5;
+    private static final int CREATE_MAS_INSTANCES = 5;
+    private static final int UPDATE_MAS_INSTANCES = 6;
 
     public static final int UPDATE_MAS_INSTANCES_ACCOUNT_ADDED = 0;
     public static final int UPDATE_MAS_INSTANCES_ACCOUNT_REMOVED = 1;
@@ -350,14 +351,27 @@ public class BluetoothMapService extends ProfileService {
     }
 
     private final class MapServiceMessageHandler extends Handler {
-        private MapServiceMessageHandler(Looper looper) {
+        Context mContxt;
+        private MapServiceMessageHandler(Context contxt, Looper looper) {
             super(looper);
+            mContxt = contxt;
         }
         @Override
         public void handleMessage(Message msg) {
             if (DEBUG) Log.d(TAG, "Handler(): got msg=" + msg.what);
 
             switch (msg.what) {
+                case CREATE_MAS_INSTANCES:
+                    Log.d(TAG, "CREATE_MAS_INSTANCES ");
+                    mAppObserver =
+                        new BluetoothMapAppObserver(mContxt, (BluetoothMapService)mContxt);
+                    if (mAppObserver != null ) {
+                        mEnabledAccounts = mAppObserver.getEnabledAccountItems();
+                    }
+                   /** Uses mEnabledAccounts, hence getEnabledAccountItems()
+                      * must be called before this. */
+                    createMasInstances();
+                    break;
                 case UPDATE_MAS_INSTANCES:
                     updateMasInstancesHandler();
                     break;
@@ -623,7 +637,7 @@ public class BluetoothMapService extends ProfileService {
         HandlerThread thread = new HandlerThread("BluetoothMapHandler");
         thread.start();
         Looper looper = thread.getLooper();
-        mSessionStatusHandler = new MapServiceMessageHandler(looper);
+        mSessionStatusHandler = new MapServiceMessageHandler(this, looper);
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
@@ -655,12 +669,8 @@ public class BluetoothMapService extends ProfileService {
             }
         }
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        mAppObserver = new BluetoothMapAppObserver(this, this);
-
-        mEnabledAccounts = mAppObserver.getEnabledAccountItems();
-        // Uses mEnabledAccounts, hence getEnabledAccountItems() must be called before this.
-        createMasInstances();
-
+        // Move SDP records create to Handler Thread instead of main thread.
+        sendCreateMasInstances();
         // start RFCOMM listener
         sendStartListenerMessage(-1);
         mStartError = false;
@@ -969,6 +979,24 @@ public class BluetoothMapService extends ProfileService {
         pIntent.cancel();
         alarmManager.cancel(pIntent);
         mRemoveTimeoutMsg = false;
+    }
+
+    /**
+      * Create both MAP SMS/MMS and EMAIL SDP in a handler thread.
+      */
+    public void sendCreateMasInstances() {
+        if (mSessionStatusHandler != null && !mSessionStatusHandler
+                .hasMessages(CREATE_MAS_INSTANCES)) {
+            Log.d(TAG, "mSessionStatusHandler CREATE_MAS_INSTANCES ");
+            Message msg = mSessionStatusHandler.obtainMessage(CREATE_MAS_INSTANCES);
+            /* We add a small delay here to ensure the call returns true before this message is
+             * handled. It seems wrong to add a delay, but the alternative is to build a lock
+             * system to handle synchronization, which isn't nice either... */
+            mSessionStatusHandler.sendMessage(msg);
+        } else if(mSessionStatusHandler != null ) {
+                if(DEBUG)
+                    Log.w(TAG, "mSessionStatusHandler START_MAPEMAIL message already in Queue");
+        }
     }
 
     /**
