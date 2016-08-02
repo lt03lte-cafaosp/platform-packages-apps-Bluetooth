@@ -418,13 +418,16 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
         }
 
         super.onDestroy();
-        setState(BluetoothPbap.STATE_DISCONNECTED, BluetoothPbap.RESULT_CANCELED);
+        if (getState() != BluetoothPbap.STATE_DISCONNECTED) {
+            setState(BluetoothPbap.STATE_DISCONNECTED, BluetoothPbap.RESULT_CANCELED);
+        }
+        if (DEBUG)
+            Log.d(TAG, "StatusHandler :" + mSessionStatusHandler + " mInterrupted:" + mInterrupted);
         // synchronize call to closeService by sending SHUTDOWN Message
-        if (mSessionStatusHandler != null){
-            Log.d(TAG, " onDestroy, sending SHUTDOWN Message");
-            mSessionStatusHandler.sendMessage(mSessionStatusHandler
-                .obtainMessage(SHUTDOWN));
-            }
+        if (mSessionStatusHandler != null && (!mInterrupted)) {
+            if (DEBUG) Log.d(TAG, " onDestroy, sending SHUTDOWN Message");
+            mSessionStatusHandler.sendMessage(mSessionStatusHandler.obtainMessage(SHUTDOWN));
+        }
     }
 
     @Override
@@ -514,7 +517,7 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
             sRemoteDeviceName = getString(R.string.defaultname);
         }
         int permission = mRemoteDevice.getPhonebookAccessPermission();
-        if (VERBOSE) Log.v(TAG, "getPhonebookAccessPermission() = " + permission);
+        if (DEBUG) Log.d(TAG, "getPhonebookAccessPermission() = " + permission);
 
         if (permission == BluetoothDevice.ACCESS_ALLOWED) {
             try {
@@ -528,8 +531,8 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                         + ex.toString());
             }
         } else if (permission == BluetoothDevice.ACCESS_REJECTED) {
-            if (VERBOSE) {
-                Log.v(TAG, "incoming connection rejected from: " + sRemoteDeviceName
+            if (DEBUG) {
+                Log.d(TAG, "incoming connection rejected from: " + sRemoteDeviceName
                         + " automatically as already rejected device");
             }
             return false;
@@ -773,7 +776,7 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                             .obtainMessage(AUTH_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
                     break;
                 case SHUTDOWN:
-                    Log.d(TAG, "Closing PBAP service");
+                    if (DEBUG) Log.d(TAG, "Closing PBAP service ");
                     closeService();
                     break;
                 case MSG_ACQUIRE_WAKE_LOCK:
@@ -805,6 +808,10 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
 
     private void setState(int state) {
         setState(state, BluetoothPbap.RESULT_SUCCESS);
+    }
+
+    private int getState() {
+        return mState;
     }
 
     private synchronized void setState(int state, int result) {
