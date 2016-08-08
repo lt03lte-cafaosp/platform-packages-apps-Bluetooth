@@ -300,7 +300,9 @@ public class AvrcpControllerService extends ProfileService {
                 sendCommand  = (mRemoteMediaPlayers.getPlayStatus() == 
                                        AvrcpControllerConstants.PLAY_STATUS_STOPPED)||
                                (mRemoteMediaPlayers.getPlayStatus() == 
-                                       AvrcpControllerConstants.PLAY_STATUS_PAUSED);
+                                       AvrcpControllerConstants.PLAY_STATUS_PAUSED)||
+                                (mRemoteMediaPlayers.getPlayStatus() ==
+                                       AvrcpControllerConstants.PLAY_STATUS_PLAYING);
                 break;
             case BluetoothAvrcpController.PASS_THRU_CMD_ID_PAUSE:
             /*
