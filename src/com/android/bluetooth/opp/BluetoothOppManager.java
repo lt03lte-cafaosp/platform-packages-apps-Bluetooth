@@ -285,12 +285,12 @@ public class BluetoothOppManager {
             Uri uri;
             if (V) Log.v(TAG, "cleanUpSendingFileInfo: mMultipleFlag = " +
                 mMultipleFlag);
-            if (!mMultipleFlag) {
+            if (!mMultipleFlag && (mUriOfSendingFile != null)) {
                 uri = Uri.parse(mUriOfSendingFile);
                 if (V) Log.v(TAG, "cleanUpSendingFileInfo: " +
                     "closeSendFileInfo for uri = " + uri);
                 BluetoothOppUtility.closeSendFileInfo(uri);
-            } else {
+            } else if (mUrisOfSendingFiles != null)  {
                 for (int i = 0, count = mUrisOfSendingFiles.size(); i < count; i++) {
                     uri = mUrisOfSendingFiles.get(i);
                     if (V) Log.v(TAG, "cleanUpSendingFileInfo: " +
