@@ -76,6 +76,8 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
     /* ID to handle Virtual File System Root */
     private MediaSession  mSession;
     private Result mPendingResult = null;
+    Object resetRoot = null;
+    boolean waitForResetRoot = false;
 
     @Override
     public void onCreate() {
@@ -96,6 +98,8 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
             mSession.setMetadata(getCurrentMetaData());
             mSession.setPlaybackState(getCurrentPlayBackState());
         }
+        resetRoot = new Object();
+        waitForResetRoot = false;
         mSession.setActive(true);
     }
     @Override
@@ -125,8 +129,23 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
             Log.e(TAG," onGetRoot, Browsed player not set ");
             return null;
         }
-        if (!ctrlService.browseToRoot())
-            return null;
+        synchronized (resetRoot) {
+            int ret = ctrlService.browseToRoot();
+            Log.d(TAG," browseToRoot returned "+ ret);
+            if (ret == AvrcpControllerConstants.STATUS_INVALID)
+                return null;
+            if (ret > 0) {
+                try {
+                    waitForResetRoot = true;
+                    Log.d(TAG, " onGetRoot waiting for resetRoot ");
+                    resetRoot.wait();
+                } catch (InterruptedException e) {
+                    Log.e(TAG, " interrrupted in OnGetRoot ");
+                }
+                waitForResetRoot = false;
+            }
+        }
+        Log.d(TAG, " returning BrowseRoot ");
         /* make current scope as browsing */
         return new BrowserRoot(AvrcpControllerConstants.AVRCP_BROWSE_ROOT_FOLDER, null);
     }
@@ -299,6 +318,14 @@ public class AvrcpControllerBrowseService extends MediaBrowserService {
                 mSession.setQueue(mPlayingQueue);
             }
             mSession.setQueueTitle("Now Playing List");
+        }
+    }
+    public void notifyResetRootDone() {
+        synchronized (resetRoot) {
+            if (waitForResetRoot) {
+                Log.d(TAG, " notifyResetRootDone ");
+                resetRoot.notify();
+            }
         }
     }
     public void updateMetaData(MediaMetadata mediaMetadata) {
