@@ -472,13 +472,17 @@ public class AvrcpControllerService extends ProfileService {
         if (mAvrcpRemoteDevice == null) return AvrcpControllerConstants.BTRC_FEAT_NONE;
         return mAvrcpRemoteDevice.mRemoteFeatures;
     }
-    public boolean browseToRoot() {
+    /* returns folderDepth from root folder
+    *  0 - in case we don't have to send change path
+    *  STATUS_INVALID in case of error
+     *  +ve value of folderdepth in case changepath required*/
+    public int browseToRoot() {
         Log.d(TAG," browseToRoot ");
         if (GetBrowsedPlayer() == null){
             Log.d(TAG," browseToRoot called when Browsed player is not set");
-            return false;
+            return AvrcpControllerConstants.STATUS_INVALID;
         }
-        if (mRemoteFileSystem == null) return false;
+        if (mRemoteFileSystem == null) return AvrcpControllerConstants.STATUS_INVALID;
         mRemoteFileSystem.clearSearchList();
         mRemoteNowPlayingList.clearNowPlayingList();
         mAvrcpRemoteDevice.setCurrentScope(AvrcpControllerConstants.AVRCP_SCOPE_VFS);
@@ -487,7 +491,7 @@ public class AvrcpControllerService extends ProfileService {
             stackInfo.folderUid = AvrcpControllerConstants.AVRCP_BROWSE_ROOT_FOLDER;
             stackInfo.numItems = AvrcpControllerConstants.DEFAULT_BROWSE_END_INDEX;
             mRemoteFileSystem.mFolderStack.add(stackInfo);
-            return true;
+            return 0;
         }
         /* We have to perform changePath to Root */
         int changePathDepth = -1 * (mRemoteFileSystem.mFolderStack.size() - 1);
@@ -496,7 +500,7 @@ public class AvrcpControllerService extends ProfileService {
                     changePathDepth, 0);
             mHandler.sendMessage(msg);
         }
-        return true;
+        return (-1 * changePathDepth);
     }
     public boolean loadFolderUp(final String folderId) {
         if ((mAvrcpRemoteDevice == null) || (mAvrcpRemoteDevice.getCurrentScope() !=
@@ -558,7 +562,7 @@ public class AvrcpControllerService extends ProfileService {
             mAvrcpRemoteDevice.setCurrentScope(AvrcpControllerConstants.AVRCP_SCOPE_VFS);
             if (mRemoteFileSystem.mFolderStack.isEmpty()) {
                 /* This will be the case after doing SetAddressedPlayer */
-                if (!browseToRoot()) {
+                if (browseToRoot() == AvrcpControllerConstants.STATUS_INVALID) {
                     return false;
                 }
             }
@@ -1584,6 +1588,13 @@ public class AvrcpControllerService extends ProfileService {
                     if (folderDepth == 0) {
                         mAvrcpRemoteDevice.mPendingBrwCmds.removeCmd(0);
                         resetBipForBrowsing();
+                        AvrcpControllerBrowseService avrcpBrService = AvrcpControllerBrowseService.
+                                getAvrcpControllerBrowseService();
+                        String topmostFolderUid = mRemoteFileSystem.mFolderStack.get(mRemoteFileSystem.mFolderStack.size() - 1).folderUid;
+                        Log.d(TAG," current top folder " + topmostFolderUid);
+                        if(topmostFolderUid == AvrcpControllerConstants.AVRCP_BROWSE_ROOT_FOLDER) {
+                            avrcpBrService.notifyResetRootDone();
+                        }
                     }
                     else {
                         data.putInt("delta", folderDepth);
