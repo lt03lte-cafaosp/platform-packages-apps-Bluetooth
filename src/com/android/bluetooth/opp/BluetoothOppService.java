@@ -496,7 +496,7 @@ public class BluetoothOppService extends Service {
                     }
                     try {
                         if (!mPowerManager.isInteractive())
-                            Thread.sleep(1000);
+                            Thread.sleep(10);
                     } catch (InterruptedException e) {
                             Log.e(TAG, "Interrupted", e);
                     }
