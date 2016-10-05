@@ -336,15 +336,21 @@ final class HeadsetStateMachine extends StateMachine {
         if (mHeadsetBrsf != null) {
             mHeadsetBrsf.clear();
         }
-        if (mConnectedDevicesList != null) {
-            mConnectedDevicesList.clear();
-        }
         if (mActiveScoDevice != null && !mPhoneState.getIsCsCall()) {
             sendVoipConnectivityNetworktype(false);
         }
         if (mNativeAvailable) {
             cleanupNative();
             mNativeAvailable = false;
+        }
+        if (mConnectedDevicesList != null) {
+            int deviceSize = mConnectedDevicesList.size();
+            for (int i = 0; i < deviceSize; i++) {
+                mCurrentDevice = mConnectedDevicesList.get(i);
+                broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_DISCONNECTED,
+                                          BluetoothProfile.STATE_CONNECTED);
+            }
+            mConnectedDevicesList.clear();
         }
     }
 
