@@ -126,6 +126,13 @@ class AdapterProperties {
             mBondedDevices.clear();
     }
 
+    public boolean brEdrCleanup() {
+        synchronized (mObject) {
+            return mService.setAdapterPropertyNative(
+                    AbstractionLayer.BT_PROPERTY_BREDR_CLEANUP, Utils.intToByteArray(1));
+        }
+    }
+
     @Override
     public Object clone() throws CloneNotSupportedException {
         throw new CloneNotSupportedException();
@@ -584,7 +591,13 @@ class AdapterProperties {
                         mService.sendBroadcast(intent, mService.BLUETOOTH_PERM);
                         debugLog("Scan Mode:" + mScanMode);
                         if (mBluetoothDisabling) {
-                            mBluetoothDisabling=false;
+                            mService.startBrEdrCleanup();
+                        }
+                        break;
+                    case AbstractionLayer.BT_PROPERTY_BREDR_CLEANUP:
+                        debugLog("BREDR cleanup done");
+                        if (mBluetoothDisabling) {
+                            mBluetoothDisabling = false;
                             mService.startBluetoothDisable();
                         }
                         break;
