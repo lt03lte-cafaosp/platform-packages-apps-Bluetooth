@@ -419,6 +419,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 mConnectThread.interrupt();
                 if (V) Log.v(TAG, "waiting for connect thread to terminate");
                 mConnectThread.join();
+                if (V) Log.v(TAG, "connect thread terminated");
             } catch (InterruptedException e) {
                 if (V) Log.v(TAG, "Interrupted waiting for connect thread to join");
             }
@@ -593,6 +594,8 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         private boolean mRetry = false;
 
+        private boolean isInterrupted = false;
+
         /* create a TCP socket */
         public SocketConnectThread(String host, int port, int dummy) {
             super("Socket Connect Thread");
@@ -611,6 +614,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             this.channel = channel;
             isConnected = false;
             mRetry = retry;
+            isInterrupted = false;
         }
 
         /* create a Rfcomm Socket */
@@ -622,10 +626,13 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
             this.channel = -1;
             isConnected = false;
             mRetry = retry;
+            isInterrupted = false;
         }
 
         public void interrupt() {
             if (!Constants.USE_TCP_DEBUG) {
+                isInterrupted = true;
+                OolConnManager.interruptSdp= true;
                 if (btSocket != null) {
                     try {
                         btSocket.close();
@@ -633,12 +640,18 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                         Log.v(TAG, "Error when close socket");
                     }
                 }
+                if (V) Log.v(TAG, " Socket thread interrupted ");
             }
         }
 
         private void connectRfcommSocket() {
 
             try {
+                if (isInterrupted) {
+                    Log.d(TAG, "connectRfcommSocket interrupted");
+                    markConnectionFailed(btSocket);
+                    return;
+                  }
                 btSocket = device.createInsecureRfcommSocketToServiceRecord(BluetoothUuid.ObexObjectPush.getUuid());
             } catch (IOException e1) {
                 Log.e(TAG, "Rfcomm socket create error",e1);
@@ -749,7 +762,13 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
                 l2cChannel = 0;
                 try {
                     l2cChannel = OolConnManager.getL2cPSM(device);
-                    btSocket = device.createInsecureL2capSocket(l2cChannel);
+                    if (isInterrupted) {
+                        Log.e(TAG, "btSocket connect interrupted ");
+                        markConnectionFailed(btSocket);
+                        return;
+                    } else {
+                        btSocket = device.createInsecureL2capSocket(l2cChannel);
+                    }
                 } catch (IOException e1) {
                   Log.e(TAG, "L2cap socket create error",e1);
                   connectRfcommSocket();
