@@ -2333,6 +2333,10 @@ public class AdapterService extends Service {
                 mAlarmManager.cancel(mPendingAlarm);
             }
 
+            if(delayMillis == 0) {
+                return false;
+            }
+
             long wakeupTime = SystemClock.elapsedRealtime() + delayMillis;
             int type = shouldWake
                 ? AlarmManager.ELAPSED_REALTIME_WAKEUP
