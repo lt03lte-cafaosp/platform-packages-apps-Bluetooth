@@ -81,6 +81,10 @@ class BluetoothOppNotification {
     private static final String WHERE_COMPLETED_OUTBOUND = WHERE_COMPLETED + " AND " + "("
             + BluetoothShare.DIRECTION + " == " + BluetoothShare.DIRECTION_OUTBOUND + ")";
 
+    private static final String WHERE_ALL_OUTBOUND = visible +
+            " AND " + not_through_handover + " AND " + "("
+            + BluetoothShare.DIRECTION + " == " + BluetoothShare.DIRECTION_OUTBOUND + ")";
+
     private static final String WHERE_COMPLETED_INBOUND = WHERE_COMPLETED + " AND " + "("
             + BluetoothShare.DIRECTION + " == " + BluetoothShare.DIRECTION_INBOUND + ")";
 
@@ -105,6 +109,7 @@ class BluetoothOppNotification {
 
     private int mActiveNotificationId = 0;
 
+    private boolean mUpdateCount = false;
     /**
      * This inner class is used to describe some properties for one transfer.
      */
@@ -159,10 +164,13 @@ class BluetoothOppNotification {
     public void updateNotifier() {
         if (V) Log.v(TAG, "updateNotifier while BT is Turning OFF");
         synchronized (BluetoothOppNotification.this) {
+            if (mHandler != null) {
+                mHandler.removeCallbacksAndMessages(null);
+            }
             updateActiveNotification();
             if (V) Log.v(TAG, "Update Inbound and Outbound count");
             mUpdateCompleteNotification = true;
-            updateCompletedNotification();
+            updateCompletedNotification(true);
             cancelIncomingFileConfirmNotification();
         }
     }
@@ -213,7 +221,7 @@ class BluetoothOppNotification {
                 mPendingUpdate = 0;
             }
             updateActiveNotification();
-            updateCompletedNotification();
+            updateCompletedNotification(false);
             updateIncomingFileConfirmNotification();
             synchronized (BluetoothOppNotification.this) {
                 mUpdateNotificationThread = null;
@@ -366,11 +374,14 @@ class BluetoothOppNotification {
             b.setContentIntent(PendingIntent.getBroadcast(mContext, 0, intent, 0));
             mNotificationMgr.notify(item.id, b.getNotification());
 
-            mActiveNotificationId = item.id;
+            if (mActiveNotificationId != item.id) {
+                mActiveNotificationId = item.id;
+                mUpdateCount = true;
+            }
         }
     }
 
-    private void updateCompletedNotification() {
+    private void updateCompletedNotification(boolean btTurningOff) {
         String title;
         String unsuccess_caption;
         String caption;
@@ -385,25 +396,28 @@ class BluetoothOppNotification {
 
         // If there is active transfer, no need to update complete transfer
         // notification
-        if (!mUpdateCompleteNotification) {
+        if (!mUpdateCompleteNotification && !mUpdateCount) {
             if (V) Log.v(TAG, "No need to update complete notification");
             return;
         }
+        mUpdateCount = false;
 
         // After merge complete notifications to 2 notifications, there is no
         // chance to update the active notifications to complete notifications
         // as before. So need cancel the active notification after the active
         // transfer becomes complete.
-        if (mNotificationMgr != null && mActiveNotificationId != 0) {
+        if (mNotificationMgr != null && mActiveNotificationId != 0 && mUpdateCompleteNotification) {
             mNotificationMgr.cancel(mActiveNotificationId);
             if (V) Log.v(TAG, "ongoing transfer notification was removed");
         }
+        if (V) Log.v(TAG, "updateCompletedNotification, btTurningOff: " + btTurningOff);
 
         // Creating outbound notification
         Cursor cursor;
         try {
+            String selection = btTurningOff ? WHERE_ALL_OUTBOUND : WHERE_COMPLETED_OUTBOUND;
             cursor = mContext.getContentResolver().query(BluetoothShare.CONTENT_URI, null,
-                   WHERE_COMPLETED_OUTBOUND, null, BluetoothShare.TIMESTAMP + " DESC");
+                   selection, null, BluetoothShare.TIMESTAMP + " DESC");
         } catch (SQLiteException e) {
             cursor = null;
             Log.e(TAG, "SQLite exception: " + e);
@@ -422,7 +436,8 @@ class BluetoothOppNotification {
             }
             int status = cursor.getInt(statusIndex);
 
-            if (BluetoothShare.isStatusError(status)) {
+            if (BluetoothShare.isStatusError(status)
+                    || (btTurningOff && BluetoothShare.isStatusInformational(status))) {
                 outboundFailNumber++;
             } else {
                 outboundSuccNumber++;
