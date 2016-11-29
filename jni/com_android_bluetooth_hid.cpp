@@ -29,6 +29,7 @@
 #include "utils/Log.h"
 #include "android_runtime/AndroidRuntime.h"
 
+#include <pthread.h>
 #include <string.h>
 
 namespace android {
@@ -43,6 +44,8 @@ static jmethodID method_onVirtualUnplug;
 static const bthh_interface_t *sBluetoothHidInterface = NULL;
 static jobject mCallbacksObj = NULL;
 static JNIEnv *sCallbackEnv = NULL;
+
+static pthread_mutex_t mMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static bool checkCallbackThread() {
 
@@ -70,7 +73,15 @@ static void connection_state_callback(bt_bdaddr_t *bd_addr, bthh_connection_stat
     }
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onConnectStateChanged, addr, (jint) state);
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onConnectStateChanged,
+            addr, (jint) state);
+    } else {
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    }
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -93,7 +104,15 @@ static void get_protocol_mode_callback(bt_bdaddr_t *bd_addr, bthh_status_t hh_st
     }
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onGetProtocolMode, addr, (jint) mode);
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onGetProtocolMode,
+            addr, (jint) mode);
+    } else {
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    }
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -116,7 +135,15 @@ static void get_idle_time_callback(bt_bdaddr_t *bd_addr, bthh_status_t hh_status
     }
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onGetIdleTime, addr, (jint) idle_time);
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onGetIdleTime,
+            addr, (jint) idle_time);
+    } else {
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    }
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -149,7 +176,15 @@ static void get_report_callback(bt_bdaddr_t *bd_addr, bthh_status_t hh_status, u
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
     sCallbackEnv->SetByteArrayRegion(data, 0, rpt_size, (jbyte *) rpt_data);
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onGetReport, addr, data, (jint) rpt_size);
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onGetReport,
+            addr, data, (jint) rpt_size);
+    } else {
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    }
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
     sCallbackEnv->DeleteLocalRef(data);
@@ -168,7 +203,15 @@ static void virtual_unplug_callback(bt_bdaddr_t *bd_addr, bthh_status_t hh_statu
     }
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
 
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onVirtualUnplug, addr, (jint) hh_status);
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onVirtualUnplug,
+            addr, (jint) hh_status);
+    } else {
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    }
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 
@@ -201,7 +244,15 @@ static void handshake_callback(bt_bdaddr_t *bd_addr, bthh_status_t hh_status)
         return;
     }
     sCallbackEnv->SetByteArrayRegion(addr, 0, sizeof(bt_bdaddr_t), (jbyte *) bd_addr);
-    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onHandshake, addr, (jint) hh_status);
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onHandshake,
+            addr, (jint) hh_status);
+    } else {
+        ALOGE("Callbacks Obj is no more valid: '%s", __FUNCTION__);
+    }
+    pthread_mutex_unlock(&mMutex);
+
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
     sCallbackEnv->DeleteLocalRef(addr);
 }
@@ -245,28 +296,33 @@ static void initializeNative(JNIEnv *env, jobject object) {
         sBluetoothHidInterface = NULL;
     }
 
-    if (mCallbacksObj != NULL) {
-        ALOGW("Cleaning up Bluetooth GID callback object");
-        env->DeleteGlobalRef(mCallbacksObj);
-        mCallbacksObj = NULL;
-    }
-
-
     if ( (sBluetoothHidInterface = (bthh_interface_t *)
           btInf->get_profile_interface(BT_PROFILE_HIDHOST_ID)) == NULL) {
         ALOGE("Failed to get Bluetooth HID Interface");
         return;
     }
 
+    pthread_mutex_lock(&mMutex);
+    if (mCallbacksObj != NULL) {
+        ALOGW("Cleaning up Bluetooth HID callback object");
+        env->DeleteGlobalRef(mCallbacksObj);
+        mCallbacksObj = NULL;
+    }
+    mCallbacksObj = env->NewGlobalRef(object);
+    pthread_mutex_unlock(&mMutex);
+
     if ( (status = sBluetoothHidInterface->init(&sBluetoothHidCallbacks)) != BT_STATUS_SUCCESS) {
         ALOGE("Failed to initialize Bluetooth HID, status: %d", status);
         sBluetoothHidInterface = NULL;
+        pthread_mutex_lock(&mMutex);
+        if (mCallbacksObj != NULL) {
+            ALOGW("Cleaning up Bluetooth HID callback object");
+            env->DeleteGlobalRef(mCallbacksObj);
+            mCallbacksObj = NULL;
+        }
+        pthread_mutex_unlock(&mMutex);
         return;
     }
-
-
-
-    mCallbacksObj = env->NewGlobalRef(object);
 }
 
 static void cleanupNative(JNIEnv *env, jobject object) {
@@ -283,13 +339,13 @@ static void cleanupNative(JNIEnv *env, jobject object) {
         sBluetoothHidInterface = NULL;
     }
 
+    pthread_mutex_lock(&mMutex);
     if (mCallbacksObj != NULL) {
-        ALOGW("Cleaning up Bluetooth GID callback object");
+        ALOGW("Cleaning up Bluetooth HID callback object");
         env->DeleteGlobalRef(mCallbacksObj);
         mCallbacksObj = NULL;
     }
-
-    env->DeleteGlobalRef(mCallbacksObj);
+    pthread_mutex_unlock(&mMutex);
 }
 
 static jboolean connectHidNative(JNIEnv *env, jobject object, jbyteArray address) {
