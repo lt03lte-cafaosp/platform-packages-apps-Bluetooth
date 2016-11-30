@@ -1464,38 +1464,47 @@ public final class Avrcp {
 
             case MESSAGE_FAST_FORWARD:
             case MESSAGE_REWIND:
-                 deviceIndex = getIndexForDevice((BluetoothDevice) msg.obj);
-                 if (msg.what == MESSAGE_FAST_FORWARD) {
-                     if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
-                                 PlaybackState.ACTION_FAST_FORWARD) != 0) {
-                          int keyState = msg.arg1 == KEY_STATE_PRESS ?
-                                  KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
-                          KeyEvent keyEvent =
-                                  new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
-                          mMediaController.dispatchMediaButtonEvent(keyEvent);
-                          break;
-                     }
-                 } else if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
-                             PlaybackState.ACTION_REWIND) != 0) {
-                     int keyState = msg.arg1 == KEY_STATE_PRESS ?
-                             KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
-                     KeyEvent keyEvent =
-                             new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_REWIND);
-                     mMediaController.dispatchMediaButtonEvent(keyEvent);
-                     break;
-                 }
-                 int skipAmount;
-                 if (msg.what == MESSAGE_FAST_FORWARD) {
-                     if (DEBUG)
-                         Log.v(TAG, "MESSAGE_FAST_FORWARD");
-                     removeMessages(MESSAGE_FAST_FORWARD);
-                     skipAmount = BASE_SKIP_AMOUNT;
-                 } else {
-                     if (DEBUG)
-                         Log.v(TAG, "MESSAGE_REWIND");
-                     removeMessages(MESSAGE_REWIND);
-                     skipAmount = -BASE_SKIP_AMOUNT;
-                 }
+                deviceIndex = getIndexForDevice((BluetoothDevice) msg.obj);
+                if (msg.what == MESSAGE_FAST_FORWARD) {
+                    if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
+                                PlaybackState.ACTION_FAST_FORWARD) != 0) {
+                        int keyState = msg.arg1 == KEY_STATE_PRESS ?
+                                KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
+                        KeyEvent keyEvent =
+                                new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
+                        if (mMediaController != null) {
+                            mMediaController.dispatchMediaButtonEvent(keyEvent);
+                        } else {
+                            Log.e(TAG, "MediaController null ");
+                        }
+                        break;
+                    }
+                } else if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
+                            PlaybackState.ACTION_REWIND) != 0) {
+                    int keyState = msg.arg1 == KEY_STATE_PRESS ?
+                            KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
+                    KeyEvent keyEvent =
+                            new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_REWIND);
+                    if (mMediaController != null) {
+                        mMediaController.dispatchMediaButtonEvent(keyEvent);
+                    } else {
+                        Log.e(TAG, "MediaController null");
+                    }
+                    break;
+                }
+
+                int skipAmount;
+                if (msg.what == MESSAGE_FAST_FORWARD) {
+                    if (DEBUG)
+                        Log.v(TAG, "MESSAGE_FAST_FORWARD");
+                    removeMessages(MESSAGE_FAST_FORWARD);
+                    skipAmount = BASE_SKIP_AMOUNT;
+                } else {
+                    if (DEBUG)
+                        Log.v(TAG, "MESSAGE_REWIND");
+                    removeMessages(MESSAGE_REWIND);
+                    skipAmount = -BASE_SKIP_AMOUNT;
+                }
 
                  if (hasMessages(MESSAGE_CHANGE_PLAY_POS) &&
                      (skipAmount != mSkipAmount)) {
@@ -2745,7 +2754,7 @@ public final class Avrcp {
                 retError =  INTERNAL_ERROR;
                 num_attributes = 0;
             }
-            folder_depth = folderPath.size() - 1;
+            folder_depth = (folderPath.size() > 0) ? folderPath.size()- 1 : 0;
             String [] folderNames = new String[folderPath.size()];
             folderNames = folderPath.toArray(folderNames);
             Log.i(TAG,"SetBrowsedplayer for playerid = " + playerId + " and status code" + retError);
@@ -3520,6 +3529,7 @@ public final class Avrcp {
                 }
             }
         }
+
         if (scope == SCOPE_VIRTUAL_FILE_SYS) {
             if (deviceFeatures[deviceIndex].mCurrentPath.equals(PATH_ROOT)) {
                 playItemRspNative(UID_A_DIRECTORY ,
@@ -3667,7 +3677,13 @@ public final class Avrcp {
 
             }
         } else if (scope == SCOPE_NOW_PLAYING) {
-            mMediaController.getTransportControls().setRemoteControlClientPlayItem(uid, scope);
+            if (mMediaController != null) {
+                mMediaController.getTransportControls().setRemoteControlClientPlayItem(uid, scope);
+            } else {
+               Log.e(TAG,"Media Controller null");
+               playItemRspNative(INTERNAL_ERROR ,
+                       getByteAddress(device));
+            }
         } else {
             playItemRspNative(DOES_NOT_EXIST ,
                     getByteAddress(device));
@@ -3738,9 +3754,14 @@ public final class Avrcp {
         }
         if (scope == SCOPE_NOW_PLAYING && cachereq) {
             Log.v(TAG,"scope now playing, caching req");
-            mMediaController.getTransportControls().getRemoteControlClientNowPlayingEntries();
-            mCachedRequest = new CachedRequest((long)0, (long)0, numAttr, attrs, size, false,
-                                               uid, scope, deviceAddress, true);
+            if (mMediaController != null) {
+                mMediaController.getTransportControls().getRemoteControlClientNowPlayingEntries();
+                mCachedRequest = new CachedRequest((long)0, (long)0, numAttr, attrs, size, false,
+                                                   uid, scope, deviceAddress, true);
+            } else {
+               Log.e(TAG,"Media Controller null");
+               return;
+            }
         }
         else
             processGetItemAttr(scope, uid, numAttr, attrs, size, deviceAddress, null);
@@ -4947,9 +4968,18 @@ public final class Avrcp {
                     }
                 }
             }
-            mMediaController.getTransportControls().getRemoteControlClientNowPlayingEntries();
-            mCachedRequest = new CachedRequest(start, end, numAttr, attrs, size, true, (long)0,
-                                               (byte)0, null, false);
+            if (mMediaController != null) {
+                mMediaController.getTransportControls().getRemoteControlClientNowPlayingEntries();
+                mCachedRequest = new CachedRequest(start, end, numAttr, attrs, size, true, (long)0,
+                                                   (byte)0, null, false);
+            } else {
+                getFolderItemsRspNative((byte)INTERNAL_ERROR ,
+                        numItems, itemType, uid, type,
+                        playable, displayName, numAtt, attValues, attIds, size,
+                        getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
+                Log.e(TAG, "Media Controller null");
+                return;
+            }
         }
     }
 
@@ -5163,7 +5193,11 @@ public final class Avrcp {
         long currentPosMs = getPlayPosition(mAdapter.getRemoteDevice(deviceAddress));
         if (currentPosMs == -1L) return;
         long newPosMs = Math.max(0L, currentPosMs + amount);
-        mMediaController.getTransportControls().seekTo(newPosMs);
+        if (mMediaController != null) {
+            mMediaController.getTransportControls().seekTo(newPosMs);
+        } else {
+            Log.e(TAG, "MediaController is null");
+        }
     }
 
     private int getSkipMultiplier() {
