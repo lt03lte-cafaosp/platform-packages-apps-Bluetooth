@@ -623,7 +623,6 @@ public class BluetoothMapService extends ProfileService {
         if (!mRegisteredMapReceiver) {
             try {
                 registerReceiver(mMapReceiver, filter);
-                registerReceiver(mMapReceiver, filterMessageSent);
                 // We need WRITE_SMS permission to handle messages in
                 // actionMessageSentDisconnected()
                 registerReceiver(mMapReceiver, filterMessageSent,
