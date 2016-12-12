@@ -368,6 +368,7 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             Intent in = new Intent(BluetoothShare.INCOMING_FILE_CONFIRMATION_REQUEST_ACTION);
             in.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             mContext.sendBroadcast(in);
+            sendVendorDebugBroadcast();
         }
 
 
@@ -491,6 +492,23 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             msg.sendToTarget();
         }
         return obexResponse;
+    }
+
+    /*
+     * Automation team not able to find incoming file notification
+     * so broad cast to CST APP when receive incoming file request
+     * @ Condition set persistent property using adb "persist.sys.opp" opp
+     */
+    private void sendVendorDebugBroadcast() {
+        String property = android.os.SystemProperties.get("persist.sys.opp", "");
+        if (property.equals("opp")) {
+            Intent intent = new Intent(BluetoothShare.INCOMING_FILE_CONFIRMATION_REQUEST_ACTION);
+            intent.setComponent(new android.content.ComponentName("com.android.CST",
+                "com.android.CST.ConnectivitySystemTest.OppIncomingReceiver"));
+            mContext.sendBroadcast(intent);
+            if(D) Log.d(TAG, "intent :" + intent);
+        }
+        if(D) Log.d(TAG, "property :" + property +":");
     }
 
     private int receiveFile(BluetoothOppReceiveFileInfo fileInfo, Operation op) {
