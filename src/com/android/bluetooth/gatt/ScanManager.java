@@ -266,7 +266,7 @@ public class ScanManager {
 
                 mScanNative.stopRegularScan(client);
 
-                if (mScanNative.numRegularScanClients() == 0) {
+                if (mScanNative.numRegularScanClients() == 0 && mHandler != null) {
                     mHandler.removeMessages(MSG_SCAN_TIMEOUT);
                 }
 
