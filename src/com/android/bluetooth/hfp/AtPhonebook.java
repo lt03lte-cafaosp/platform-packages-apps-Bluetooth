@@ -67,7 +67,8 @@ public class AtPhonebook {
     private static final String INCOMING_CALL_WHERE = Calls.TYPE + "=" + Calls.INCOMING_TYPE;
     private static final String MISSED_CALL_WHERE = Calls.TYPE + "=" + Calls.MISSED_TYPE;
     private static final String VISIBLE_PHONEBOOK_WHERE = Phone.IN_VISIBLE_GROUP + "=1";
-
+    /** Call log type for outgoing IMS calls. */
+    private static final int OUTGOING_IMS_TYPE = 9;
     private class PhonebookResult {
         public Cursor  cursor; // result set of last query
         public int     numberColumn;
@@ -122,8 +123,11 @@ public class AtPhonebook {
     public String getLastDialledNumber() {
         String[] projection = {Calls.NUMBER};
         Cursor cursor = mContentResolver.query(Calls.CONTENT_URI, projection,
-                Calls.TYPE + "=" + Calls.OUTGOING_TYPE, null, Calls.DEFAULT_SORT_ORDER +
+                Calls.TYPE + " = " + Calls.OUTGOING_TYPE + " OR " + Calls.TYPE +
+                " = " + OUTGOING_IMS_TYPE + " OR " + Calls.TYPE + " = " +
+                Calls.OUTGOING_WIFI_TYPE, null, Calls.DEFAULT_SORT_ORDER +
                 " LIMIT 1");
+        Log.w(TAG, "Queried the last dialled number for CS, IMS, WIFI calls");
         if (cursor == null) return null;
 
         if (cursor.getCount() < 1) {
