@@ -669,7 +669,7 @@ public final class Avrcp {
                     SUB_TYPE_NONE,
                     (byte)RemoteControlClient.PLAYSTATE_PAUSED,
                     CHAR_SET_UTF8,
-                    (short)0x05,
+                    (short)playerName1.length,
                     playerName1,
                     "com.android.music",
                     true,
@@ -679,7 +679,7 @@ public final class Avrcp {
                     SUB_TYPE_NONE,
                     (byte)RemoteControlClient.PLAYSTATE_PAUSED,
                     CHAR_SET_UTF8,
-                    (short)0x06,
+                    (short)playerName2.length,
                     playerName2,
                     "com.google.android.music",
                     true,
@@ -4288,6 +4288,9 @@ public final class Avrcp {
                 break;
 
             case EVT_PLAY_POS_CHANGED:
+                if (param <= 0)
+                    param = 1;
+
                 long songPosition = getPlayPosition(deviceFeatures[deviceIndex].mCurrentDevice);
                 deviceFeatures[deviceIndex].mPlayPosChangedNT = NOTIFICATION_TYPE_INTERIM;
                 deviceFeatures[deviceIndex].mPlaybackIntervalMs = (long)param * 1000L;
