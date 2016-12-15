@@ -30,6 +30,7 @@ public class BluetoothMapbMessageSms extends BluetoothMapbMessage {
     private String mSmsBody = null;
     private String PCM_CARKIT = "9C:DF:03";
     private String FORD_SYNC_CARKIT ="00:1E:AE";
+    private String SYNC_CARKIT = "D0:39:72";
 
     public void setSmsBodyPdus(ArrayList<SmsPdu> smsBodyPdus) {
         this.mSmsBodyPdus = smsBodyPdus;
@@ -90,6 +91,13 @@ public class BluetoothMapbMessageSms extends BluetoothMapbMessage {
             } else if(BluetoothMapService.getRemoteDevice().getAddress()
                     .startsWith(FORD_SYNC_CARKIT)) {
                tmpBody = tmpBody.replaceAll("\n", "");
+            /* Fix IOT issue to remove trailing line feeds in the message body */
+            } else if (BluetoothMapService.getRemoteDevice().getAddress()
+                    .startsWith(SYNC_CARKIT) &&  tmpBody.length() > 0) {
+               int trailingLF = 0;
+               while ((tmpBody.charAt(tmpBody.length() - trailingLF - 1)) == '\n')
+                   trailingLF ++;
+               tmpBody = tmpBody.substring(0, (tmpBody.length() - trailingLF));
             }
             bodyFragments.add(tmpBody.getBytes("UTF-8"));
         }else if (mSmsBodyPdus != null && mSmsBodyPdus.size() > 0) {
