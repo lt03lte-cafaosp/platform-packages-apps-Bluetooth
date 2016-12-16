@@ -5804,6 +5804,18 @@ public final class Avrcp {
                         where play state update is missed because of that happening
                         even before Avrcp connects*/
                 deviceFeatures[i].mCurrentPlayState = mCurrentPlayerState;
+                if (isPlayingState(mCurrentPlayerState)) {
+                /* In dual a2dp connection mode, if music is streaming on other device and
+                ** avrcp connection was delayed to second device and is not in playing state
+                ** check for playing device and update play status accordingly
+                */
+                    if (!isPlayStateToBeUpdated(i)) {
+                        PlaybackState.Builder playState = new PlaybackState.Builder();
+                        playState.setState(PlaybackState.STATE_PAUSED,
+                                       PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f);
+                        deviceFeatures[i].mCurrentPlayState = playState.build();
+                    }
+                }
                 if (!isPlayingState(mCurrentPlayerState) &&
                      mA2dpService.getA2dpPlayingDevice().size() > 0) {
                 /*A2DP playstate updated for video playback scenario, where a2dp play status is
@@ -5828,7 +5840,15 @@ public final class Avrcp {
         }
 
         for (int i = 0; i < maxAvrcpConnections; i++ ) {
-            if (deviceFeatures[i].mCurrentDevice != null &&
+            if (isPlayingState(mCurrentPlayerState)) {
+                if (deviceFeatures[i].mCurrentDevice != null &&
+                    !isPlayStateToBeUpdated(i) &&
+                    deviceFeatures[i].isActiveDevice) {
+                    deviceFeatures[i].isActiveDevice = false;
+                    Log.i(TAG,"Active device set to false at index =  " + i);
+                }
+            }
+            else if (deviceFeatures[i].mCurrentDevice != null &&
                     !(deviceFeatures[i].mCurrentDevice.equals(device)) &&
                     deviceFeatures[i].isActiveDevice) {
                 deviceFeatures[i].isActiveDevice = false;
