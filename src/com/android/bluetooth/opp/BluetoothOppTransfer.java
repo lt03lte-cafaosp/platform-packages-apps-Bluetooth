@@ -670,6 +670,7 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
 
         private void connectRfcommSocket() {
 
+            if (V) Log.v(TAG, "connectRfcommSocket");
             try {
                 if (isInterrupted) {
                     Log.d(TAG, "connectRfcommSocket interrupted");
@@ -856,8 +857,11 @@ public class BluetoothOppTransfer implements BluetoothOppBatch.BluetoothOppBatch
         }
 
         private void markConnectionFailed(BluetoothSocket s) {
+            if (V) Log.v(TAG, "markConnectionFailed " + s);
             try {
-                s.close();
+                if (s != null) {
+                    s.close();
+                }
             } catch (IOException e) {
                 if (V) Log.e(TAG, "Error when close socket");
             }
