@@ -126,6 +126,9 @@ public final class Avrcp {
     private int mAddressedPlayerId;
     private int mBrowsedPlayerId;
     private String mFocusedPlayer;
+    private boolean mFastforward;
+    private boolean mRewind;
+
     /* BTRC features */
     public static final int BTRC_FEAT_METADATA = 0x01;
     public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
@@ -441,6 +444,8 @@ public final class Avrcp {
         mCurrentPlayerState = new PlaybackState.Builder().setState(PlaybackState.STATE_NONE, -1L, 0.0f).build();
         mLastStateUpdate = -1L;
         mSongLengthMs = 0L;
+        mFastforward = false;
+        mRewind = false;
         mA2dpService = svc;
         maxAvrcpConnections = maxConnections;
         deviceFeatures = new DeviceDependentFeature[maxAvrcpConnections];
@@ -1082,7 +1087,8 @@ public final class Avrcp {
             case MESSAGE_GET_PLAY_STATUS:
             {
                 BluetoothDevice device;
-                int playState, position;
+                int playState = PLAYSTATUS_ERROR;
+                int position;
                 if (DEBUG)
                     Log.v(TAG, "MESSAGE_GET_PLAY_STATUS");
                 Log.v(TAG, "Event for device address " + (String)msg.obj);
@@ -1093,7 +1099,15 @@ public final class Avrcp {
                     Log.e(TAG,"Invalid device index for play status");
                     break;
                 }
-                playState = convertPlayStateToPlayStatus(deviceFeatures[deviceIndex].mCurrentPlayState);
+                if (mFastforward) {
+                    playState = PLAYSTATUS_FWD_SEEK;
+                }
+                if (mRewind) {
+                    playState = PLAYSTATUS_REV_SEEK;
+                }
+                if (!mFastforward && !mRewind) {
+                    playState = convertPlayStateToPlayStatus(deviceFeatures[deviceIndex].mCurrentPlayState);
+                }
                 position = (int)getPlayPosition(device);
                 Log.v(TAG, "Play Status for : " + device.getName() +
                     " state: " + playState + " position: " + position);
@@ -1439,62 +1453,61 @@ public final class Avrcp {
 
             case MESSAGE_FAST_FORWARD:
             case MESSAGE_REWIND:
-                deviceIndex = getIndexForDevice((BluetoothDevice) msg.obj);
-                if (msg.what == MESSAGE_FAST_FORWARD) {
-                    if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
-                                PlaybackState.ACTION_FAST_FORWARD) != 0) {
-                        int keyState = msg.arg1 == KEY_STATE_PRESS ?
-                                KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
-                        KeyEvent keyEvent =
-                                new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
-                        mMediaController.dispatchMediaButtonEvent(keyEvent);
-                        break;
-                    }
-                } else if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
-                            PlaybackState.ACTION_REWIND) != 0) {
-                    int keyState = msg.arg1 == KEY_STATE_PRESS ?
-                            KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
-                    KeyEvent keyEvent =
-                            new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_REWIND);
-                    mMediaController.dispatchMediaButtonEvent(keyEvent);
-                    break;
-                }
+                 deviceIndex = getIndexForDevice((BluetoothDevice) msg.obj);
+                 if (msg.what == MESSAGE_FAST_FORWARD) {
+                     if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
+                                 PlaybackState.ACTION_FAST_FORWARD) != 0) {
+                          int keyState = msg.arg1 == KEY_STATE_PRESS ?
+                                  KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
+                          KeyEvent keyEvent =
+                                  new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
+                          mMediaController.dispatchMediaButtonEvent(keyEvent);
+                          break;
+                     }
+                 } else if ((deviceFeatures[deviceIndex].mCurrentPlayState.getActions() &
+                             PlaybackState.ACTION_REWIND) != 0) {
+                     int keyState = msg.arg1 == KEY_STATE_PRESS ?
+                             KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
+                     KeyEvent keyEvent =
+                             new KeyEvent(keyState, KeyEvent.KEYCODE_MEDIA_REWIND);
+                     mMediaController.dispatchMediaButtonEvent(keyEvent);
+                     break;
+                 }
+                 int skipAmount;
+                 if (msg.what == MESSAGE_FAST_FORWARD) {
+                     if (DEBUG)
+                         Log.v(TAG, "MESSAGE_FAST_FORWARD");
+                     removeMessages(MESSAGE_FAST_FORWARD);
+                     skipAmount = BASE_SKIP_AMOUNT;
+                 } else {
+                     if (DEBUG)
+                         Log.v(TAG, "MESSAGE_REWIND");
+                     removeMessages(MESSAGE_REWIND);
+                     skipAmount = -BASE_SKIP_AMOUNT;
+                 }
 
-                int skipAmount;
-                if (msg.what == MESSAGE_FAST_FORWARD) {
-                    if (DEBUG)
-                        Log.v(TAG, "MESSAGE_FAST_FORWARD");
-                    removeMessages(MESSAGE_FAST_FORWARD);
-                    skipAmount = BASE_SKIP_AMOUNT;
-                } else {
-                    if (DEBUG)
-                        Log.v(TAG, "MESSAGE_REWIND");
-                    removeMessages(MESSAGE_REWIND);
-                    skipAmount = -BASE_SKIP_AMOUNT;
-                }
+                 if (hasMessages(MESSAGE_CHANGE_PLAY_POS) &&
+                     (skipAmount != mSkipAmount)) {
+                     Log.w(TAG, "missing release button event:" + mSkipAmount);
+                 }
 
-                if (hasMessages(MESSAGE_CHANGE_PLAY_POS) &&
+                 if ((!hasMessages(MESSAGE_CHANGE_PLAY_POS)) ||
                         (skipAmount != mSkipAmount)) {
-                    Log.w(TAG, "missing release button event:" + mSkipAmount);
-                }
+                      mSkipStartTime = SystemClock.elapsedRealtime();
+                 }
 
-                if ((!hasMessages(MESSAGE_CHANGE_PLAY_POS)) ||
-                        (skipAmount != mSkipAmount)) {
-                    mSkipStartTime = SystemClock.elapsedRealtime();
-                }
+                 removeMessages(MESSAGE_CHANGE_PLAY_POS);
+                 if (msg.arg1 == KEY_STATE_PRESS) {
+                      mSkipAmount = skipAmount;
+                      changePositionBy(mSkipAmount * getSkipMultiplier(),
+                              (String)(((BluetoothDevice)msg.obj).getAddress()));
+                      Message posMsg = obtainMessage(MESSAGE_CHANGE_PLAY_POS,
+                                      0, 0, msg.obj);
+                      posMsg.arg1 = 1;
+                      sendMessageDelayed(posMsg, SKIP_PERIOD);
+                 }
 
-                removeMessages(MESSAGE_CHANGE_PLAY_POS);
-                if (msg.arg1 == KEY_STATE_PRESS) {
-                    mSkipAmount = skipAmount;
-                    changePositionBy(mSkipAmount * getSkipMultiplier(),
-                            (String)(((BluetoothDevice)msg.obj).getAddress()));
-                    Message posMsg = obtainMessage(MESSAGE_CHANGE_PLAY_POS,
-                            0, 0, msg.obj);
-                    posMsg.arg1 = 1;
-                    sendMessageDelayed(posMsg, SKIP_PERIOD);
-                }
-
-                break;
+                 break;
 
             case MESSAGE_CHANGE_PLAY_POS:
                 if (DEBUG)
@@ -2747,6 +2760,11 @@ public final class Avrcp {
                 (keyState == KEY_STATE_RELEASE)) {
             Log.e(TAG, "Ignore key release event");
         } else {
+            if (keyState == KEY_STATE_PRESS) {
+                mFastforward = true;
+            } else {
+                mFastforward = false;
+            }
             Message msg = mHandler.obtainMessage(MESSAGE_FAST_FORWARD, keyState,
                     0, device);
             mHandler.sendMessage(msg);
@@ -2765,6 +2783,11 @@ public final class Avrcp {
                 (keyState == KEY_STATE_RELEASE)) {
             Log.e(TAG, "Ignore key release event");
         } else {
+            if (keyState == KEY_STATE_PRESS) {
+                mRewind = true;
+            } else {
+                mRewind = false;
+            }
             Message msg = mHandler.obtainMessage(MESSAGE_REWIND, keyState, 0,
                     device);
             mHandler.sendMessage(msg);
