@@ -1674,7 +1674,7 @@ public final class Avrcp {
                 if (isPlaying) {
                     deviceFeatures[i].isActiveDevice = true;
                     builder.setState(PlaybackState.STATE_PLAYING,
-                                     PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f);
+                                     deviceFeatures[i].mCurrentPlayState.getPosition(), 1.0f);
                     Log.v(TAG,"updateA2dpAudioState: Active device is set true at index = " + i);
                 } else {
                     builder.setState(PlaybackState.STATE_PAUSED,
