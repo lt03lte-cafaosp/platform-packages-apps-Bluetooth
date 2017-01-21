@@ -66,7 +66,7 @@ public class AtPhonebook {
     private static final String OUTGOING_CALL_WHERE = Calls.TYPE + "=" + Calls.OUTGOING_TYPE;
     private static final String INCOMING_CALL_WHERE = Calls.TYPE + "=" + Calls.INCOMING_TYPE;
     private static final String MISSED_CALL_WHERE = Calls.TYPE + "=" + Calls.MISSED_TYPE;
-    private static final String VISIBLE_PHONEBOOK_WHERE = Phone.IN_VISIBLE_GROUP + "=1";
+    private static final String VISIBLE_PHONEBOOK_WHERE = null;
 
     private class PhonebookResult {
         public Cursor  cursor; // result set of last query
@@ -433,6 +433,7 @@ public class AtPhonebook {
             final Uri phoneContentUri = DevicePolicyUtils.getEnterprisePhoneUri(mContext);
             pbr.cursor = mContentResolver.query(phoneContentUri, PHONES_PROJECTION,
                     where, null, Phone.NUMBER + " LIMIT " + MAX_PHONEBOOK_SIZE);
+            Log.i(TAG, "queryPhonebook where " + where + " uri :" + phoneContentUri);
             if (pbr.cursor == null) return false;
 
             pbr.numberColumn = pbr.cursor.getColumnIndex(Phone.NUMBER);
