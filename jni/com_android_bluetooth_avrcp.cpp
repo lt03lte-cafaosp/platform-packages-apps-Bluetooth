@@ -320,6 +320,7 @@ static void btavrcp_getPlayer_app_value_text(uint8_t attr_id , uint8_t num_val ,
         ALOGE("%s: mCallbacksObj is null", __FUNCTION__);
     }
     sCallbackEnv->DeleteLocalRef(Attr_Value);
+    sCallbackEnv->DeleteLocalRef(addr);
 }
 
 static void btavrcp_get_element_attr_callback(uint8_t num_attr, btrc_media_attr_t *p_attrs,
