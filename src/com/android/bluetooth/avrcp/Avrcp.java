@@ -2422,9 +2422,15 @@ public final class Avrcp {
                 case ATTR_ALBUM_NAME:
                     return albumName;
                 case ATTR_MEDIA_NUMBER:
-                    return mediaNumber;
+                    if(mediaNumber.equals("0"))
+                        return new String();
+                    else
+                        return mediaNumber;
                 case ATTR_MEDIA_TOTAL_NUMBER:
-                    return mediaTotalNumber;
+                    if(mediaTotalNumber.equals("0"))
+                        return new String();
+                    else
+                        return mediaTotalNumber;
                 case ATTR_GENRE:
                     return genre;
                 case ATTR_PLAYING_TIME_MS:
