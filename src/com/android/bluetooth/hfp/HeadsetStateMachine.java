@@ -128,6 +128,8 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CONNECT_TIMEOUT = 201;
     /* Allow time for possible LMP response timeout + Page timeout */
     private static final int CONNECT_TIMEOUT_SEC = 38000;
+    /* Retry outgoing connection after this time if the first attempt fails */
+    private static final int RETRY_CONNECT_TIME_SEC = 2500;
 
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
@@ -709,8 +711,18 @@ final class HeadsetStateMachine extends StateMachine {
                     } else if (mTargetDevice != null && mTargetDevice.equals(device)) {
                         // outgoing connection failed
                         if (mRetryConnect.containsKey(mTargetDevice)) {
-                            Log.d(TAG, "Removing conn retry entry for device = " + mTargetDevice);
-                            mRetryConnect.remove(mTargetDevice);
+                            // retry again only if we tried once
+                            if (mRetryConnect.get(device) == 1) {
+                                Log.d(TAG, "Retry outgoing conn again for device = " + mTargetDevice
+                                      + " after " + RETRY_CONNECT_TIME_SEC + "msec");
+                                Message m = obtainMessage(CONNECT);
+                                m.obj = device;
+                                sendMessageDelayed(m, RETRY_CONNECT_TIME_SEC);
+                            } else {
+                                Log.d(TAG, "Removing conn retry entry for device = " +
+                                      mTargetDevice);
+                                mRetryConnect.remove(mTargetDevice);
+                            }
                         }
                         broadcastConnectionState(mTargetDevice, BluetoothProfile.STATE_DISCONNECTED,
                                                  BluetoothProfile.STATE_CONNECTING);
@@ -2186,8 +2198,18 @@ final class HeadsetStateMachine extends StateMachine {
                         }
                     } else if (mTargetDevice != null && mTargetDevice.equals(device)) {
                         if (mRetryConnect.containsKey(mTargetDevice)) {
-                            Log.d(TAG, "Removing conn retry entry for device = " + mTargetDevice);
-                            mRetryConnect.remove(mTargetDevice);
+                            // retry again only if we tried once
+                            if (mRetryConnect.get(device) == 1) {
+                                Log.d(TAG, "Retry outgoing conn again for device = " + mTargetDevice
+                                      + " after " + RETRY_CONNECT_TIME_SEC + "msec");
+                                Message m = obtainMessage(CONNECT);
+                                m.obj = device;
+                                sendMessageDelayed(m, RETRY_CONNECT_TIME_SEC);
+                            } else {
+                                Log.d(TAG, "Removing conn retry entry for device = " +
+                                      mTargetDevice);
+                                mRetryConnect.remove(mTargetDevice);
+                            }
                         }
                         broadcastConnectionState(mTargetDevice, BluetoothProfile.STATE_DISCONNECTED,
                                                  BluetoothProfile.STATE_CONNECTING);
