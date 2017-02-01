@@ -197,6 +197,15 @@ import com.android.bluetooth.btservice.BluetoothProto;
                 }
             }
         }
+        synchronized (mConnections) {
+            Iterator<Connection> i = mConnections.iterator();
+            while(i.hasNext()) {
+                Connection connection = i.next();
+                if (connection.appId == id) {
+                    i.remove();
+                }
+            }
+        }
     }
 
     /**
@@ -221,7 +230,6 @@ import com.android.bluetooth.btservice.BluetoothProto;
                 Connection connection = i.next();
                 if (connection.connId == connId) {
                     i.remove();
-                    break;
                 }
             }
         }
