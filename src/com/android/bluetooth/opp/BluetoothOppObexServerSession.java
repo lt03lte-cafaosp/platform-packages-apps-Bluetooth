@@ -93,6 +93,8 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
     private BluetoothOppReceiveFileInfo mFileInfo;
 
+    private WakeLock mWakeLock;
+
     private WakeLock mPartialWakeLock;
 
     boolean mTimeoutMsgSent = false;
@@ -101,10 +103,16 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
 
     private long position;
 
+    private BluetoothOppManager mOppManager;
+
+    private static final int OPP_A2DP_SCO_CONCURRENCY_REDUCED_MTU_SIZE = 8192;
+
     public BluetoothOppObexServerSession(Context context, ObexTransport transport) {
         mContext = context;
         mTransport = transport;
         PowerManager pm = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
+        mWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                | PowerManager.ON_AFTER_RELEASE, TAG);
         mPartialWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
     }
 
@@ -120,7 +128,12 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         try {
             if (D) Log.d(TAG, "Create ServerSession with transport " + mTransport.toString());
             mSession = new ServerSession(mTransport, this, null);
-        } catch (IOException e) {
+            mOppManager = BluetoothOppManager.getInstance(mContext);
+            if(mOppManager.isA2DPPlaying) {
+                mSession.reduceMTU(true);
+            }
+
+         } catch (IOException e) {
             Log.e(TAG, "Create server session error" + e);
         }
     }
@@ -365,9 +378,13 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         mLocalShareInfoId = Integer.parseInt(contentUri.getPathSegments().get(1));
 
         if (needConfirm) {
+            if (V) Log.d(TAG, "acquire full WakeLock");
+            mWakeLock.acquire();
+
             Intent in = new Intent(BluetoothShare.INCOMING_FILE_CONFIRMATION_REQUEST_ACTION);
             in.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             mContext.sendBroadcast(in);
+            sendVendorDebugBroadcast();
         }
 
 
@@ -376,8 +393,12 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
         if (V) Log.v(TAG, "mLocalShareInfoId = " + mLocalShareInfoId);
 
         synchronized (this) {
-            mPartialWakeLock.acquire();
             mServerBlocking = true;
+            if (mWakeLock.isHeld()) {
+                if (V) Log.v(TAG, "acquire partial WakeLock");
+                mPartialWakeLock.acquire();
+                mWakeLock.release();
+            }
             try {
 
                 while (mServerBlocking) {
@@ -491,6 +512,23 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
             msg.sendToTarget();
         }
         return obexResponse;
+    }
+
+    /*
+     * Automation team not able to find incoming file notification
+     * so broad cast to CST APP when receive incoming file request
+     * @ Condition set persistent property using adb "persist.sys.opp" opp
+     */
+    private void sendVendorDebugBroadcast() {
+        String property = android.os.SystemProperties.get("persist.sys.opp", "");
+        if (property.equals("opp")) {
+            Intent intent = new Intent(BluetoothShare.INCOMING_FILE_CONFIRMATION_REQUEST_ACTION);
+            intent.setComponent(new android.content.ComponentName("com.android.CST",
+                "com.android.CST.ConnectivitySystemTest.OppIncomingReceiver"));
+            mContext.sendBroadcast(intent);
+            if(D) Log.d(TAG, "intent :" + intent);
+        }
+        if(D) Log.d(TAG, "property :" + property +":");
     }
 
     private int receiveFile(BluetoothOppReceiveFileInfo fileInfo, Operation op) {
@@ -686,6 +724,9 @@ public class BluetoothOppObexServerSession extends ServerRequestHandler implemen
     }
 
     private synchronized void releaseWakeLocks() {
+        if (mWakeLock.isHeld()) {
+            mWakeLock.release();
+        }
         if (mPartialWakeLock.isHeld()) {
             mPartialWakeLock.release();
         }

@@ -139,6 +139,16 @@ static bool bredrcleanupNative(JNIEnv *env, jobject obj) {
     return JNI_TRUE;
 }
 
+static void captureVndLogsNative(JNIEnv *env, jobject object) {
+
+    ALOGI("%s", __FUNCTION__);
+
+    if (!sBluetoothVendorInterface) return;
+
+    sBluetoothVendorInterface->capture_vnd_logs();
+    return;
+}
+
 static bool ssrcleanupNative(JNIEnv *env, jobject obj, jboolean cleanup) {
 
     ALOGI("%s", __FUNCTION__);
@@ -160,6 +170,7 @@ static JNINativeMethod sMethods[] = {
     {"cleanupNative", "()V", (void *) cleanupNative},
     {"ssrcleanupNative", "(Z)V", (void*) ssrcleanupNative},
     {"bredrcleanupNative", "()V", (void*) bredrcleanupNative},
+    {"captureVndLogsNative", "()V", (void*) captureVndLogsNative},
 };
 
 int register_com_android_bluetooth_btservice_vendor(JNIEnv* env)

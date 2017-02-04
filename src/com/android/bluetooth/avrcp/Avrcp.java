@@ -274,7 +274,8 @@ public final class Avrcp {
     private static final int PLAYER_STATUS_CHANGED_NOTIFICATION = 105;
     private static final int AVAILABLE_PLAYERS_CHANGED_NOTIFICATION = 106;
 
-    private static final String [] BlacklistDeviceNames = {"BMW"};
+    private static final String [] BlacklistDeviceNames = {"BMW", "TOYOTA Prius"};
+    private static final String [] BlacklistDeviceAddr  = {"88:c3:55"/*Toyota Prius*/};
     private static final int INVALID_ADDRESSED_PLAYER_ID = -1;
     // Device dependent registered Notification & Variables
     private class DeviceDependentFeature {
@@ -2421,9 +2422,15 @@ public final class Avrcp {
                 case ATTR_ALBUM_NAME:
                     return albumName;
                 case ATTR_MEDIA_NUMBER:
-                    return mediaNumber;
+                    if(mediaNumber.equals("0"))
+                        return new String();
+                    else
+                        return mediaNumber;
                 case ATTR_MEDIA_TOTAL_NUMBER:
-                    return mediaTotalNumber;
+                    if(mediaTotalNumber.equals("0"))
+                        return new String();
+                    else
+                        return mediaTotalNumber;
                 case ATTR_GENRE:
                     return genre;
                 case ATTR_PLAYING_TIME_MS:
@@ -3719,12 +3726,14 @@ public final class Avrcp {
         boolean browsePlayerFocused = false;
         String[] textArray;
         Log.v(TAG,"processGetItemAttrInternal uid = " + uid);
-
+        String CurrentPackageName = (mMediaController != null) ? mMediaController.getPackageName():null;
         if (mMediaPlayers.size() > 0 ) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
             while (rccIterator.hasNext()) {
                 final MediaPlayerInfo di = rccIterator.next();
-                if (di.IsPlayerBrowsable() && (di.GetPlayerFocus() == true)) {
+                if (di.IsPlayerBrowsable() && ((di.GetPlayerFocus() == true) ||
+                    (CurrentPackageName != null &&
+                     di.getPlayerPackageName().equals(CurrentPackageName)))) {
                     browsePlayerFocused = true;
                 }
             }
@@ -4947,7 +4956,8 @@ public final class Avrcp {
                     final MediaPlayerInfo di = rccIterator.next();
                     if (di.GetPlayerFocus()) {
                         if (!di.IsRemoteAddressable() ||
-                             deviceFeatures[deviceIndex].mCurrentPath.equals(PATH_INVALID)) {
+                            deviceFeatures[deviceIndex].mCurrentPath.equals(PATH_INVALID) ||
+                            !di.IsPlayerBrowsable()) {
                             getFolderItemsRspNative((byte)INTERNAL_ERROR ,
                                     numItems, itemType, uid, type,
                                     playable, displayName, numAtt, attValues, attIds, size,
@@ -5245,7 +5255,10 @@ public final class Avrcp {
                         final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
                         while (rccIterator.hasNext()) {
                             final MediaPlayerInfo di = rccIterator.next();
-                            if (di.IsPlayerBrowsable() && (di.GetPlayerFocus() == true)) {
+                            if (di.IsPlayerBrowsable() &&
+                                (di.GetPlayerFocus() == true ||
+                                (CurrentPackageName != null &&
+                                (di.getPlayerPackageName().equals(CurrentPackageName))))) {
                                 TrackNumberRsp = Long.parseLong(mMediaAttributes.getString
                                                        (MediaAttributes.ATTR_TRACK_NUM));
                                 Log.e(TAG,"sendTrackChangedRsp: tracnum = " + TrackNumberRsp);
@@ -5946,12 +5959,24 @@ public final class Avrcp {
         for (int i = 0; i < maxAvrcpConnections; i++) {
              if (deviceFeatures[i].mCurrentDevice != null) {
                  String deviceName = deviceFeatures[i].mCurrentDevice.getName();
+                 String deviceAddr = deviceFeatures[i].mCurrentDevice.getAddress();
+                 Log.i(TAG,"deviceName  =  " + deviceName);
+                 Log.i(TAG,"deviceAddr  = " + deviceAddr);
                  for (int j = 0; j < BlacklistDeviceNames.length;j++) {
                      String name = BlacklistDeviceNames[j];
                      if (deviceName.toLowerCase().startsWith(name.toLowerCase()) ||
                          deviceName.toLowerCase().equals(name.toLowerCase())) {
                          Log.i(TAG,"Remote device supports blacklisted solution");
                          deviceFeatures[i].mBlacklisted = true;
+                     }
+                 }
+                 if (deviceFeatures[i].mBlacklisted != true) {
+                     for (int j = 0; j < BlacklistDeviceAddr.length;j++) {
+                         String addr = BlacklistDeviceAddr[j];
+                         if (deviceAddr.toLowerCase().startsWith(addr.toLowerCase())) {
+                             Log.i(TAG,"Remote device address support BL solution");
+                             deviceFeatures[i].mBlacklisted = true;
+                         }
                      }
                  }
              }
