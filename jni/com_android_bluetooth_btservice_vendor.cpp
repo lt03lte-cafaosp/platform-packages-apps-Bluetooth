@@ -33,6 +33,7 @@
 namespace android {
 
 static jmethodID method_onBredrCleanup;
+static jmethodID method_onSnooplogStatusUpdate;
 
 static btvendor_interface_t *sBluetoothVendorInterface = NULL;
 static jobject mCallbacksObj = NULL;
@@ -62,14 +63,26 @@ static void bredr_cleanup_callback(bool status){
     checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
 }
 
+static void snooplog_status_callback(bool status){
+
+    ALOGI("%s", __FUNCTION__);
+
+    CHECK_CALLBACK_ENV
+
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_onSnooplogStatusUpdate, (jboolean)status);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+}
+
 static btvendor_callbacks_t sBluetoothVendorCallbacks = {
     sizeof(sBluetoothVendorCallbacks),
-    bredr_cleanup_callback
+    bredr_cleanup_callback,
+    snooplog_status_callback
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_onBredrCleanup = env->GetMethodID(clazz, "onBredrCleanup", "(Z)V");
+    method_onSnooplogStatusUpdate = env->GetMethodID(clazz, "onSnooplogStatusUpdate", "(Z)V");
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 
