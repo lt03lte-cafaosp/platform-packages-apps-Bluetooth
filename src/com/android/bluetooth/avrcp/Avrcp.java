@@ -253,6 +253,7 @@ public final class Avrcp {
     private static final int PLAY_STATUS_CHANGE_NOTIFICATION = 102;
     private static final int TRACK_CHANGE_NOTIFICATION = 103;
     private static final int NOW_PALYING_CONTENT_CHANGED_NOTIFICATION = 104;
+    private static final int PLAYER_STATUS_CHANGED_NOTIFICATION = 105;
 
     private static final int INVALID_ADDRESSED_PLAYER_ID = -1;
     // Device dependent registered Notification & Variables
@@ -1792,6 +1793,20 @@ public final class Avrcp {
                     }
 
                     break;
+                case PLAYER_STATUS_CHANGED_NOTIFICATION:
+                    if (deviceFeatures[i].mPlayerStatusChangeNT ==
+                             NOTIFICATION_TYPE_INTERIM) {
+                       if (DEBUG)
+                           Log.v(TAG, "player changed reject to stack");
+                       deviceFeatures[i].mPlayerStatusChangeNT =
+                                         NOTIFICATION_TYPE_REJECT;
+                       sendPlayerAppChangedRsp(deviceFeatures[i].mPlayerStatusChangeNT,
+                                         deviceFeatures[i].mCurrentDevice);
+                    } else {
+                        Log.v(TAG,"i " + i + " status is"+
+                                 deviceFeatures[i].mPlayerStatusChangeNT);
+                    }
+                    break;
                 default :
                     Log.e(TAG,"Invalid Notification type ");
             }
@@ -1805,6 +1820,7 @@ public final class Avrcp {
         updateResetNotification(PLAY_POSITION_CHANGE_NOTIFICATION);
         updateResetNotification(TRACK_CHANGE_NOTIFICATION);
         updateResetNotification(NOW_PALYING_CONTENT_CHANGED_NOTIFICATION);
+        updateResetNotification(PLAYER_STATUS_CHANGED_NOTIFICATION);
     }
 
     void updateBrowsedPlayerFolder(int numOfItems, int status, String[] folderNames) {
