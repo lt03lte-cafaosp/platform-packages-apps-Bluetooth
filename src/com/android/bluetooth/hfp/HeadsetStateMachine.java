@@ -201,6 +201,7 @@ final class HeadsetStateMachine extends StateMachine {
     private boolean mA2dpSuspend;
     private boolean mPendingCiev;
     private boolean mIsCsCall = true;
+    private boolean mPendingScoForVR = false;
     //ConcurrentLinkeQueue is used so that it is threadsafe
     private ConcurrentLinkedQueue<HeadsetCallState> mPendingCallStates = new ConcurrentLinkedQueue<HeadsetCallState>();
 
@@ -234,6 +235,7 @@ final class HeadsetStateMachine extends StateMachine {
     private BluetoothDevice mIncomingDevice = null;
     private BluetoothDevice mActiveScoDevice = null;
     private BluetoothDevice mMultiDisconnectDevice = null;
+    private BluetoothDevice mPendingScoForVRDevice = null;
 
     // Multi HFP: Connected devices list holds all currently connected headsets
     private ArrayList<BluetoothDevice> mConnectedDevicesList =
@@ -1316,6 +1318,17 @@ final class HeadsetStateMachine extends StateMachine {
                     mAudioState = BluetoothHeadset.STATE_AUDIO_CONNECTING;
                     broadcastAudioState(device, BluetoothHeadset.STATE_AUDIO_CONNECTING,
                                         BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
+                    break;
+                /* When VR is stopped before SCO creation is complete, we need
+                   to resume A2DP if we had suspended it */
+                case HeadsetHalConstants.AUDIO_STATE_DISCONNECTED:
+                    if (mA2dpSuspend) {
+                        if ((!isInCall()) && (mPhoneState.getNumber().isEmpty())) {
+                            log("Audio is closed,Set A2dpSuspended=false");
+                            mAudioManager.setParameters("A2dpSuspended=false");
+                            mA2dpSuspend = false;
+                        }
+                    }
                     break;
                     // TODO(BT) process other states
                 default:
@@ -2707,8 +2720,23 @@ final class HeadsetStateMachine extends StateMachine {
                 // or MODE_IN_CALL which shall automatically suspend the AVDTP stream if needed.
                 // Whereas for VoiceDial we want to activate the SCO connection but we are still
                 // in MODE_NORMAL and hence the need to explicitly suspend the A2DP stream
-                mA2dpSuspend = true;
-                mAudioManager.setParameters("A2dpSuspended=true");
+                if (getA2dpConnState() == BluetoothProfile.STATE_CONNECTED) {
+                    if (!mA2dpSuspend) {
+                        Log.d(TAG, "Suspend A2DP streaming");
+                        mA2dpSuspend = true;
+                        mAudioManager.setParameters("A2dpSuspended=true");
+                    }
+
+                    if (getA2dpPlayState() == BluetoothA2dp.STATE_PLAYING) {
+                        mPendingScoForVRDevice = device;
+                        mPendingScoForVR = true;
+                        if (mStartVoiceRecognitionWakeLock.isHeld()) {
+                            mStartVoiceRecognitionWakeLock.release();
+                        }
+                        return;
+                    }
+                }
+
                 if (device != null) {
                     connectAudioNative(getByteAddress(device));
                 } else {
@@ -3195,6 +3223,13 @@ final class HeadsetStateMachine extends StateMachine {
                     }
                 }
                 mPendingCiev = false;
+            }
+            else if (mA2dpSuspend && mPendingScoForVR) {
+                 if (mPendingScoForVRDevice != null)
+                     connectAudioNative(getByteAddress(mPendingScoForVRDevice));
+
+                 mPendingScoForVRDevice = null;
+                 mPendingScoForVR = false;
             }
         }
         else if (prevState == BluetoothA2dp.STATE_NOT_PLAYING) {
