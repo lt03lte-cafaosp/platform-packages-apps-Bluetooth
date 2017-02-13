@@ -3230,6 +3230,13 @@ final class HeadsetStateMachine extends StateMachine {
                  mPendingScoForVRDevice = null;
                  mPendingScoForVR = false;
             }
+            else if (mA2dpSuspend && mPendingScoForVR) {
+                 if (mPendingScoForVRDevice != null)
+                     connectAudioNative(getByteAddress(mPendingScoForVRDevice));
+
+                 mPendingScoForVRDevice = null;
+                 mPendingScoForVR = false;
+            }
         }
         else if (prevState == BluetoothA2dp.STATE_NOT_PLAYING) {
             Log.d(TAG, "A2dp Started " + currState);
