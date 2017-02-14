@@ -465,7 +465,6 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     method_onKeyPressed = env->GetMethodID(clazz, "onKeyPressed", "([B)V");
     method_onAtBind = env->GetMethodID(clazz, "onAtBind", "(Ljava/lang/String;I[B)V");
     method_onAtBiev = env->GetMethodID(clazz, "onAtBiev", "(Ljava/lang/String;[B)V");
-
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 
@@ -725,8 +724,6 @@ static jboolean cindResponseNative(JNIEnv *env, jobject object,
     env->ReleaseByteArrayElements(address, addr, 0);
     return (status == BT_STATUS_SUCCESS) ? JNI_TRUE : JNI_FALSE;
 }
-
-
 static jboolean atResponseStringNative(JNIEnv *env, jobject object, jstring response_str,
                                                  jbyteArray address) {
     jbyte *addr;

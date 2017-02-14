@@ -190,6 +190,7 @@ import com.android.bluetooth.btservice.BluetoothProto;
             while (i.hasNext()) {
                 App entry = i.next();
                 if (entry.id == id) {
+                    removeConnectionsByAppId(id);
                     entry.unlinkToDeath();
                     entry.appScanStats.isRegistered = false;
                     i.remove();
@@ -214,7 +215,7 @@ import com.android.bluetooth.btservice.BluetoothProto;
     void addConnection(int id, int connId, String address) {
         synchronized (mConnections) {
             App entry = getById(id);
-            if (entry != null){
+            if (entry != null) {
                 mConnections.add(new Connection(connId, address, id));
             }
         }
@@ -231,6 +232,19 @@ import com.android.bluetooth.btservice.BluetoothProto;
                 if (connection.connId == connId) {
                     i.remove();
                 }
+            }
+        }
+    }
+
+    /**
+     * Remove all connections for a given application ID.
+     */
+    void removeConnectionsByAppId(int appId) {
+        Iterator<Connection> i = mConnections.iterator();
+        while (i.hasNext()) {
+            Connection connection = i.next();
+            if (connection.appId == appId) {
+                i.remove();
             }
         }
     }

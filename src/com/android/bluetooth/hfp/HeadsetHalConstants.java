@@ -64,4 +64,5 @@ final public class HeadsetHalConstants {
     final static int CALL_STATE_INCOMING = 4;
     final static int CALL_STATE_WAITING = 5;
     final static int CALL_STATE_IDLE = 6;
+
 }

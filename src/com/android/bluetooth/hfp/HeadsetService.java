@@ -331,6 +331,7 @@ public class HeadsetService extends ProfileService {
             if (service == null) return false;
             return service.disableWBS();
         }
+
     };
 
     //API methods
