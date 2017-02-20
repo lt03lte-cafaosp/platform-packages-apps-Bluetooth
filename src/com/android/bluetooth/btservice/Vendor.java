@@ -46,6 +46,10 @@ final class Vendor {
         bredrcleanupNative();
     }
 
+    public void captureVndLogs() {
+        captureVndLogsNative();
+    }
+
     public void cleanup() {
         cleanupNative();
     }
@@ -57,6 +61,7 @@ final class Vendor {
 
     private native void ssrcleanupNative(boolean cleanup);
     private native void bredrcleanupNative();
+    private native void captureVndLogsNative();
     private native void initNative();
     private native static void classInitNative();
     private native void cleanupNative();
