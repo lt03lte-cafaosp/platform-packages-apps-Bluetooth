@@ -651,7 +651,6 @@ final class HeadsetStateMachine extends StateMachine {
                             }
                             processConnectionEvent(event.valueInt, event.device);
                             break;
-
                         default:
                             Log.e(TAG, "Unexpected event: " + event.type);
                             break;

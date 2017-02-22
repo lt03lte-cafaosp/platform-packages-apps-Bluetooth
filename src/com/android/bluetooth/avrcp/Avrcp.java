@@ -1770,7 +1770,6 @@ public final class Avrcp {
         if (mRewind) {
             newPlayStatus = PLAYSTATUS_REV_SEEK;
         }
-
         if (DEBUG) {
             Log.v(TAG, "updatePlaybackState (" + deviceFeatures[deviceIndex].mPlayStatusChangedNT + "): "+
                        "old=" + deviceFeatures[deviceIndex].mCurrentPlayState + "(" + oldPlayStatus + "), "+

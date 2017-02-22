@@ -41,14 +41,12 @@ import android.util.Log;
 public class BluetoothPbapReceiver extends BroadcastReceiver {
 
     private static final String TAG = "BluetoothPbapReceiver";
-
-    private static final boolean V = Log.isLoggable(BluetoothPbapService.LOG_TAG, Log.VERBOSE);
     private static final boolean D = BluetoothPbapService.DEBUG;
+    private static final boolean V = Log.isLoggable(BluetoothPbapService.LOG_TAG, Log.VERBOSE);
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (V) Log.v(TAG, "PbapReceiver onReceive ");
-
         Intent in = new Intent();
         in.putExtras(intent);
         in.setClass(context, BluetoothPbapService.class);
