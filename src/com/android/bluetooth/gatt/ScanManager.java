@@ -260,6 +260,14 @@ public class ScanManager {
 
         void handleStopScan(ScanClient client) {
             Utils.enforceAdminPermission(mService);
+            boolean appDied;
+            if (client == null) return;
+
+            // The caller may pass a dummy client with only clientIf
+            // and appDied status. Perform the operation on the
+            // actual client in that case.
+            appDied = client.appDied;
+            client = mScanNative.getRegularScanClient(client.clientIf);
             if (client == null) return;
 
             if (mRegularScanClients.contains(client)) {
@@ -276,18 +284,14 @@ public class ScanManager {
 
                 // Update BatteryStats with this workload.
                 try {
-                    // The ScanClient passed in just holds the clientIf. We retrieve the real client,
-                    // which may have workSource set.
-                    ScanClient workClient = mScanNative.getRegularScanClient(client.clientIf);
-                    if (workClient != null)
-                        mBatteryStats.noteBleScanStopped(workClient.workSource);
+                    mBatteryStats.noteBleScanStopped(client.workSource);
                 } catch (RemoteException e) {
                     /* ignore */
                 }
             } else {
                 mScanNative.stopBatchScan(client);
             }
-            if (client.appDied) {
+            if (appDied) {
                 logd("app died, unregister client - " + client.clientIf);
                 mService.unregisterClient(client.clientIf);
             }
