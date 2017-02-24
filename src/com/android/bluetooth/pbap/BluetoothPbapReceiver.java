@@ -41,7 +41,9 @@ import android.util.Log;
 public class BluetoothPbapReceiver extends BroadcastReceiver {
 
     private static final String TAG = "BluetoothPbapReceiver";
+
     private static final boolean D = BluetoothPbapService.DEBUG;
+
     private static final boolean V = Log.isLoggable(BluetoothPbapService.LOG_TAG, Log.VERBOSE);
 
     @Override
