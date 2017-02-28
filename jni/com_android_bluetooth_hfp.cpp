@@ -465,7 +465,6 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     method_onKeyPressed = env->GetMethodID(clazz, "onKeyPressed", "([B)V");
     method_onAtBind = env->GetMethodID(clazz, "onAtBind", "(Ljava/lang/String;I[B)V");
     method_onAtBiev = env->GetMethodID(clazz, "onAtBiev", "(Ljava/lang/String;[B)V");
-
     ALOGI("%s: succeeds", __FUNCTION__);
 }
 

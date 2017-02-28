@@ -59,6 +59,11 @@ final class Vendor {
         mService.startBluetoothDisable();
     }
 
+   private void onSnooplogStatusUpdate(boolean status) {
+        Log.d(TAG,"Snooplog state updated to: " + status);
+        mService.setSnooplogState(status);
+    }
+
     private native void ssrcleanupNative(boolean cleanup);
     private native void bredrcleanupNative();
     private native void captureVndLogsNative();
