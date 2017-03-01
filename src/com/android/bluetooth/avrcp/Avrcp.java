@@ -121,6 +121,7 @@ public final class Avrcp {
     private final BluetoothAdapter mAdapter;
     private static Uri mMediaUriStatic;
     private static long currentTrackPos;
+    private static long mCurrentTrackId;
     private static boolean updatePlayTime;
     private static boolean updateValues;
     private int mAddressedPlayerId;
@@ -128,6 +129,7 @@ public final class Avrcp {
     private String mFocusedPlayer;
     private boolean mFastforward;
     private boolean mRewind;
+    private boolean mRemotePassthroughCmd;
 
     /* BTRC features */
     public static final int BTRC_FEAT_METADATA = 0x01;
@@ -257,6 +259,9 @@ public final class Avrcp {
     private final static int PLAYLISTS_ITEM_INDEX = 2;
     private final static int TITLES_ITEM_INDEX = 3;
 
+    static final long NO_TRACK_SELECTED = -1L;
+    static final long TRACK_IS_SELECTED = 0L;
+
     //Intents for PlayerApplication Settings
     private static final String PLAYERSETTINGS_REQUEST =
             "org.codeaurora.music.playersettingsrequest";
@@ -277,6 +282,7 @@ public final class Avrcp {
     private static final String [] BlacklistDeviceNames = {"BMW", "TOYOTA Prius"};
     private static final String [] BlacklistDeviceAddr  = {"88:c3:55"/*Toyota Prius*/};
     private static final int INVALID_ADDRESSED_PLAYER_ID = -1;
+
     // Device dependent registered Notification & Variables
     private class DeviceDependentFeature {
         private BluetoothDevice mCurrentDevice;
@@ -448,8 +454,10 @@ public final class Avrcp {
         mSongLengthMs = 0L;
         mFastforward = false;
         mRewind = false;
+        mRemotePassthroughCmd = false;
         mA2dpService = svc;
         maxAvrcpConnections = maxConnections;
+        mCurrentTrackId = NO_TRACK_SELECTED;
         deviceFeatures = new DeviceDependentFeature[maxAvrcpConnections];
         mAddressedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
         mBrowsedPlayerId = INVALID_ADDRESSED_PLAYER_ID;
@@ -1525,7 +1533,8 @@ public final class Avrcp {
                     Log.v(TAG, "MESSAGE_CHANGE_PLAY_POS:" + msg.arg1);
                 changePositionBy(mSkipAmount * getSkipMultiplier(),
                         (String)(((BluetoothDevice)msg.obj).getAddress()));
-                if (msg.arg1 * SKIP_PERIOD < BUTTON_TIMEOUT_TIME) {
+                Log.v(TAG, "MESSAGE_CHANGE_PLAY_POS:mRemotePassthroughCmd" + mRemotePassthroughCmd);
+                if (!mRemotePassthroughCmd) {
                     Message posMsg = obtainMessage(MESSAGE_CHANGE_PLAY_POS,
                             0, 0, msg.obj);
                     posMsg.arg1 = msg.arg1 + 1;
@@ -1688,7 +1697,7 @@ public final class Avrcp {
                     Log.v(TAG,"updateA2dpAudioState: Active device is set true at index = " + i);
                 } else {
                     builder.setState(PlaybackState.STATE_PAUSED,
-                                     PlaybackState.PLAYBACK_POSITION_UNKNOWN, 0.0f);
+                                     deviceFeatures[i].mCurrentPlayState.getPosition(), 1.0f);
                 }
                 updatePlaybackState(builder.build(), device);
             }
@@ -1746,14 +1755,21 @@ public final class Avrcp {
 
     private void updatePlayStatusForDevice(int deviceIndex, PlaybackState state) {
         if (state == null) {
-            state = new PlaybackState.Builder().setState(PlaybackState.STATE_NONE,
-                PlaybackState.PLAYBACK_POSITION_UNKNOWN, 0.0f).build();
+            Log.i(TAG,"updatePlayStatusForDevice: device: state is =" + state);
+            return;
         }
         Log.i(TAG,"updatePlayStatusForDevice: device: " +
                     deviceFeatures[deviceIndex].mCurrentDevice);
+
         int newPlayStatus = convertPlayStateToPlayStatus(state);
         int oldPlayStatus = convertPlayStateToPlayStatus(deviceFeatures[deviceIndex].mCurrentPlayState);
 
+        if (mFastforward) {
+            newPlayStatus = PLAYSTATUS_FWD_SEEK;
+        }
+        if (mRewind) {
+            newPlayStatus = PLAYSTATUS_REV_SEEK;
+        }
         if (DEBUG) {
             Log.v(TAG, "updatePlaybackState (" + deviceFeatures[deviceIndex].mPlayStatusChangedNT + "): "+
                        "old=" + deviceFeatures[deviceIndex].mCurrentPlayState + "(" + oldPlayStatus + "), "+
@@ -1776,8 +1792,8 @@ public final class Avrcp {
         if (DEBUG) Log.v(TAG, "updatePlayerPlayPauseState, old=" +
                             mCurrentPlayerState + ", state=" + state);
         if (state == null) {
-            state = new PlaybackState.Builder().setState(PlaybackState.STATE_NONE,
-                PlaybackState.PLAYBACK_POSITION_UNKNOWN, 0.0f).build();
+            Log.i(TAG,"updatePlayerStateAndPosition: device: state = " + state);
+            return;
         }
 
         if (DEBUG) Log.v(TAG, "old state = " + mCurrentPlayerState + ", new state= " + state);
@@ -2466,6 +2482,10 @@ public final class Avrcp {
         if (DEBUG)
             Log.v(TAG, "updateMetadata");
 
+        if (mCurrentTrackId == NO_TRACK_SELECTED) {
+            mCurrentTrackId = TRACK_IS_SELECTED;
+        }
+
         MediaAttributes oldAttributes = mMediaAttributes;
         mMediaAttributes = new MediaAttributes(data);
         if (data == null) {
@@ -2785,8 +2805,10 @@ public final class Avrcp {
         } else {
             if (keyState == KEY_STATE_PRESS) {
                 mFastforward = true;
+                mRemotePassthroughCmd = false;
             } else {
                 mFastforward = false;
+                mRemotePassthroughCmd = true;
             }
             Message msg = mHandler.obtainMessage(MESSAGE_FAST_FORWARD, keyState,
                     0, device);
@@ -2808,8 +2830,10 @@ public final class Avrcp {
         } else {
             if (keyState == KEY_STATE_PRESS) {
                 mRewind = true;
+                mRemotePassthroughCmd = false;
             } else {
                 mRewind = false;
+                mRemotePassthroughCmd = true;
             }
             Message msg = mHandler.obtainMessage(MESSAGE_REWIND, keyState, 0,
                     device);
@@ -5108,6 +5132,16 @@ public final class Avrcp {
             String deviceAddress) {
         BluetoothDevice device = mAdapter.getRemoteDevice(deviceAddress);
         int deviceIndex = getIndexForDevice(device);
+        int currPlayState = convertPlayStateToPlayStatus
+                (deviceFeatures[deviceIndex].mCurrentPlayState);
+
+        if (mFastforward) {
+            currPlayState = PLAYSTATUS_FWD_SEEK;
+        }
+        if (mRewind) {
+            currPlayState = PLAYSTATUS_REV_SEEK;
+        }
+
         Log.v(TAG,"processRegisterNotification: eventId" + eventId);
         if (deviceIndex == INVALID_DEVICE_INDEX) {
             Log.v(TAG,"device entry not present, bailing out");
@@ -5119,8 +5153,7 @@ public final class Avrcp {
                         NOTIFICATION_TYPE_INTERIM;
                 registerNotificationRspPlayStatusNative(
                         deviceFeatures[deviceIndex].mPlayStatusChangedNT,
-                        convertPlayStateToPlayStatus(
-                        deviceFeatures[deviceIndex].mCurrentPlayState),
+                        currPlayState,
                         getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
                 break;
 
@@ -5189,6 +5222,10 @@ public final class Avrcp {
             case BluetoothAvrcp.PASSTHROUGH_ID_FAST_FOR:
                 fastForward(keyState, Utils.getAddressStringFromByte(address));
                 break;
+            default:
+                Log.v(TAG, "PassthroughCmd: id = " + id + "keyState= " + keyState);
+                mRemotePassthroughCmd = true;
+                break;
         }
     }
 
@@ -5213,31 +5250,37 @@ public final class Avrcp {
         byte[] track = new byte[TRACK_ID_SIZE];
         long TrackNumberRsp = -1L;
         int deviceIndex = getIndexForDevice(device);
+        int PlayStatus = convertPlayStateToPlayStatus(deviceFeatures[deviceIndex].mCurrentPlayState);
         String CurrentPackageName = (mMediaController!=null)?mMediaController.getPackageName():null;
         if(DEBUG) Log.v(TAG,"mCurrentPlayState" +
                 deviceFeatures[deviceIndex].mCurrentPlayState );
+        Log.v(TAG,"Current music player is = " + CurrentPackageName);
 
         try {
-            TrackNumberRsp = Long.parseLong(mMediaAttributes.getString
-                                (MediaAttributes.ATTR_MEDIA_NUMBER));
-            Log.v(TAG,"Current music player is = " + CurrentPackageName);
-            if (CurrentPackageName != null && !(CurrentPackageName.equals("com.android.music"))) {
-                if (deviceFeatures[deviceIndex].mTrackChangedNT == NOTIFICATION_TYPE_CHANGED) {
-                    if (TrackNumberRsp == deviceFeatures[deviceIndex].mTrackNumber) {
-                        deviceFeatures[deviceIndex].mTrackNumber++;
-                        TrackNumberRsp = deviceFeatures[deviceIndex].mTrackNumber;
-                    } else {
-                        deviceFeatures[deviceIndex].mTrackNumber = TrackNumberRsp;
-                    }
-                }else if (deviceFeatures[deviceIndex].mTrackChangedNT == NOTIFICATION_TYPE_INTERIM){
-                    if (deviceFeatures[deviceIndex].mTrackNumber != -1L) {
-                        TrackNumberRsp = deviceFeatures[deviceIndex].mTrackNumber;
-                    } else {
-                        deviceFeatures[deviceIndex].mTrackNumber = TrackNumberRsp;
-                    }
-                }
+            if ((deviceFeatures[deviceIndex].mFeatures & BTRC_FEAT_BROWSE) == 0) {
+                TrackNumberRsp = mCurrentTrackId;
             } else {
-                if ((((deviceFeatures[deviceIndex].mFeatures & BTRC_FEAT_BROWSE) != 0) &&
+                TrackNumberRsp = Long.parseLong(mMediaAttributes.getString
+                                    (MediaAttributes.ATTR_MEDIA_NUMBER));
+
+                if (CurrentPackageName != null &&
+                        !(CurrentPackageName.equals("com.android.music"))) {
+                    if (deviceFeatures[deviceIndex].mTrackChangedNT == NOTIFICATION_TYPE_CHANGED) {
+                        if (TrackNumberRsp == deviceFeatures[deviceIndex].mTrackNumber) {
+                            deviceFeatures[deviceIndex].mTrackNumber++;
+                            TrackNumberRsp = deviceFeatures[deviceIndex].mTrackNumber;
+                        } else {
+                            deviceFeatures[deviceIndex].mTrackNumber = TrackNumberRsp;
+                        }
+                     }else if (deviceFeatures[deviceIndex].mTrackChangedNT ==
+                                NOTIFICATION_TYPE_INTERIM) {
+                        if (deviceFeatures[deviceIndex].mTrackNumber != -1L) {
+                            TrackNumberRsp = deviceFeatures[deviceIndex].mTrackNumber;
+                        } else {
+                            deviceFeatures[deviceIndex].mTrackNumber = TrackNumberRsp;
+                        }
+                     }
+                } else if ((((deviceFeatures[deviceIndex].mFeatures & BTRC_FEAT_BROWSE) != 0) &&
                     (deviceFeatures[deviceIndex].mCurrentPath != PATH_INVALID)) ||
                     ((deviceFeatures[deviceIndex].mTrackChangedNT == NOTIFICATION_TYPE_INTERIM) &&
                     (((deviceFeatures[deviceIndex].mFeatures & BTRC_FEAT_BROWSE) != 0) &&
@@ -5424,8 +5467,7 @@ public final class Avrcp {
     }
 
     private boolean isPlayingState(PlaybackState state) {
-        return (state.getState() == PlaybackState.STATE_PLAYING) ||
-                (state.getState() == PlaybackState.STATE_BUFFERING);
+        return (state.getState() == PlaybackState.STATE_PLAYING);
     }
 
     /**

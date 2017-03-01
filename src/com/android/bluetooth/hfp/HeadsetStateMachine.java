@@ -128,6 +128,8 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CONNECT_TIMEOUT = 201;
     /* Allow time for possible LMP response timeout + Page timeout */
     private static final int CONNECT_TIMEOUT_SEC = 38000;
+    /* Retry outgoing connection after this time if the first attempt fails */
+    private static final int RETRY_CONNECT_TIME_SEC = 2500;
 
     private static final int DIALING_OUT_TIMEOUT_VALUE = 10000;
     private static final int START_VR_TIMEOUT_VALUE = 5000;
@@ -199,6 +201,7 @@ final class HeadsetStateMachine extends StateMachine {
     private boolean mA2dpSuspend;
     private boolean mPendingCiev;
     private boolean mIsCsCall = true;
+    private boolean mPendingScoForVR = false;
     //ConcurrentLinkeQueue is used so that it is threadsafe
     private ConcurrentLinkedQueue<HeadsetCallState> mPendingCallStates = new ConcurrentLinkedQueue<HeadsetCallState>();
 
@@ -232,6 +235,7 @@ final class HeadsetStateMachine extends StateMachine {
     private BluetoothDevice mIncomingDevice = null;
     private BluetoothDevice mActiveScoDevice = null;
     private BluetoothDevice mMultiDisconnectDevice = null;
+    private BluetoothDevice mPendingScoForVRDevice = null;
 
     // Multi HFP: Connected devices list holds all currently connected headsets
     private ArrayList<BluetoothDevice> mConnectedDevicesList =
@@ -709,8 +713,18 @@ final class HeadsetStateMachine extends StateMachine {
                     } else if (mTargetDevice != null && mTargetDevice.equals(device)) {
                         // outgoing connection failed
                         if (mRetryConnect.containsKey(mTargetDevice)) {
-                            Log.d(TAG, "Removing conn retry entry for device = " + mTargetDevice);
-                            mRetryConnect.remove(mTargetDevice);
+                            // retry again only if we tried once
+                            if (mRetryConnect.get(device) == 1) {
+                                Log.d(TAG, "Retry outgoing conn again for device = " + mTargetDevice
+                                      + " after " + RETRY_CONNECT_TIME_SEC + "msec");
+                                Message m = obtainMessage(CONNECT);
+                                m.obj = device;
+                                sendMessageDelayed(m, RETRY_CONNECT_TIME_SEC);
+                            } else {
+                                Log.d(TAG, "Removing conn retry entry for device = " +
+                                      mTargetDevice);
+                                mRetryConnect.remove(mTargetDevice);
+                            }
                         }
                         broadcastConnectionState(mTargetDevice, BluetoothProfile.STATE_DISCONNECTED,
                                                  BluetoothProfile.STATE_CONNECTING);
@@ -1303,6 +1317,17 @@ final class HeadsetStateMachine extends StateMachine {
                     mAudioState = BluetoothHeadset.STATE_AUDIO_CONNECTING;
                     broadcastAudioState(device, BluetoothHeadset.STATE_AUDIO_CONNECTING,
                                         BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
+                    break;
+                /* When VR is stopped before SCO creation is complete, we need
+                   to resume A2DP if we had suspended it */
+                case HeadsetHalConstants.AUDIO_STATE_DISCONNECTED:
+                    if (mA2dpSuspend) {
+                        if ((!isInCall()) && (mPhoneState.getNumber().isEmpty())) {
+                            log("Audio is closed,Set A2dpSuspended=false");
+                            mAudioManager.setParameters("A2dpSuspended=false");
+                            mA2dpSuspend = false;
+                        }
+                    }
                     break;
                     // TODO(BT) process other states
                 default:
@@ -2186,8 +2211,18 @@ final class HeadsetStateMachine extends StateMachine {
                         }
                     } else if (mTargetDevice != null && mTargetDevice.equals(device)) {
                         if (mRetryConnect.containsKey(mTargetDevice)) {
-                            Log.d(TAG, "Removing conn retry entry for device = " + mTargetDevice);
-                            mRetryConnect.remove(mTargetDevice);
+                            // retry again only if we tried once
+                            if (mRetryConnect.get(device) == 1) {
+                                Log.d(TAG, "Retry outgoing conn again for device = " + mTargetDevice
+                                      + " after " + RETRY_CONNECT_TIME_SEC + "msec");
+                                Message m = obtainMessage(CONNECT);
+                                m.obj = device;
+                                sendMessageDelayed(m, RETRY_CONNECT_TIME_SEC);
+                            } else {
+                                Log.d(TAG, "Removing conn retry entry for device = " +
+                                      mTargetDevice);
+                                mRetryConnect.remove(mTargetDevice);
+                            }
                         }
                         broadcastConnectionState(mTargetDevice, BluetoothProfile.STATE_DISCONNECTED,
                                                  BluetoothProfile.STATE_CONNECTING);
@@ -2684,8 +2719,23 @@ final class HeadsetStateMachine extends StateMachine {
                 // or MODE_IN_CALL which shall automatically suspend the AVDTP stream if needed.
                 // Whereas for VoiceDial we want to activate the SCO connection but we are still
                 // in MODE_NORMAL and hence the need to explicitly suspend the A2DP stream
-                mA2dpSuspend = true;
-                mAudioManager.setParameters("A2dpSuspended=true");
+                if (getA2dpConnState() == BluetoothProfile.STATE_CONNECTED) {
+                    if (!mA2dpSuspend) {
+                        Log.d(TAG, "Suspend A2DP streaming");
+                        mA2dpSuspend = true;
+                        mAudioManager.setParameters("A2dpSuspended=true");
+                    }
+
+                    if (getA2dpPlayState() == BluetoothA2dp.STATE_PLAYING) {
+                        mPendingScoForVRDevice = device;
+                        mPendingScoForVR = true;
+                        if (mStartVoiceRecognitionWakeLock.isHeld()) {
+                            mStartVoiceRecognitionWakeLock.release();
+                        }
+                        return;
+                    }
+                }
+
                 if (device != null) {
                     connectAudioNative(getByteAddress(device));
                 } else {
@@ -3172,6 +3222,13 @@ final class HeadsetStateMachine extends StateMachine {
                     }
                 }
                 mPendingCiev = false;
+            }
+            else if (mA2dpSuspend && mPendingScoForVR) {
+                 if (mPendingScoForVRDevice != null)
+                     connectAudioNative(getByteAddress(mPendingScoForVRDevice));
+
+                 mPendingScoForVRDevice = null;
+                 mPendingScoForVR = false;
             }
         }
         else if (prevState == BluetoothA2dp.STATE_NOT_PLAYING) {
@@ -4189,18 +4246,18 @@ final class HeadsetStateMachine extends StateMachine {
         return mAdapter.getRemoteDevice(Utils.getAddressStringFromByte(address));
     }
 
-    private boolean isInCall() {
+    boolean isInCall() {
         Log.d(TAG, "isInCall()");
         return ((mPhoneState.getNumActiveCall() > 0) || (mPhoneState.getNumHeldCall() > 0) ||
-                ((mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_IDLE) &&
-                 (mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_INCOMING)));
+                ((mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_IDLE)));
     }
 
     // Accept incoming SCO only when there is active call, VR activated,
     // active VOIP call
     private boolean isScoAcceptable() {
         Log.d(TAG, "isScoAcceptable()");
-        return mAudioRouteAllowed && (mVoiceRecognitionStarted || isInCall());
+        return mAudioRouteAllowed && (mVoiceRecognitionStarted || (isInCall() &&
+                (mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_INCOMING)));
     }
 
     boolean isConnected() {
