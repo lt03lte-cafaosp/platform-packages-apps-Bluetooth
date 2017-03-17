@@ -37,6 +37,7 @@ class AdapterProperties {
     private static final boolean DBG = true;
     private static final boolean VDBG = false;
     private static final String TAG = "BluetoothAdapterProperties";
+    private static final int BLUETOOTH_NAME_MAX_LENGTH_BYTES = 248;
 
     private static final int BD_ADDR_LEN = 6; // 6 bytes
     private volatile String mName;
@@ -116,6 +117,8 @@ class AdapterProperties {
      */
     boolean setName(String name) {
         synchronized (mObject) {
+            if (name.length() > BLUETOOTH_NAME_MAX_LENGTH_BYTES)
+                name =  name.substring(0, BLUETOOTH_NAME_MAX_LENGTH_BYTES);
             return mService.setAdapterPropertyNative(
                     AbstractionLayer.BT_PROPERTY_BDNAME, name.getBytes());
         }
