@@ -894,6 +894,11 @@ public final class Avrcp {
         public void onActiveSessionsChanged(List<MediaController> controllers) {
             Log.v(TAG, "Active sessions changed, " + controllers.size() + " sessions");
             if (controllers.size() > 0) {
+                HeadsetService mService = HeadsetService.getHeadsetService();
+                if (mService != null && mService.isInCall()) {
+                    Log.d(TAG, "Ignoring session changed update because of MT call in progress");
+                    return;
+                }
                 updateCurrentMediaController(controllers.get(0));
             }
             Log.d(TAG, "Exit onActiveSessionsChanged()");
@@ -1559,6 +1564,19 @@ public final class Avrcp {
                                       0, 0, msg.obj);
                       posMsg.arg1 = 1;
                       sendMessageDelayed(posMsg, SKIP_PERIOD);
+                 } else if (msg.arg1 == KEY_STATE_RELEASE) {
+                      /* Send a PlayState Change response to Remote after FF/Rewind Key Release */
+                      if (deviceFeatures[deviceIndex].mPlayStatusChangedNT
+                              == NOTIFICATION_TYPE_INTERIM) {
+                          deviceFeatures[deviceIndex].mPlayStatusChangedNT
+                                  = NOTIFICATION_TYPE_CHANGED;
+                          int currPlayStatus = convertPlayStateToPlayStatus
+                                  (deviceFeatures[deviceIndex].mCurrentPlayState);
+                          Log.v(TAG, "Sending Playstatus change as a part of FF/Rewind release");
+                          registerNotificationRspPlayStatusNative(
+                                  deviceFeatures[deviceIndex].mPlayStatusChangedNT, currPlayStatus,
+                                  getByteAddress(deviceFeatures[deviceIndex].mCurrentDevice));
+                      }
                  }
 
                  break;
