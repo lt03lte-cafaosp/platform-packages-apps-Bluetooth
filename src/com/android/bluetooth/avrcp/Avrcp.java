@@ -56,6 +56,7 @@ import android.view.KeyEvent;
 import com.android.bluetooth.R;
 import android.content.BroadcastReceiver;
 import com.android.bluetooth.a2dp.A2dpService;
+import com.android.bluetooth.hfp.HeadsetService;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.ProfileService;
 import com.android.bluetooth.Utils;
@@ -130,6 +131,7 @@ public final class Avrcp {
     private boolean mFastforward;
     private boolean mRewind;
     private boolean mRemotePassthroughCmd;
+    private HeadsetService mService;
 
     /* BTRC features */
     public static final int BTRC_FEAT_METADATA = 0x01;
@@ -310,6 +312,7 @@ public final class Avrcp {
         private String mCurrentPath;
         private String mCurrentPathUid;
         private Uri mMediaUri;
+        private HashMap<Integer, Integer> mMusicAppCmdResponsePending;
         private boolean isMusicAppResponsePending;
         private boolean isBrowsingSupported;
         private boolean isAbsoluteVolumeSupportingDevice;
@@ -352,6 +355,7 @@ public final class Avrcp {
             mCurrentPath = PATH_INVALID;
             mCurrentPathUid = null;
             mMediaUri = Uri.EMPTY;
+            mMusicAppCmdResponsePending = new HashMap<Integer, Integer>();
             isMusicAppResponsePending = false;
             isBrowsingSupported = false;
             isAbsoluteVolumeSupportingDevice = false;
@@ -372,7 +376,6 @@ public final class Avrcp {
     };
 
     private class PlayerSettings {
-        public byte attr;
         public byte [] attrIds;
         public String path;
     };
@@ -438,6 +441,7 @@ public final class Avrcp {
     private final String UPDATE_VALUE_TEXT = "UpdateValuesText";
     private ArrayList <Integer> mPendingCmds;
     private ArrayList <Integer> mPendingSetAttributes;
+    private ArrayList <Byte> mPlayerSettingCmds;
     DeviceDependentFeature[] deviceFeatures;
 
     static {
@@ -503,6 +507,7 @@ public final class Avrcp {
         }
         mPendingCmds = new ArrayList<Integer>();
         mPendingSetAttributes = new ArrayList<Integer>();
+        mPlayerSettingCmds = new ArrayList<Byte>();
         // clear path for all devices
         for (int i = 0; i < maxAvrcpConnections; i++) {
            deviceFeatures[i].mCurrentPath = PATH_INVALID;
@@ -567,10 +572,10 @@ public final class Avrcp {
                     }
                 }
                 for (int i = 0; i < maxAvrcpConnections; i++) {
-                    if (deviceFeatures[i].isMusicAppResponsePending ==
-                            true) {
+                    if ((deviceFeatures[i].mMusicAppCmdResponsePending
+                            .containsKey(getResponse))) {
+                        CreateMusicSettingsAppCmdLookupOrUpdate(getResponse, i, false);
                         device = deviceFeatures[i].mCurrentDevice;
-                        deviceFeatures[i].isMusicAppResponsePending = false;
                         break;
                     }
                 }
@@ -596,6 +601,14 @@ public final class Avrcp {
                             Log.e(TAG,"ERROR!!! device is null");
                             return;
                         }
+
+                        if (!mPlayerSettingCmds.isEmpty()) {
+                            mPlayerSettingCmds.remove(0);
+                        } else {
+                            Log.e(TAG, "No cmds in the queue");
+                            break;
+                        }
+
                         data = intent.getByteArrayExtra(EXTRA_VALUE_ID_ARRAY);
                         numAttr = (byte) data.length;
                         if (DEBUG)
@@ -808,6 +821,8 @@ public final class Avrcp {
             deviceFeatures[i].mMediaUri = Uri.EMPTY;
             deviceFeatures[i].mCurrentPathUid = null;
             deviceFeatures[i].mRequestedAddressedPlayerPackageName = null;
+            if (deviceFeatures[i].mMusicAppCmdResponsePending != null)
+                deviceFeatures[i].mMusicAppCmdResponsePending.clear();
             if (deviceFeatures[i].mVolumeMapping != null)
                 deviceFeatures[i].mVolumeMapping.clear();
         }
@@ -879,6 +894,11 @@ public final class Avrcp {
         public void onActiveSessionsChanged(List<MediaController> controllers) {
             Log.v(TAG, "Active sessions changed, " + controllers.size() + " sessions");
             if (controllers.size() > 0) {
+                HeadsetService mService = HeadsetService.getHeadsetService();
+                if (mService != null && mService.isInCall()) {
+                    Log.d(TAG, "Ignoring session changed update because of MT call in progress");
+                    return;
+                }
                 updateCurrentMediaController(controllers.get(0));
             }
             Log.d(TAG, "Exit onActiveSessionsChanged()");
@@ -920,6 +940,16 @@ public final class Avrcp {
                 case MESSAGE_PLAYERSETTINGS_TIMEOUT:
                     Log.e(TAG, "**MESSAGE_PLAYSTATUS_TIMEOUT: Addr: " +
                                 (String)msg.obj + " Msg: " + msg.arg1);
+                    BluetoothDevice currdevice;
+                    currdevice = mAdapter.getRemoteDevice((String) msg.obj);
+                    deviceIndex = getIndexForDevice(currdevice);
+                    if (deviceIndex == INVALID_DEVICE_INDEX) {
+                        Log.e(TAG,"Invalid device index for send response");
+                        break;
+                    }
+                    int rsp = msg.arg1;
+                    CreateMusicSettingsAppCmdLookupOrUpdate(rsp, deviceIndex, false);
+
                     synchronized (mPendingCmds) {
                         Integer val = new Integer(msg.arg1);
                         if (!mPendingCmds.contains(val)) {
@@ -927,6 +957,7 @@ public final class Avrcp {
                         }
                         mPendingCmds.remove(val);
                     }
+
                     switch (msg.arg1) {
                     case GET_ATTRIBUTE_IDS:
                         getListPlayerappAttrRspNative((byte)def_attrib.length ,
@@ -934,7 +965,16 @@ public final class Avrcp {
                                 mAdapter.getRemoteDevice((String) msg.obj)));
                     break;
                     case GET_VALUE_IDS:
-                        switch (mPlayerSettings.attr) {
+                        byte attrib = 0;
+                        if (!mPlayerSettingCmds.isEmpty()) {
+                            attrib = mPlayerSettingCmds.get(0);
+                            mPlayerSettingCmds.remove(0);
+                        } else {
+                            Log.e(TAG, "No cmds in queue");
+                            break;
+                        }
+
+                        switch (attrib) {
                             case ATTRIBUTE_REPEATMODE:
                                 getPlayerAppValueRspNative((byte)value_repmode.length,
                                         value_repmode,
@@ -5019,6 +5059,11 @@ public final class Avrcp {
         boolean focussed = false;
         boolean isResetFocusRequired = false;
         BluetoothDevice device = null;
+        HeadsetService mService = HeadsetService.getHeadsetService();
+        if (mService != null && mService.isInCall()) {
+            Log.d(TAG, "There is an active call, so don't processRCCStateChange.");
+            return;
+        }
         if (isFocussed == 1)
             focussed = true;
         if (isAvailable == 1)
@@ -5746,7 +5791,9 @@ public final class Avrcp {
             Log.e(TAG,"invalid index for device");
             return;
         }
-        deviceFeatures[deviceIndex].isMusicAppResponsePending = true;
+
+        CreateMusicSettingsAppCmdLookupOrUpdate(GET_ATTRIBUTE_IDS, deviceIndex, true);
+
         Message msg = mHandler.obtainMessage(MESSAGE_PLAYERSETTINGS_TIMEOUT,
                 GET_ATTRIBUTE_IDS,0 ,
                 Utils.getAddressStringFromByte(address));
@@ -5762,7 +5809,6 @@ public final class Avrcp {
         intent.putExtra(EXTRA_GET_COMMAND, GET_VALUE_IDS);
         intent.putExtra(EXTRA_ATTRIBUTE_ID, attr);
         mContext.sendBroadcast(intent, BLUETOOTH_PERM);
-        mPlayerSettings.attr = attr;
         int deviceIndex =
                 getIndexForDevice(mAdapter.getRemoteDevice(
                 Utils.getAddressStringFromByte(address)));
@@ -5771,7 +5817,8 @@ public final class Avrcp {
             return;
         }
 
-        deviceFeatures[deviceIndex].isMusicAppResponsePending = true;
+        mPlayerSettingCmds.add(attr);
+        CreateMusicSettingsAppCmdLookupOrUpdate(GET_VALUE_IDS, deviceIndex, true);
 
         Message msg = mHandler.obtainMessage();
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
@@ -5808,7 +5855,8 @@ public final class Avrcp {
             Log.e(TAG,"invalid index for device");
             return;
         }
-        deviceFeatures[deviceIndex].isMusicAppResponsePending = true;
+
+        CreateMusicSettingsAppCmdLookupOrUpdate(GET_ATTRIBUTE_VALUES, deviceIndex, true);
 
         Message msg = mHandler.obtainMessage();
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
@@ -5844,7 +5892,7 @@ public final class Avrcp {
             return;
         }
 
-        deviceFeatures[deviceIndex].isMusicAppResponsePending = true;
+        CreateMusicSettingsAppCmdLookupOrUpdate(SET_ATTRIBUTE_VALUES, deviceIndex, true);
 
         Message msg = mHandler.obtainMessage();
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
@@ -5878,7 +5926,7 @@ public final class Avrcp {
             return;
         }
 
-        deviceFeatures[deviceIndex].isMusicAppResponsePending = true;
+        CreateMusicSettingsAppCmdLookupOrUpdate(GET_ATTRIBUTE_TEXT, deviceIndex, true);
 
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
         msg.arg1 = GET_ATTRIBUTE_TEXT;
@@ -5888,7 +5936,7 @@ public final class Avrcp {
         mHandler.sendMessageDelayed(msg, 500);
    }
 
-    //PDU 0x15
+    //PDU 0x16
     private void getplayervalue_text(byte attr_id , byte num_value , byte [] value,
             byte[] address)
     {
@@ -5908,7 +5956,8 @@ public final class Avrcp {
             Log.e(TAG,"invalid index for device");
             return;
         }
-        deviceFeatures[deviceIndex].isMusicAppResponsePending = true;
+
+        CreateMusicSettingsAppCmdLookupOrUpdate(GET_VALUE_TEXT, deviceIndex, true);
 
         for (int i = 0; i < num_value; i++)
             mPlayerSettings.attrIds[i] = value[i];
@@ -5919,6 +5968,44 @@ public final class Avrcp {
         msg.obj = Utils.getAddressStringFromByte(address);
         mPendingCmds.add(new Integer(msg.arg1));
         mHandler.sendMessageDelayed(msg, 500);
+    }
+
+    private void CreateMusicSettingsAppCmdLookupOrUpdate(Integer cmd,
+            int deviceIndex, boolean entry_new) {
+        if (deviceIndex == INVALID_DEVICE_INDEX) {
+           Log.e(TAG,"invalid index for device");
+           return;
+        }
+        Log.v(TAG,"Cmd = " + cmd + "on index = " + deviceIndex + "new entry" + entry_new);
+
+        if (entry_new) {
+            if (deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.
+                    containsKey(cmd)) {
+                int cmdCount =
+                        deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.get(cmd);
+                Log.v(TAG,"cmdCount = " + cmdCount + "for command type = " + cmd);
+                deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.put
+                        (cmd, cmdCount + 1);
+            } else {
+                deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.put
+                        (cmd, 1);
+            }
+        } else {
+            if (deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.
+                    containsKey(cmd)) {
+                int PendingCmds =
+                        deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.get(cmd);
+                Log.v(TAG,"PendingCmds = " + PendingCmds + "for resoponse type = " + cmd);
+                if (PendingCmds > 1) {
+                    deviceFeatures[deviceIndex].mMusicAppCmdResponsePending
+                            .put(cmd, PendingCmds - 1);
+                } else if (PendingCmds == 1) {
+                    deviceFeatures[deviceIndex].mMusicAppCmdResponsePending.remove(cmd);
+                } else {
+                    Log.e(TAG,"Invalid Player Setting Cmd count entry in lookup");
+                }
+            }
+        }
     }
 
     /**
