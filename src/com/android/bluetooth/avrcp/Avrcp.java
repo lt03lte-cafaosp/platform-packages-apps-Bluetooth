@@ -5225,8 +5225,13 @@ public final class Avrcp {
                 if (param <= 0)
                    param = 1;
 
+                int update_interval = SystemProperties.getInt("persist.bt.avrcp.pos_time", 3000);
                 deviceFeatures[deviceIndex].mPlayPosChangedNT = NOTIFICATION_TYPE_INTERIM;
-                deviceFeatures[deviceIndex].mPlaybackIntervalMs = (long)param * 1000L;
+                if(update_interval == 0) {
+                    deviceFeatures[deviceIndex].mPlaybackIntervalMs = (long)param * 1000L;
+                } else {
+                    deviceFeatures[deviceIndex].mPlaybackIntervalMs = update_interval;
+                }
                 sendPlayPosNotificationRsp(true, deviceIndex);
                 if (DEBUG)
                     Log.v(TAG,"mPlayPosChangedNT updated for index " +
@@ -6089,6 +6094,12 @@ public final class Avrcp {
                     deviceFeatures[i].isActiveDevice) {
                     deviceFeatures[i].isActiveDevice = false;
                     Log.i(TAG,"Active device set to false at index =  " + i);
+                    if (isPlayingState(deviceFeatures[i].mCurrentPlayState)) {
+                        PlaybackState.Builder playState = new PlaybackState.Builder();
+                        playState.setState(PlaybackState.STATE_PAUSED,
+                                       PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f);
+                        updatePlaybackState(playState.build(), deviceFeatures[i].mCurrentDevice);
+                    }
                 }
             }
             else if (deviceFeatures[i].mCurrentDevice != null &&
