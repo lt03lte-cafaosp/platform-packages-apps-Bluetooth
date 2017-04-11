@@ -119,6 +119,7 @@ final class HeadsetStateMachine extends StateMachine {
     static final int UPDATE_A2DP_CONN_STATE = 19;
     static final int QUERY_PHONE_STATE_AT_SLC = 20;
     static final int UPDATE_CALL_TYPE = 21;
+    static final int SEND_INCOMING_CALL_IND = 22;
 
     private static final int STACK_EVENT = 101;
     private static final int DIALING_OUT_TIMEOUT = 102;
@@ -136,6 +137,14 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int START_VR_TIMEOUT_VALUE = 5000;
     private static final int CLCC_RSP_TIMEOUT_VALUE = 5000;
     private static final int QUERY_PHONE_STATE_CHANGED_DELAYED = 100;
+    private static final int INCOMING_CALL_IND_DELAY = 200;
+    // Blacklist remote device addresses to send incoimg call indicators with delay of 200ms
+    private static final String [] BlacklistDeviceAddrToDelayCallInd =
+                                                               {"00:15:83", /* Beiqi CK */
+                                                                "2a:eb:00", /* BIAC CK */
+                                                                "30:53:00", /* BIAC series */
+                                                                "00:17:53",  /* ADAYO CK */
+                                                               };
 
     // Max number of HF connections at any time
     private int max_hf_connections = 1;
@@ -208,6 +217,10 @@ final class HeadsetStateMachine extends StateMachine {
 
     // Indicates whether audio can be routed to the device.
     private boolean mAudioRouteAllowed = true;
+
+    private boolean mIsCallIndDelay = false;
+
+    private boolean mIsBlacklistedDevice = false;
 
     // mCurrentDevice is the device connected before the state changes
     // mTargetDevice is the device to be connected
@@ -406,6 +419,7 @@ final class HeadsetStateMachine extends StateMachine {
             mVoiceRecognitionStarted = false;
             mWaitingForVoiceRecognition = false;
             mDialingOut = false;
+            mIsBlacklistedDevice = false;
         }
 
         @Override
@@ -1128,6 +1142,10 @@ final class HeadsetStateMachine extends StateMachine {
                     Intent intent = (Intent) message.obj;
                     processCpbr(intent);
                     break;
+                case SEND_INCOMING_CALL_IND:
+                    phoneStateChangeNative(0, 0, HeadsetHalConstants.CALL_STATE_INCOMING,
+                                       mPhoneState.getNumber(), mPhoneState.getType());
+                    break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
                     Log.d(TAG, "event type: " + event.type + "event device : "
@@ -1360,6 +1378,8 @@ final class HeadsetStateMachine extends StateMachine {
             } else {
                 Log.e(TAG, "Handsfree phone proxy null for query phone state");
             }
+            // Checking for the Blacklisted device Addresses
+            mIsBlacklistedDevice = isConnectedDeviceBlacklistedforIncomingCall();
             Log.d(TAG, "Exit Connected processSlcConnected()");
         }
 
@@ -1646,6 +1666,10 @@ final class HeadsetStateMachine extends StateMachine {
                 case PROCESS_CPBR:
                     Intent intent = (Intent) message.obj;
                     processCpbr(intent);
+                    break;
+                case SEND_INCOMING_CALL_IND:
+                    phoneStateChangeNative(0, 0, HeadsetHalConstants.CALL_STATE_INCOMING,
+                                       mPhoneState.getNumber(), mPhoneState.getType());
                     break;
                 case STACK_EVENT:
                     StackEvent event = (StackEvent) message.obj;
@@ -3218,6 +3242,7 @@ final class HeadsetStateMachine extends StateMachine {
                     if (it != null) {
                         while (it.hasNext()) {
                             HeadsetCallState callState = it.next();
+                            Log.d(TAG, "mIsCallIndDelay: " + mIsCallIndDelay);
                             phoneStateChangeNative( callState.mNumActive,
                                             callState.mNumHeld,callState.mCallState,
                                             callState.mNumber,callState.mType);
@@ -3414,6 +3439,28 @@ final class HeadsetStateMachine extends StateMachine {
     private void processCallState(HeadsetCallState callState,
         boolean isVirtualCall) {
         Log.d(TAG, "Enter processCallState()");
+
+        /* If active call is ended, no held call is present, disconnect SCO
+         * and fake the MT Call indicators. */
+        Log.d(TAG, "mIsBlacklistedDevice:" + mIsBlacklistedDevice);
+        if (mIsBlacklistedDevice &&
+            mPhoneState.getNumActiveCall() == 1 &&
+            callState.mNumActive == 0 &&
+            callState.mNumHeld == 0 &&
+            callState.mCallState == HeadsetHalConstants.CALL_STATE_INCOMING) {
+
+            Log.d(TAG, "Disconnect SCO since active call is ended, only waiting call is there");
+            Message m = obtainMessage(DISCONNECT_AUDIO);
+            m.obj = mCurrentDevice;
+            sendMessage(m);
+
+            Log.d(TAG, "Send Idle call indicators once Active call disconnected.");
+            mPhoneState.setCallState(HeadsetHalConstants.CALL_STATE_IDLE);
+            phoneStateChangeNative(callState.mNumActive, callState.mNumHeld,
+                  HeadsetHalConstants.CALL_STATE_IDLE, callState.mNumber, callState.mType);
+            mIsCallIndDelay = true;
+        }
+
         mPhoneState.setNumActiveCall(callState.mNumActive);
         mPhoneState.setNumHeldCall(callState.mNumHeld);
         mPhoneState.setCallState(callState.mCallState);
@@ -3492,8 +3539,14 @@ final class HeadsetStateMachine extends StateMachine {
         }
         if (getCurrentState() != mDisconnected) {
             log("No A2dp playing to suspend");
-            phoneStateChangeNative(callState.mNumActive, callState.mNumHeld,
-                callState.mCallState, callState.mNumber, callState.mType);
+            Log.d(TAG, "mIsCallIndDelay: " + mIsCallIndDelay);
+            if (mIsCallIndDelay) {
+                mIsCallIndDelay = false;
+                sendMessageDelayed(SEND_INCOMING_CALL_IND, INCOMING_CALL_IND_DELAY);
+            } else {
+                phoneStateChangeNative(callState.mNumActive, callState.mNumHeld,
+                  callState.mCallState, callState.mNumber, callState.mType);
+            }
         }
         if (mA2dpSuspend && (!isAudioOn())) {
             if ((!isInCall()) && (callState.mNumber.isEmpty())) {
@@ -4304,8 +4357,10 @@ final class HeadsetStateMachine extends StateMachine {
     // active VOIP call
     private boolean isScoAcceptable() {
         Log.d(TAG, "isScoAcceptable()");
-        return mAudioRouteAllowed && (mVoiceRecognitionStarted || (isInCall() &&
-                (mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_INCOMING)));
+        return mAudioRouteAllowed && (mVoiceRecognitionStarted ||
+               ((mPhoneState.getNumActiveCall() > 0) || (mPhoneState.getNumHeldCall() > 0) ||
+                ((mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_IDLE) &&
+                 (mPhoneState.getCallState() != HeadsetHalConstants.CALL_STATE_INCOMING))));
     }
 
     boolean isConnected() {
@@ -4337,6 +4392,20 @@ final class HeadsetStateMachine extends StateMachine {
         return ret;
     }
 
+    boolean isConnectedDeviceBlacklistedforIncomingCall() {
+        // Checking for the Blacklisted device Addresses
+        if (max_hf_connections < 2) {
+            BluetoothDevice device = mConnectedDevicesList.get(0);
+            for (int j = 0; j < BlacklistDeviceAddrToDelayCallInd.length;j++) {
+                 String addr = BlacklistDeviceAddrToDelayCallInd[j];
+                 if (device.toString().toLowerCase().startsWith(addr.toLowerCase())) {
+                     Log.d(TAG,"Remote device address Blacklisted for sending delay");
+                     return true;
+                 }
+            }
+        }
+        return false;
+    }
     private void sendVoipConnectivityNetworktype(boolean isVoipStarted) {
         Log.d(TAG, "Enter sendVoipConnectivityNetworktype()");
         NetworkInfo networkInfo = mConnectivityManager.getActiveNetworkInfo();
