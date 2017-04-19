@@ -138,18 +138,12 @@ final class HeadsetStateMachine extends StateMachine {
     private static final int CLCC_RSP_TIMEOUT_VALUE = 5000;
     private static final int QUERY_PHONE_STATE_CHANGED_DELAYED = 100;
     private static final int INCOMING_CALL_IND_DELAY = 200;
-    private int RETRY_SCO_CONNECTION_DELAY = 0;
     // Blacklist remote device addresses to send incoimg call indicators with delay of 200ms
     private static final String [] BlacklistDeviceAddrToDelayCallInd =
                                                                {"00:15:83", /* Beiqi CK */
                                                                 "2a:eb:00", /* BIAC CK */
                                                                 "30:53:00", /* BIAC series */
                                                                 "00:17:53",  /* ADAYO CK */
-                                                               };
-    /* Blacklist remote device addresses to retry SCO connection once more after
-           1sec for MT call or 3 sec for MO call */
-    private static final String [] BlacklistDeviceAddrToRetrySCO =
-                                                               {"04:52:c7",
                                                                };
 
     // Max number of HF connections at any time
@@ -227,10 +221,6 @@ final class HeadsetStateMachine extends StateMachine {
     private boolean mIsCallIndDelay = false;
 
     private boolean mIsBlacklistedDevice = false;
-
-    private boolean mIsRetrySco = false;
-
-    private boolean mIsBlacklistedDeviceforRetrySCO = false;
 
     // mCurrentDevice is the device connected before the state changes
     // mTargetDevice is the device to be connected
@@ -430,7 +420,6 @@ final class HeadsetStateMachine extends StateMachine {
             mWaitingForVoiceRecognition = false;
             mDialingOut = false;
             mIsBlacklistedDevice = false;
-            mIsBlacklistedDeviceforRetrySCO = false;
         }
 
         @Override
@@ -1391,7 +1380,6 @@ final class HeadsetStateMachine extends StateMachine {
             }
             // Checking for the Blacklisted device Addresses
             mIsBlacklistedDevice = isConnectedDeviceBlacklistedforIncomingCall();
-            mIsBlacklistedDeviceforRetrySCO = isConnectedDeviceBlacklistedforRetrySco();
             Log.d(TAG, "Exit Connected processSlcConnected()");
         }
 
@@ -1883,13 +1871,6 @@ final class HeadsetStateMachine extends StateMachine {
                             mPhoneState.setIsCsCall(true);
                         } else {
                             log("Sco disconnected for CS call, do not check network type");
-                        }
-                        if ((mIsBlacklistedDeviceforRetrySCO == true) && (mIsRetrySco == true)) {
-                            Log.d(TAG, "blacklisted device, retry SCO after " +
-                                         RETRY_SCO_CONNECTION_DELAY + " msec");
-                            Message m = obtainMessage(CONNECT_AUDIO);
-                            sendMessageDelayed(m, RETRY_SCO_CONNECTION_DELAY);
-                            mIsRetrySco = false;
                         }
                     }
                     transitionTo(mConnected);
@@ -3480,26 +3461,6 @@ final class HeadsetStateMachine extends StateMachine {
             mIsCallIndDelay = true;
         }
 
-        /* If device is blacklisted, set retry SCO flag true before creating SCO for 1st time */
-        Log.d(TAG, "mIsBlacklistedDeviceforRetrySCO: " + mIsBlacklistedDeviceforRetrySCO);
-        if (mIsBlacklistedDeviceforRetrySCO) {
-            if (((mPhoneState.getNumActiveCall() == 0 && callState.mNumActive == 1) ||
-                  (mPhoneState.getNumHeldCall() == 0 && callState.mNumHeld == 1)) &&
-                  (mPhoneState.getCallState() == HeadsetHalConstants.CALL_STATE_INCOMING &&
-                   callState.mCallState == HeadsetHalConstants.CALL_STATE_IDLE)) {
-                Log.d(TAG, "Incoming call is accepted as Active or Held call");
-                mIsRetrySco = true;
-                RETRY_SCO_CONNECTION_DELAY = 1000;
-            } else if ((callState.mNumActive == 0 && callState.mNumHeld == 0) &&
-                        (mPhoneState.getCallState() == HeadsetHalConstants.CALL_STATE_IDLE &&
-                        (callState.mCallState == HeadsetHalConstants.CALL_STATE_DIALING ||
-                         callState.mCallState == HeadsetHalConstants.CALL_STATE_ALERTING)))
-            {
-                Log.d(TAG, "Dialing or Alerting indication");
-                mIsRetrySco = true;
-                RETRY_SCO_CONNECTION_DELAY = 3000;
-            }
-        }
         mPhoneState.setNumActiveCall(callState.mNumActive);
         mPhoneState.setNumHeldCall(callState.mNumHeld);
         mPhoneState.setCallState(callState.mCallState);
@@ -4439,20 +4400,6 @@ final class HeadsetStateMachine extends StateMachine {
                  String addr = BlacklistDeviceAddrToDelayCallInd[j];
                  if (device.toString().toLowerCase().startsWith(addr.toLowerCase())) {
                      Log.d(TAG,"Remote device address Blacklisted for sending delay");
-                     return true;
-                 }
-            }
-        }
-        return false;
-    }
-    boolean isConnectedDeviceBlacklistedforRetrySco() {
-        // Checking for the Blacklisted device Addresses
-        if (max_hf_connections < 2) {
-            BluetoothDevice device = mConnectedDevicesList.get(0);
-            for (int j = 0; j < BlacklistDeviceAddrToRetrySCO.length;j++) {
-                 String addr = BlacklistDeviceAddrToRetrySCO[j];
-                 if (device.toString().toLowerCase().startsWith(addr.toLowerCase())) {
-                     Log.d(TAG,"Remote device address Blacklisted for Retry SCO");
                      return true;
                  }
             }
