@@ -777,6 +777,8 @@ public class AdapterService extends Service {
     private static final int CONNECT_OTHER_PROFILES_TIMEOUT= 6000;
     private static final int CONNECT_OTHER_PROFILES_TIMEOUT_DELAYED = 10000;
     private static final int CONNECT_OTHER_CLIENT_PROFILES_TIMEOUT= 2000;
+    private static final int MESSAGE_AUTO_CONNECT_PROFILES = 50;
+    private static final int AUTO_CONNECT_PROFILES_TIMEOUT= 500;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -812,6 +814,11 @@ public class AdapterService extends Service {
                     debugLog( "handleMessage() - MESSAGE_CONNECT_OTHER_CLIENT_PROFILES ");
                     processConnectOtherClientProfiles((BluetoothDevice) msg.obj, msg.arg1);
                     break;
+                case MESSAGE_AUTO_CONNECT_PROFILES: {
+                    if (DBG) debugLog( "MESSAGE_AUTO_CONNECT_PROFILES");
+                    autoConnectProfilesDelayed();
+                    break;
+                }
             }
         }
     };
@@ -1198,6 +1205,12 @@ public class AdapterService extends Service {
             AdapterService service = getService();
             if (service == null) return BluetoothDevice.BOND_NONE;
             return service.getBondState(device);
+        }
+
+        public long getSupportedProfiles() {
+            AdapterService service = getService();
+            if (service == null) return 0;
+            return service.getSupportedProfiles();
         }
 
         public int getConnectionState(BluetoothDevice device) {
@@ -1743,7 +1756,18 @@ public class AdapterService extends Service {
           return mQuietmode;
      }
 
-     public void autoConnect(){
+    // Delaying Auto Connect to make sure that all clients
+    // are up and running, specially BluetoothHeadset.
+    public void autoConnect() {
+        debugLog( "delay auto connect by 500 ms");
+        if ((mHandler.hasMessages(MESSAGE_AUTO_CONNECT_PROFILES) == false) &&
+            (isQuietModeEnabled()== false)) {
+            Message m = mHandler.obtainMessage(MESSAGE_AUTO_CONNECT_PROFILES);
+            mHandler.sendMessageDelayed(m,AUTO_CONNECT_PROFILES_TIMEOUT);
+        }
+    }
+
+    private void autoConnectProfilesDelayed(){
         if (getState() != BluetoothAdapter.STATE_ON){
              errorLog("autoConnect() - BT is not ON. Exiting autoConnect");
              return;
@@ -2201,6 +2225,10 @@ public class AdapterService extends Service {
             return BluetoothDevice.BOND_NONE;
         }
         return deviceProp.getBondState();
+    }
+
+    long getSupportedProfiles() {
+        return Config.getSupportedProfilesBitMask();
     }
 
     int getConnectionState(BluetoothDevice device) {
@@ -2765,20 +2793,6 @@ public class AdapterService extends Service {
                 return;
             }
         }
-
-        long onDuration = System.currentTimeMillis() - mBluetoothStartTime;
-        String onDurationString = String.format("%02d:%02d:%02d.%03d",
-                                      (int)(onDuration / (1000 * 60 * 60)),
-                                      (int)((onDuration / (1000 * 60)) % 60),
-                                      (int)((onDuration / 1000) % 60),
-                                      (int)(onDuration % 1000));
-
-        writer.println("Bluetooth Status");
-        writer.println("  enabled: " + isEnabled());
-        writer.println("  state: " + getStateString());
-        writer.println("  address: " + getAddress());
-        writer.println("  name: " + getName());
-        writer.println("  time since enabled: " + onDurationString + "\n");
 
         writer.println("Bonded devices:");
         for (BluetoothDevice device : getBondedDevices()) {
