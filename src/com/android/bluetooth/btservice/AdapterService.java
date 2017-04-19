@@ -21,6 +21,7 @@
 package com.android.bluetooth.btservice;
 
 import android.app.AlarmManager;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -89,7 +90,8 @@ import android.os.SystemProperties;
 
 public class AdapterService extends Service {
     private static final String TAG = "BluetoothAdapterService";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
+    private static final boolean VERBOSE = false;
     private static final boolean TRACE_REF = false;
     private static final int MIN_ADVT_INSTANCES_FOR_MA = 5;
     private static final int MIN_OFFLOADED_FILTERS = 10;
@@ -124,6 +126,7 @@ public class AdapterService extends Service {
     public static final String BLUETOOTH_ADMIN_PERM =
         android.Manifest.permission.BLUETOOTH_ADMIN;
 
+    public static int oppNotificationId = 0;
     static final ParcelUuid[] A2DP_SOURCE_SINK_UUIDS = {
         BluetoothUuid.AudioSource,
         BluetoothUuid.AudioSink
@@ -539,6 +542,8 @@ public class AdapterService extends Service {
         mProfileObserver = new ProfileObserver(getApplicationContext(), this, new Handler());
         mProfileObserver.start();
         mVendor.init();
+
+        setAdapterService(this);
     }
 
     @Override
@@ -547,12 +552,9 @@ public class AdapterService extends Service {
         return mBinder;
     }
     public boolean onUnbind(Intent intent) {
-        if (getState() == BluetoothAdapter.STATE_OFF) {
-            Log.w(TAG, "onUnbind, calling cleanup");
-            cleanup();
-            return super.onUnbind(intent);
-        }
-        return false;
+        Log.w(TAG, "onUnbind, calling cleanup");
+        cleanup();
+        return super.onUnbind(intent);
     }
 
     public void onDestroy() {
@@ -596,9 +598,6 @@ public class AdapterService extends Service {
         } catch (RemoteException e) {
             // Ignore.
         }
-
-        //FIXME: Set static instance here???
-        setAdapterService(this);
 
         //Start Gatt service
         setGattProfileServiceState(supportedProfileServices,BluetoothAdapter.STATE_ON);
@@ -653,6 +652,15 @@ public class AdapterService extends Service {
                     + serviceName + " with result: " + res);
             }
         return;
+    }
+
+    void cleanOppNotifciations() {
+        Log.d(TAG, " cleanOppNotifciations ID:" + oppNotificationId);
+        if (oppNotificationId != 0) {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            nm.cancel(oppNotificationId);
+            oppNotificationId = 0;
+        }
     }
 
     boolean stopGattProfileService() {
@@ -1046,7 +1054,8 @@ public class AdapterService extends Service {
             //do not allow setmode when multicast is active
             A2dpService a2dpService = A2dpService.getA2dpService();
             if (a2dpService != null &&
-                    a2dpService.isMulticastOngoing(null)) {
+                a2dpService.isMulticastFeatureEnabled() &&
+                a2dpService.isMulticastOngoing(null)) {
                 Log.i(TAG,"A2dp Multicast is Ongoing, ignore setmode " + mode);
                 mScanmode = mode;
                 return false;
@@ -1642,11 +1651,15 @@ public class AdapterService extends Service {
         //do not allow new connections with active multicast
         A2dpService a2dpService = A2dpService.getA2dpService();
         if (a2dpService != null &&
-                a2dpService.isMulticastOngoing(null)) {
+            a2dpService.isMulticastFeatureEnabled() &&
+            a2dpService.isMulticastOngoing(null)) {
             Log.i(TAG,"A2dp Multicast is Ongoing, ignore discovery");
             return false;
         }
-
+        if (mAdapterProperties.isDiscovering()) {
+            Log.i(TAG,"discovery already active, ignore startDiscovery");
+            return false;
+        }
         return startDiscoveryNative();
     }
 
@@ -1654,6 +1667,10 @@ public class AdapterService extends Service {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                        "Need BLUETOOTH ADMIN permission");
 
+        if (!mAdapterProperties.isDiscovering()) {
+            Log.i(TAG,"discovery not active, ignore cancelDiscovery");
+            return false;
+        }
         return cancelDiscoveryNative();
     }
 
@@ -1698,7 +1715,8 @@ public class AdapterService extends Service {
         // Multicast: Do not allow bonding while multcast
         A2dpService a2dpService = A2dpService.getA2dpService();
         if (a2dpService != null &&
-                a2dpService.isMulticastOngoing(null)) {
+            a2dpService.isMulticastFeatureEnabled() &&
+            a2dpService.isMulticastOngoing(null)) {
             Log.i(TAG,"A2dp Multicast is ongoing, ignore bonding");
             return false;
         }
@@ -1757,6 +1775,12 @@ public class AdapterService extends Service {
        }
     }
 
+     private void cancelDiscoveryforautoConnect(){
+        if (mAdapterProperties.isDiscovering() == true) {
+            cancelDiscovery();
+        }
+    }
+
      private void autoConnectHeadset(){
         HeadsetService  hsService = HeadsetService.getHeadsetService();
 
@@ -1766,6 +1790,7 @@ public class AdapterService extends Service {
         }
         for (BluetoothDevice device : bondedDevices) {
             if (hsService.getPriority(device) == BluetoothProfile.PRIORITY_AUTO_CONNECT ){
+                cancelDiscoveryforautoConnect();
                 debugLog("autoConnectHeadset() - Connecting HFP with " + device.toString());
                 hsService.connect(device);
             }
@@ -1780,6 +1805,7 @@ public class AdapterService extends Service {
         }
         for (BluetoothDevice device : bondedDevices) {
             if (a2dpSservice.getPriority(device) == BluetoothProfile.PRIORITY_AUTO_CONNECT ){
+                cancelDiscoveryforautoConnect();
                 debugLog("autoConnectA2dp() - Connecting A2DP with " + device.toString());
                 a2dpSservice.connect(device);
             }
@@ -1795,9 +1821,10 @@ public class AdapterService extends Service {
 
         for (BluetoothDevice device : bondedDevices) {
             if (headsetClientService.getPriority(device) == BluetoothProfile.PRIORITY_AUTO_CONNECT){
-            debugLog("autoConnectHeadsetClient() - Connecting Headset Client with " +
-                device.toString());
-            headsetClientService.connect(device);
+                cancelDiscoveryforautoConnect();
+                debugLog("autoConnectHeadsetClient() - Connecting Headset Client with " +
+                          device.toString());
+                headsetClientService.connect(device);
             }
         }
     }
@@ -1811,6 +1838,7 @@ public class AdapterService extends Service {
 
          for (BluetoothDevice device : bondedDevices) {
              if (a2dpSinkService.getPriority(device) == BluetoothProfile.PRIORITY_AUTO_CONNECT) {
+                 cancelDiscoveryforautoConnect();
                  debugLog("autoConnectA2dpSink() - Connecting A2DP Sink with " + device.toString());
                  a2dpSinkService.connect(device);
              }
@@ -1825,6 +1853,7 @@ public class AdapterService extends Service {
          }
          for (BluetoothDevice device : bondedDevices) {
              if (pbapClientService.getPriority(device) == BluetoothProfile.PRIORITY_AUTO_CONNECT) {
+                 cancelDiscoveryforautoConnect();
                  debugLog("autoConnectPbapClient() - Connecting PBAP Client with " +
                          device.toString());
                  pbapClientService.connect(device);
@@ -2104,9 +2133,9 @@ public class AdapterService extends Service {
 
             case BluetoothProfile.A2DP:
                 A2dpService a2dpService = A2dpService.getA2dpService();
-                deviceList = a2dpService.getConnectedDevices();
                 if ((a2dpService != null) &&
                     (BluetoothProfile.PRIORITY_AUTO_CONNECT != a2dpService.getPriority(device))){
+                     deviceList = a2dpService.getConnectedDevices();
                      adjustOtherSinkPriorities(a2dpService, deviceList);
                      a2dpService.setPriority(device,BluetoothProfile.PRIORITY_AUTO_CONNECT);
                 }
@@ -2260,8 +2289,8 @@ public class AdapterService extends Service {
     }
 
      boolean setPairingConfirmation(BluetoothDevice device, boolean accept) {
-        enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
-                                       "Need BLUETOOTH ADMIN permission");
+        enforceCallingOrSelfPermission(BLUETOOTH_PRIVILEGED,
+                                       "Need BLUETOOTH PRIVILEGED permission");
         DeviceProperties deviceProp = mRemoteDevices.getDeviceProperties(device);
         if (deviceProp == null || deviceProp.getBondState() != BluetoothDevice.BOND_BONDING) {
             return false;
@@ -2665,11 +2694,12 @@ public class AdapterService extends Service {
             }
         }
 
-        debugLog("energyInfoCallback() status = " + status +
-                "tx_time = " + tx_time + "rx_time = " + rx_time +
-                "idle_time = " + idle_time + "energy_used = " + energy_used +
-                "ctrl_state = " + ctrl_state +
-                "traffic = " + Arrays.toString(data));
+        verboseLog("energyInfoCallback() status = " + status +
+                   "tx_time = " + tx_time + "rx_time = " + rx_time +
+                   "idle_time = " + idle_time +
+                   "energy_used = " + energy_used +
+                   "ctrl_state = " + ctrl_state +
+                   "traffic = " + Arrays.toString(data));
     }
 
     private int getIdleCurrentMa() {
@@ -2715,8 +2745,8 @@ public class AdapterService extends Service {
         enforceCallingOrSelfPermission(android.Manifest.permission.DUMP, TAG);
 
         if (args.length > 0) {
-            debugLog("dumpsys arguments, check for protobuf output: " +
-                    TextUtils.join(" ", args));
+            verboseLog("dumpsys arguments, check for protobuf output: "
+                       + TextUtils.join(" ", args));
             if (args[0].startsWith("--proto")) {
                 if (args[0].equals("--proto-java-bin")) {
                     dumpJava(fd);
@@ -2764,6 +2794,7 @@ public class AdapterService extends Service {
 
     private void dumpJava(FileDescriptor fd) {
         BluetoothProto.BluetoothLog log = new BluetoothProto.BluetoothLog();
+        log.setNumBondedDevices(getBondedDevices().length);
 
         for (ProfileService profile : mProfiles) {
             profile.dumpProto(log);
@@ -2789,6 +2820,10 @@ public class AdapterService extends Service {
 
     private void debugLog(String msg) {
         if (DBG) Log.d(TAG, msg);
+    }
+
+    private void verboseLog(String msg) {
+        if (VERBOSE) Log.v(TAG, msg);
     }
 
     private void errorLog(String msg) {

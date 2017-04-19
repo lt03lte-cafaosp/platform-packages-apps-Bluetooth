@@ -67,7 +67,9 @@ import java.util.ArrayList;
 import com.android.bluetooth.sdp.SdpManager;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-
+import android.bluetooth.BluetoothA2dp;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothDevice;
 
 /**
  * Performs the background Bluetooth OPP transfer. It also starts thread to
@@ -142,12 +144,16 @@ public class BluetoothOppService extends Service {
     private ObexTransport mPendingConnection = null;
     private int mOppSdpHandle = -1;
 
+    private boolean isScreenOff = false;
+
     /*
      * TODO No support for queue incoming from multiple devices.
      * Make an array list of server session to support receiving queue from
      * multiple devices
      */
     private BluetoothOppObexServerSession mServerSession;
+
+    private BluetoothOppManager mOppManager = null;
 
     @Override
     public IBinder onBind(Intent arg0) {
@@ -167,6 +173,8 @@ public class BluetoothOppService extends Service {
         mNotifier = new BluetoothOppNotification(this);
         mNotifier.mNotificationMgr.cancelAll();
         mNotifier.updateNotification();
+        mPowerManager = (PowerManager)getSystemService(POWER_SERVICE);
+        isScreenOff = !mPowerManager.isInteractive();
 
         final ContentResolver contentResolver = getContentResolver();
         new Thread("trimDatabase") {
@@ -175,7 +183,12 @@ public class BluetoothOppService extends Service {
             }
         }.start();
 
+        mOppManager = BluetoothOppManager.getInstance(this);
         IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED);
         registerReceiver(mBluetoothReceiver, filter);
 
         synchronized (BluetoothOppService.this) {
@@ -262,7 +275,18 @@ public class BluetoothOppService extends Service {
                        mTransfer =null;
                     }
                     synchronized (BluetoothOppService.this) {
+                        if (D) Log.d(TAG, "STOP_LISTENER :" + mUpdateThread);
                         if (mUpdateThread == null) {
+                            stopSelf();
+                        } else {
+                            try {
+                                mUpdateThread.interrupt();
+                                mUpdateThread.join();
+                                if (D) Log.d(TAG, "Stop after join");
+                            } catch (InterruptedException e) {
+                                Log.e(TAG, "Interrupted", e);
+                            }
+                            mUpdateThread = null;
                             stopSelf();
                         }
                     }
@@ -440,7 +464,7 @@ public class BluetoothOppService extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-
+            if (D) Log.d(TAG," action :" + action);
             if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                 if (D) Log.d(TAG, "Adapter state = " + mAdapter.getState());
                 switch (mAdapter.getState()) {
@@ -466,6 +490,43 @@ public class BluetoothOppService extends Service {
 
                         break;
                 }
+            } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
+                isScreenOff = true;
+                if (V) Log.v(TAG, "ACTION_SCREEN_OFF ");
+            } else if (action.equals(Intent.ACTION_SCREEN_ON)) {
+                isScreenOff = false;
+                if (V) Log.v(TAG, "ACTION_SCREEN_ON ");
+            } else if (action.equals(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED)) {
+                if (V) {
+                    int newState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
+                        BluetoothA2dp.STATE_NOT_PLAYING);
+                    BluetoothDevice device = intent.getParcelableExtra(
+                        BluetoothDevice.EXTRA_DEVICE);
+                    Log.v(TAG,"device: " + device + " newState: " + newState);
+                }
+                if (mOppManager != null) {
+                    if (V) Log.v(TAG," Mark A2DP state as not playing");
+                    mOppManager.isA2DPPlaying = false;
+                }
+            } else if (action.equals(BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED)) {
+                int newState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
+                    BluetoothA2dp.STATE_NOT_PLAYING);
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (V) Log.v(TAG,"device: " + device + " newState: " + newState);
+
+                if (device == null) {
+                    return;
+                }
+                if (mOppManager != null) {
+                    if (newState == BluetoothA2dp.STATE_PLAYING) {
+                        if (V) Log.v(TAG," Mark A2DP state as playing");
+                        mOppManager.isA2DPPlaying = true;
+                    }
+                    else {
+                        if (V) Log.v(TAG," Mark A2DP state as not playing");
+                        mOppManager.isA2DPPlaying = false;
+                    }
+                }
             }
         }
     };
@@ -475,7 +536,10 @@ public class BluetoothOppService extends Service {
             mPendingUpdate = true;
             if ((mUpdateThread == null) && (mAdapter != null)
                 && mAdapter.isEnabled()) {
-                mPowerManager = (PowerManager)getSystemService(POWER_SERVICE);
+                if (mPowerManager == null) {
+                    mPowerManager = (PowerManager)getSystemService(POWER_SERVICE);
+                    isScreenOff = !mPowerManager.isInteractive();
+                }
                 if (V) Log.v(TAG, "Starting a new thread");
                 mUpdateThread = new UpdateThread();
                 mUpdateThread.start();
@@ -484,8 +548,17 @@ public class BluetoothOppService extends Service {
     }
 
     private class UpdateThread extends Thread {
+        private boolean isInterrupted ;
         public UpdateThread() {
             super("Bluetooth Share Service");
+            isInterrupted = false;
+        }
+
+        @Override
+        public void interrupt() {
+            isInterrupted = true;
+            if (D) Log.d(TAG, "Interrupted :" + isInterrupted);
+            super.interrupt();
         }
 
         @Override
@@ -493,14 +566,15 @@ public class BluetoothOppService extends Service {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
 
             boolean keepService = false;
-            for (;;) {
+            for (; !isInterrupted;) {
                 synchronized (BluetoothOppService.this) {
                     if (mUpdateThread != this) {
                         throw new IllegalStateException(
                                 "multiple UpdateThreads in BluetoothOppService");
                     }
                     if (V) Log.v(TAG, "pendingUpdate is " + mPendingUpdate + " keepUpdateThread is "
-                                + keepService + " sListenStarted is " + mListenStarted);
+                        + keepService + " sListenStarted is " + mListenStarted + " isInterrupted :"
+                        + isInterrupted + " isScreenOff:" + isScreenOff);
                     if (!mPendingUpdate) {
                         mUpdateThread = null;
                         if (!keepService && !mListenStarted) {
@@ -512,12 +586,12 @@ public class BluetoothOppService extends Service {
                         return;
                     }
                     try {
-                        if (!mPowerManager.isInteractive())
-                            Thread.sleep(10);
+                        if (isScreenOff && !isInterrupted) {
+                            Thread.sleep(1000);
+                        }
                     } catch (InterruptedException e) {
                             Log.e(TAG, "Interrupted", e);
                     }
-
                     mPendingUpdate = false;
                 }
                 Cursor cursor;
@@ -639,8 +713,9 @@ public class BluetoothOppService extends Service {
                         }
                     }
                 }
-
-                mNotifier.updateNotification();
+                if (mListenStarted ) {
+                    mNotifier.updateNotification();
+                }
 
                 cursor.close();
                 cursor = null;
