@@ -917,9 +917,11 @@ public class BluetoothPbapVcardManager {
             });
 
             if (startPoint == endPoint) {
+                int currentIndex = 0;
                 while (contactCursor.moveToNext()) {
                     long currentContactId = contactCursor.getLong(contactIdColumn);
-                    if (currentContactId == startPoint) {
+                    currentIndex++;
+                    if (currentIndex == startPoint) {
                         contactIdsCursor.addRow(new Long[]{currentContactId});
                         if (V) Log.v(TAG, "contactIdsCursor.addRow: " + currentContactId);
                         break;
