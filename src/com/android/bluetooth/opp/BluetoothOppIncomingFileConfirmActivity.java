@@ -44,6 +44,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -163,6 +164,9 @@ public class BluetoothOppIncomingFileConfirmActivity extends AlertActivity imple
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            return super.onKeyDown(keyCode,event);
+	}
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (D) Log.d(TAG, "onKeyDown() called; Key: back key");
             mUpdateValues = new ContentValues();
