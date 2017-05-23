@@ -325,6 +325,7 @@ final class BondStateMachine extends StateMachine {
                Log.e(TAG, "Unexpected error while removing bond:");
             } else {
                 if (transition) transitionTo(mPendingCommandState);
+                dev.setAlias(null);
                 return true;
             }
 
