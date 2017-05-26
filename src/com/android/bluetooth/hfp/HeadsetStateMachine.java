@@ -1037,8 +1037,9 @@ final class HeadsetStateMachine extends StateMachine {
                 case CONNECT_AUDIO:
                 {
                     BluetoothDevice device = mCurrentDevice;
-                    if (!isScoAcceptable()) {
-                        Log.w(TAG,"No Active/Held call, MO call setup, not allowing SCO");
+                    if (!isScoAcceptable() || mPendingCiev) {
+                        Log.w(TAG,"No Active/Held call, MO call setup, or A2DP"
+                                    + " is playing, not allowing SCO");
                         break;
                     }
                     // TODO(BT) when failure, broadcast audio connecting to disconnected intent
