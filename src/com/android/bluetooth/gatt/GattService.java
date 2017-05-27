@@ -1483,7 +1483,9 @@ public class GattService extends ProfileService {
 
     void stopMultiAdvertising(AdvertiseClient client) {
         enforceAdminPermission();
-        mAdvertiseManager.stopAdvertising(client);
+        if (mAdvertiseManager != null) {
+            mAdvertiseManager.stopAdvertising(client);
+        }
     }
 
     int numHwTrackFiltersAvailable() {
