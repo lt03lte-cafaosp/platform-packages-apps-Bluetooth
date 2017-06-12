@@ -1107,10 +1107,6 @@ public final class Avrcp {
                         BTRC_FEAT_BROWSE) != 0)
                 {
                     Log.v(TAG,"BTRC_FEAT_BROWSE support is present on remote side");
-                    deviceFeatures[deviceIndex].mCurrentPath = PATH_ROOT;
-                    deviceFeatures[deviceIndex].mCurrentPathUid = null;
-                    deviceFeatures[deviceIndex].mMediaUri = Uri.parse("content://media/external/audio/media");
-                    Log.v(TAG," update current path to root folder before browse");
                     deviceFeatures[deviceIndex].isBrowsingSupported = true;
                     mBrowserDevice = device;
                     Log.v(TAG,"Browsing supported by remote : mBrowserDevice = " + mBrowserDevice);
@@ -2662,7 +2658,7 @@ public final class Avrcp {
             retError = OPERATION_SUCCESSFUL;
             folderPath.add(PATH_ROOT);
 
-            if (deviceFeatures[deviceIndex].mCurrentPath.equals(PATH_ROOT)) {
+            if (CurrentPath.equals(PATH_ROOT)) {
                 num_attributes = NUM_ROOT_ELEMENTS;
                 folder_depth = 0;
 
@@ -2820,6 +2816,7 @@ public final class Avrcp {
                 }
 
             } else {
+                Log.e(TAG, "Current path either not set or invalid");
                 folderPath.clear();
                 retError =  INTERNAL_ERROR;
                 num_attributes = 0;
@@ -6048,6 +6045,11 @@ public final class Avrcp {
             if (deviceFeatures[i].mCurrentDevice == null) {
                 deviceFeatures[i].mCurrentDevice = device;
                 deviceFeatures[i].isActiveDevice = true;
+                deviceFeatures[i].mCurrentPath = PATH_ROOT;
+                deviceFeatures[i].mCurrentPathUid = null;
+                deviceFeatures[i].mMediaUri = Uri.parse
+                        ("content://media/external/audio/media");
+                Log.v(TAG,"update current path to root folder during connect");
                 /*Playstate is explicitly updated here to take care of cases
                         where play state update is missed because of that happening
                         even before Avrcp connects*/
