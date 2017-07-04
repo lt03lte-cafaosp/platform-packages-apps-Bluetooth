@@ -788,12 +788,14 @@ public class BluetoothPbapService extends Service implements IObexConnectionHand
                     intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
                     intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                                     BluetoothDevice.REQUEST_TYPE_PHONEBOOK_ACCESS);
+                    intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
                     sendBroadcast(intent);
                     mIsWaitingAuthorization = false;
                     stopObexServerSession();
                     break;
                 case AUTH_TIMEOUT:
                     Intent i = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
+                    i.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
                     sendBroadcast(i);
                     removePbapNotification(NOTIFICATION_ID_AUTH);
                     notifyAuthCancelled();
